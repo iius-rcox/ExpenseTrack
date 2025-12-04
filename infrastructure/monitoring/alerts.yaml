@@ -1,0 +1,56 @@
+# Container Insights Alert Rules for ExpenseFlow
+# These alerts integrate with Azure Monitor via Container Insights
+
+# Note: These are reference configurations for Azure Monitor alert rules
+# They can be applied via Azure CLI or ARM templates
+
+# Alert: High CPU Usage
+# az monitor metrics alert create \
+#   --name "expenseflow-high-cpu" \
+#   --resource-group rg_prod \
+#   --scopes "/subscriptions/a78954fe-f6fe-4279-8be0-2c748be2f266/resourceGroups/rg_prod/providers/Microsoft.ContainerService/managedClusters/dev-aks" \
+#   --condition "avg node_cpu_usage_percentage > 80" \
+#   --window-size 5m \
+#   --evaluation-frequency 1m \
+#   --severity 2
+
+# Alert: High Memory Usage
+# az monitor metrics alert create \
+#   --name "expenseflow-high-memory" \
+#   --resource-group rg_prod \
+#   --scopes "/subscriptions/a78954fe-f6fe-4279-8be0-2c748be2f266/resourceGroups/rg_prod/providers/Microsoft.ContainerService/managedClusters/dev-aks" \
+#   --condition "avg node_memory_working_set_percentage > 85" \
+#   --window-size 5m \
+#   --evaluation-frequency 1m \
+#   --severity 2
+
+# Alert: Pod Restart Count
+# az monitor metrics alert create \
+#   --name "expenseflow-pod-restarts" \
+#   --resource-group rg_prod \
+#   --scopes "/subscriptions/a78954fe-f6fe-4279-8be0-2c748be2f266/resourceGroups/rg_prod/providers/Microsoft.ContainerService/managedClusters/dev-aks" \
+#   --condition "sum restartingContainerCount > 5" \
+#   --window-size 15m \
+#   --evaluation-frequency 5m \
+#   --severity 3
+
+# Alert: Database Pod Not Ready
+# This uses a log-based alert for Supabase PostgreSQL health
+# az monitor scheduled-query create \
+#   --name "expenseflow-db-health" \
+#   --resource-group rg_prod \
+#   --scopes "/subscriptions/a78954fe-f6fe-4279-8be0-2c748be2f266/resourceGroups/rg_prod/providers/Microsoft.ContainerService/managedClusters/dev-aks" \
+#   --condition "count KubePodInventory | where Namespace == 'expenseflow-dev' and Name startswith 'supabase-postgresql' and PodStatus != 'Running' | count > 0" \
+#   --window-size 5m \
+#   --evaluation-frequency 1m \
+#   --severity 1
+
+# Recommended Alert Configuration:
+#
+# | Alert Name | Metric | Threshold | Severity |
+# |------------|--------|-----------|----------|
+# | High CPU | node_cpu_usage_percentage | > 80% | 2 (Warning) |
+# | High Memory | node_memory_working_set_percentage | > 85% | 2 (Warning) |
+# | Pod Restarts | restartingContainerCount | > 5/15min | 3 (Info) |
+# | DB Not Ready | KubePodInventory.PodStatus | != Running | 1 (Critical) |
+# | PVC Usage | pvUsedBytes/pvCapacityBytes | > 80% | 2 (Warning) |

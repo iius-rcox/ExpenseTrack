@@ -40,3 +40,25 @@ logs/
 *.tmp
 *.temp
 .cache/
+
+# Claude / AI Assistant files
+# Claude Desktop conversation history and settings
+.claude/
+claude-*.json
+*.claude
+
+# Cursor IDE / Claude AI integration
+.cursor/
+.cursorrules
+.cursorignore
+
+# AI-generated code artifacts
+*.ai.md
+*.claude.md
+ai-suggestions/
+claude-suggestions/
+
+# Conversation exports and backups
+conversations/
+*.conversation
+claude-exports/

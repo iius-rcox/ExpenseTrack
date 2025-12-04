@@ -1,0 +1,155 @@
+# Supabase Helm Values for ExpenseFlow
+# Auth and Storage disabled - using Entra ID and Azure Blob respectively
+# Image versions pinned from official docker-compose.yml (2025-11-26)
+
+# Required secrets (hex-encoded for sed compatibility)
+secret:
+  jwt:
+    anonKey: "72b670006b7007cc4fdf4f8936aa3a8ac918eaafd13c39055fe4ca8da2f540f2"
+    serviceKey: "adfacbc27278f91596927d1bfb70c1b59b1929b5fdcb590649672eaa5bbe27b6"
+    secret: "48d03da7317b97019dcb466e521e676a6928212d63fa55ff3428f48978d601c4"
+  db:
+    username: "postgres"
+    password: "0522f6633df254e6afe49f3eee40e3e1"
+    database: "postgres"
+  dashboard:
+    username: "admin"
+    password: "b0c163e637ecbad1"
+
+# Database configuration
+db:
+  enabled: true
+  image:
+    repository: supabase/postgres
+    pullPolicy: IfNotPresent
+    tag: "15.8.1.085"  # PostgreSQL 15 with pgvector
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  persistence:
+    enabled: true
+    storageClassName: managed-csi-premium
+    size: 20Gi
+    accessModes:
+      - ReadWriteOnce
+
+# Studio - Supabase Dashboard UI
+studio:
+  enabled: true
+  image:
+    repository: supabase/studio
+    pullPolicy: IfNotPresent
+    tag: "2025.11.26-sha-8f096b5"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Auth - DISABLED (using Entra ID)
+auth:
+  enabled: false
+
+# Storage - DISABLED (using Azure Blob)
+storage:
+  enabled: false
+
+# Realtime - WebSocket subscriptions for live updates
+realtime:
+  enabled: true
+  image:
+    repository: supabase/realtime
+    pullPolicy: IfNotPresent
+    tag: "v2.33.70"  # From official docker-compose.yml
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+  environment:
+    DB_USER: supabase_admin
+    DB_PORT: "5432"
+    DB_SSL: "false"  # Boolean as string - internal cluster, no SSL needed
+    DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+    DB_ENC_KEY: supabaserealtime
+    PORT: "4000"
+    APP_NAME: realtime
+    FLY_ALLOC_ID: fly123
+    FLY_APP_NAME: realtime
+    SECRET_KEY_BASE: "UpNVntn3cDxHJpq99YMc1T1AQgQpc8kfYTuRgBiYa15BLrx8etQoXz3gZv1/u2oq"
+    ERL_AFLAGS: "-proto_dist inet_tcp"
+    ENABLE_TAILSCALE: "false"
+    DNS_NODES: "''"
+
+# Kong - API Gateway (required for Studio and API access)
+kong:
+  enabled: true
+  image:
+    repository: kong
+    pullPolicy: IfNotPresent
+    tag: "2.8.1"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# REST - PostgREST (required for REST API)
+rest:
+  enabled: true
+  image:
+    repository: postgrest/postgrest
+    pullPolicy: IfNotPresent
+    tag: "v13.0.7"
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# Meta - Metadata service
+meta:
+  enabled: true
+  image:
+    repository: supabase/postgres-meta
+    pullPolicy: IfNotPresent
+    tag: "v0.93.1"
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# Image Proxy - disabled (not needed)
+imgproxy:
+  enabled: false
+
+# Analytics - disabled (using Container Insights)
+analytics:
+  enabled: false
+
+# Vector - disabled (not needed for MVP)
+vector:
+  enabled: false
+
+# Functions - disabled (not needed for MVP)
+functions:
+  enabled: false
+
+# Minio - disabled (using Azure Blob)
+minio:
+  enabled: false

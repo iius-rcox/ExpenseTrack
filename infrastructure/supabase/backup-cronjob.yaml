@@ -1,0 +1,47 @@
+# Daily PostgreSQL backup CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: supabase-backup
+  namespace: expenseflow-dev
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: postgres:15-alpine  # Explicit tag for Azure Policy
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: supabase-db
+                  key: password
+            command:
+            - /bin/sh
+            - -c
+            - |
+              pg_dump -h supabase-supabase-db -U postgres -d postgres | \
+              gzip > /backup/backup-$(date +%Y%m%d-%H%M%S).sql.gz
+              # Keep only last 7 days of backups
+              find /backup -name "*.sql.gz" -mtime +7 -delete
+            volumeMounts:
+            - name: backup-volume
+              mountPath: /backup
+          volumes:
+          - name: backup-volume
+            persistentVolumeClaim:
+              claimName: supabase-backup-pvc
+          restartPolicy: OnFailure
