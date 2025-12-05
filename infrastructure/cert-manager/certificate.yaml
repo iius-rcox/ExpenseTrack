@@ -1,0 +1,41 @@
+# Development Environment Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: expenseflow-dev-cert
+  namespace: expenseflow-dev
+spec:
+  secretName: expenseflow-dev-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - dev.expense.ii-us.com
+---
+# Studio Certificate (for Supabase Studio UI)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: studio-cert
+  namespace: expenseflow-dev
+spec:
+  secretName: studio-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - studio.expense.ii-us.com
+---
+# Staging Environment Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: expenseflow-staging-cert
+  namespace: expenseflow-staging
+spec:
+  secretName: expenseflow-staging-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - staging.expense.ii-us.com

@@ -1,0 +1,485 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Receipts API
+  description: API for receipt upload, processing, and management
+  version: 1.0.0
+  contact:
+    name: ExpenseFlow Team
+
+servers:
+  - url: /api
+    description: Base API path
+
+security:
+  - BearerAuth: []
+
+paths:
+  /receipts:
+    post:
+      summary: Upload receipt(s)
+      description: Upload one or more receipt files (PDF, JPG, PNG, HEIC). Max 20 files, 25MB each.
+      operationId: uploadReceipts
+      tags:
+        - Receipts
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  maxItems: 20
+                  description: Receipt files to upload
+              required:
+                - files
+      responses:
+        '201':
+          description: Receipts uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: File too large (max 25MB)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Document Intelligence service unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+    get:
+      summary: List receipts
+      description: Get paginated list of receipts for the authenticated user
+      operationId: listReceipts
+      tags:
+        - Receipts
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ReceiptStatus'
+          description: Filter by status
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter by created date (from)
+        - name: toDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter by created date (to)
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Items per page
+      responses:
+        '200':
+          description: Paginated list of receipts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /receipts/unmatched:
+    get:
+      summary: List unmatched receipts
+      description: Get receipts that haven't been matched to any transaction
+      operationId: listUnmatchedReceipts
+      tags:
+        - Receipts
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: List of unmatched receipts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /receipts/{id}:
+    get:
+      summary: Get receipt details
+      description: Get full details of a specific receipt including all extracted data
+      operationId: getReceipt
+      tags:
+        - Receipts
+      parameters:
+        - $ref: '#/components/parameters/ReceiptId'
+      responses:
+        '200':
+          description: Receipt details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update receipt
+      description: Manually update or correct receipt data
+      operationId: updateReceipt
+      tags:
+        - Receipts
+      parameters:
+        - $ref: '#/components/parameters/ReceiptId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReceiptUpdateRequest'
+      responses:
+        '200':
+          description: Receipt updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete receipt
+      description: Delete a receipt and its associated blob
+      operationId: deleteReceipt
+      tags:
+        - Receipts
+      parameters:
+        - $ref: '#/components/parameters/ReceiptId'
+      responses:
+        '204':
+          description: Receipt deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /receipts/{id}/retry:
+    post:
+      summary: Retry extraction
+      description: Requeue a failed receipt for Document Intelligence extraction
+      operationId: retryReceipt
+      tags:
+        - Receipts
+      parameters:
+        - $ref: '#/components/parameters/ReceiptId'
+      responses:
+        '202':
+          description: Receipt requeued for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptSummary'
+        '400':
+          description: Receipt cannot be retried (not in Error status or max retries reached)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Entra ID JWT token
+
+  parameters:
+    ReceiptId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Receipt unique identifier
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  schemas:
+    ReceiptStatus:
+      type: string
+      enum:
+        - Uploaded
+        - Processing
+        - Ready
+        - ReviewRequired
+        - Error
+        - Unmatched
+        - Matched
+
+    ReceiptLineItem:
+      type: object
+      properties:
+        description:
+          type: string
+          example: "Coffee Large"
+        quantity:
+          type: number
+          format: double
+          example: 2.0
+        unitPrice:
+          type: number
+          format: double
+          example: 4.50
+        totalPrice:
+          type: number
+          format: double
+          example: 9.00
+        confidence:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          example: 0.92
+
+    ConfidenceScores:
+      type: object
+      properties:
+        vendor:
+          type: number
+          format: double
+        date:
+          type: number
+          format: double
+        amount:
+          type: number
+          format: double
+        tax:
+          type: number
+          format: double
+        overall:
+          type: number
+          format: double
+
+    ReceiptSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        thumbnailUrl:
+          type: string
+          format: uri
+          nullable: true
+        originalFilename:
+          type: string
+        status:
+          $ref: '#/components/schemas/ReceiptStatus'
+        vendorExtracted:
+          type: string
+          nullable: true
+        dateExtracted:
+          type: string
+          format: date
+          nullable: true
+        amountExtracted:
+          type: number
+          format: double
+          nullable: true
+        currency:
+          type: string
+          example: "USD"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - originalFilename
+        - status
+        - createdAt
+
+    ReceiptDetail:
+      allOf:
+        - $ref: '#/components/schemas/ReceiptSummary'
+        - type: object
+          properties:
+            blobUrl:
+              type: string
+              format: uri
+            contentType:
+              type: string
+              example: "image/jpeg"
+            fileSize:
+              type: integer
+              format: int64
+            taxExtracted:
+              type: number
+              format: double
+              nullable: true
+            lineItems:
+              type: array
+              items:
+                $ref: '#/components/schemas/ReceiptLineItem'
+              nullable: true
+            confidenceScores:
+              $ref: '#/components/schemas/ConfidenceScores'
+              nullable: true
+            errorMessage:
+              type: string
+              nullable: true
+            retryCount:
+              type: integer
+            processedAt:
+              type: string
+              format: date-time
+              nullable: true
+
+    ReceiptUpdateRequest:
+      type: object
+      properties:
+        vendorExtracted:
+          type: string
+          maxLength: 255
+        dateExtracted:
+          type: string
+          format: date
+        amountExtracted:
+          type: number
+          format: double
+        taxExtracted:
+          type: number
+          format: double
+        currency:
+          type: string
+          maxLength: 3
+        lineItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceiptLineItem'
+
+    UploadResponse:
+      type: object
+      properties:
+        receipts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceiptSummary'
+        totalUploaded:
+          type: integer
+        failed:
+          type: array
+          items:
+            type: object
+            properties:
+              filename:
+                type: string
+              error:
+                type: string
+      required:
+        - receipts
+        - totalUploaded
+
+    ReceiptListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceiptSummary'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalCount:
+          type: integer
+        totalPages:
+          type: integer
+      required:
+        - items
+        - page
+        - pageSize
+        - totalCount
+        - totalPages
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        traceId:
+          type: string

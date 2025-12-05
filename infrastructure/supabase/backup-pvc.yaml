@@ -1,0 +1,13 @@
+# Persistent Volume Claim for database backups
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: supabase-backup-pvc
+  namespace: expenseflow-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: managed-csi-premium
+  resources:
+    requests:
+      storage: 10Gi

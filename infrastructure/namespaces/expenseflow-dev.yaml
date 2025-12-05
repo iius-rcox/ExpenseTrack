@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: expenseflow-dev
+  labels:
+    name: expenseflow-dev
+    environment: development
+    app.kubernetes.io/part-of: expenseflow
