@@ -1,0 +1,388 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow API
+  description: Core Backend API for ExpenseFlow expense management system
+  version: 1.0.0
+  contact:
+    name: ExpenseFlow Team
+
+servers:
+  - url: https://dev.expense.ii-us.com/api
+    description: Development server
+  - url: https://staging.expense.ii-us.com/api
+    description: Staging server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: getHealth
+      tags:
+        - Health
+      security: []  # No auth required
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /users/me:
+    get:
+      summary: Get current user profile
+      operationId: getCurrentUser
+      tags:
+        - Users
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reference/gl-accounts:
+    get:
+      summary: List all active GL accounts
+      operationId: listGLAccounts
+      tags:
+        - Reference Data
+      parameters:
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+            default: true
+          description: Filter to active accounts only
+      responses:
+        '200':
+          description: List of GL accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GLAccountResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reference/departments:
+    get:
+      summary: List all active departments
+      operationId: listDepartments
+      tags:
+        - Reference Data
+      parameters:
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+            default: true
+          description: Filter to active departments only
+      responses:
+        '200':
+          description: List of departments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DepartmentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reference/projects:
+    get:
+      summary: List all active projects
+      operationId: listProjects
+      tags:
+        - Reference Data
+      parameters:
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+            default: true
+          description: Filter to active projects only
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reference/sync:
+    post:
+      summary: Trigger reference data sync (admin only)
+      operationId: triggerReferenceSync
+      tags:
+        - Reference Data
+      responses:
+        '202':
+          description: Sync job enqueued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobEnqueuedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /cache/stats:
+    get:
+      summary: Get cache statistics (admin only)
+      operationId: getCacheStats
+      tags:
+        - Cache
+      responses:
+        '200':
+          description: Cache statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CacheStatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Entra ID JWT token
+
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+
+    UserResponse:
+      type: object
+      required:
+        - id
+        - email
+        - displayName
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        department:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+
+    GLAccountResponse:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - isActive
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          maxLength: 10
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+
+    DepartmentResponse:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - isActive
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          maxLength: 20
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+
+    ProjectResponse:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - isActive
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          maxLength: 50
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+
+    JobEnqueuedResponse:
+      type: object
+      required:
+        - jobId
+        - status
+        - enqueuedAt
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [enqueued, processing]
+        enqueuedAt:
+          type: string
+          format: date-time
+        estimatedCompletion:
+          type: string
+          format: date-time
+          nullable: true
+
+    CacheStatsResponse:
+      type: object
+      required:
+        - descriptionCache
+        - vendorAliases
+        - statementFingerprints
+        - expenseEmbeddings
+        - splitPatterns
+      properties:
+        descriptionCache:
+          $ref: '#/components/schemas/CacheTableStats'
+        vendorAliases:
+          $ref: '#/components/schemas/CacheTableStats'
+        statementFingerprints:
+          $ref: '#/components/schemas/CacheTableStats'
+        expenseEmbeddings:
+          $ref: '#/components/schemas/CacheTableStats'
+        splitPatterns:
+          $ref: '#/components/schemas/CacheTableStats'
+
+    CacheTableStats:
+      type: object
+      required:
+        - totalEntries
+        - totalHits
+      properties:
+        totalEntries:
+          type: integer
+        totalHits:
+          type: integer
+        hitRate:
+          type: number
+          format: float
+          description: Hit rate percentage (0-100)
+
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://httpstatuses.com/401"
+            title: "Unauthorized"
+            status: 401
+            detail: "Missing or invalid authentication token"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://httpstatuses.com/403"
+            title: "Forbidden"
+            status: 403
+            detail: "Administrator role required for this operation"
+
+tags:
+  - name: Health
+    description: Service health and readiness
+  - name: Users
+    description: User profile management
+  - name: Reference Data
+    description: GL accounts, departments, and projects
+  - name: Cache
+    description: Cache management and statistics

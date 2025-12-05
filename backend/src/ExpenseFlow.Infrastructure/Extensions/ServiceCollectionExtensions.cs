@@ -1,0 +1,51 @@
+using ExpenseFlow.Core.Interfaces;
+using ExpenseFlow.Core.Services;
+using ExpenseFlow.Infrastructure.Jobs;
+using ExpenseFlow.Infrastructure.Repositories;
+using ExpenseFlow.Infrastructure.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace ExpenseFlow.Infrastructure.Extensions;
+
+/// <summary>
+/// Extension methods for registering ExpenseFlow services in DI container.
+/// </summary>
+public static class ServiceCollectionExtensions
+{
+    /// <summary>
+    /// Adds all ExpenseFlow application services to the DI container.
+    /// </summary>
+    public static IServiceCollection AddExpenseFlowServices(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // User services (US1)
+        services.AddScoped<IUserService, UserService>();
+
+        // Cache services (US2)
+        services.AddScoped<IDescriptionCacheService, DescriptionCacheService>();
+        services.AddScoped<IVendorAliasService, VendorAliasService>();
+        services.AddScoped<IStatementFingerprintService, StatementFingerprintService>();
+        services.AddScoped<IExpenseEmbeddingService, ExpenseEmbeddingService>();
+        services.AddScoped<ICacheStatsService, CacheStatsService>();
+
+        // Background job services (US3)
+        services.AddScoped<IBackgroundJobService, BackgroundJobService>();
+
+        // Reference data services (US4)
+        services.AddScoped<IReferenceDataService, ReferenceDataService>();
+        services.AddScoped<IExternalDataSource, SqlServerDataSource>();
+
+        // Sprint 3: Receipt Upload Pipeline
+        services.AddScoped<IReceiptRepository, ReceiptRepository>();
+        services.AddScoped<IReceiptService, ReceiptService>();
+        services.AddScoped<IBlobStorageService, BlobStorageService>();
+        services.AddScoped<IHeicConversionService, HeicConversionService>();
+        services.AddScoped<IDocumentIntelligenceService, DocumentIntelligenceService>();
+        services.AddScoped<IThumbnailService, ThumbnailService>();
+        services.AddScoped<IReceiptProcessingJob, ProcessReceiptJob>();
+
+        return services;
+    }
+}

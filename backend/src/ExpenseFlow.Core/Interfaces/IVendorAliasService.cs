@@ -1,0 +1,42 @@
+using ExpenseFlow.Core.Entities;
+
+namespace ExpenseFlow.Core.Interfaces;
+
+/// <summary>
+/// Service interface for vendor alias operations.
+/// </summary>
+public interface IVendorAliasService
+{
+    /// <summary>
+    /// Finds a vendor alias matching the given description.
+    /// </summary>
+    /// <param name="description">Transaction description to match.</param>
+    /// <returns>The matching alias if found, null otherwise.</returns>
+    Task<VendorAlias?> FindMatchingAliasAsync(string description);
+
+    /// <summary>
+    /// Gets a vendor alias by its canonical name.
+    /// </summary>
+    /// <param name="canonicalName">The standardized vendor name.</param>
+    /// <returns>The alias if found, null otherwise.</returns>
+    Task<VendorAlias?> GetByCanonicalNameAsync(string canonicalName);
+
+    /// <summary>
+    /// Adds or updates a vendor alias.
+    /// </summary>
+    /// <param name="alias">The vendor alias to add or update.</param>
+    /// <returns>The saved alias.</returns>
+    Task<VendorAlias> AddOrUpdateAsync(VendorAlias alias);
+
+    /// <summary>
+    /// Records a match for the given alias.
+    /// </summary>
+    /// <param name="aliasId">The alias ID.</param>
+    Task RecordMatchAsync(Guid aliasId);
+
+    /// <summary>
+    /// Gets cache statistics.
+    /// </summary>
+    /// <returns>Total entries and total matches.</returns>
+    Task<(int TotalEntries, int TotalHits)> GetStatsAsync();
+}

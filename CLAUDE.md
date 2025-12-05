@@ -1,8 +1,12 @@
-# ExpenseFlow Development Guidelines
+﻿# ExpenseFlow Development Guidelines
 
 Auto-generated from feature plans. Last updated: 2025-12-03
 
 ## Active Technologies
+- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Microsoft.Identity.Web, Polly (002-core-backend-auth)
+- PostgreSQL 15+ (Supabase self-hosted with pgvector), Azure Blob Storage (002-core-backend-auth)
+- .NET 8 with C# 12 + ASP.NET Core Web API + Entity Framework Core 8, Npgsql, Hangfire, Azure.AI.FormRecognizer, Azure.Storage.Blobs, SkiaSharp (003-receipt-pipeline)
+- PostgreSQL 15+ (Supabase self-hosted), Azure Blob Storage (ccproctemp2025) (003-receipt-pipeline)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -91,14 +95,11 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 003-receipt-pipeline: Added .NET 8 with C# 12 + ASP.NET Core Web API + Entity Framework Core 8, Npgsql, Hangfire, Azure.AI.FormRecognizer, Azure.Storage.Blobs, SkiaSharp
+- 002-core-backend-auth: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Microsoft.Identity.Web, Polly
 
 ### 001-infrastructure-setup (Current)
 - Added cert-manager for Let's Encrypt TLS certificates
-- Deployed Supabase self-hosted with PostgreSQL 15 + pgvector + Studio + Realtime
-- Supabase Auth disabled (using Entra ID), Supabase Storage disabled (using Azure Blob)
-- Created expenseflow-dev and expenseflow-staging namespaces
-- Configured zero-trust network policies
-- Set up Azure Blob Storage container for receipts
 
 ## Key Decisions
 

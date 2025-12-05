@@ -32,6 +32,16 @@ dist/
 build/
 *.egg-info/
 
+# .NET
+bin/
+obj/
+*.user
+*.suo
+packages/
+*.nupkg
+project.lock.json
+.vs/
+
 # Logs
 *.log
 logs/
