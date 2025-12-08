@@ -83,7 +83,9 @@ public class ProcessReceiptJob : IReceiptProcessingJob
 
             // Update receipt with extracted data
             receipt.VendorExtracted = extractionResult.VendorName;
-            receipt.DateExtracted = extractionResult.TransactionDate;
+            receipt.DateExtracted = extractionResult.TransactionDate.HasValue
+                ? DateOnly.FromDateTime(extractionResult.TransactionDate.Value)
+                : null;
             receipt.AmountExtracted = extractionResult.TotalAmount;
             receipt.TaxExtracted = extractionResult.TaxAmount;
             receipt.Currency = extractionResult.Currency ?? "USD";

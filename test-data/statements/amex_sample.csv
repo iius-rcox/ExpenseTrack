@@ -1,0 +1,7 @@
+Date,Description,Amount,Extended Details,Category,Card Member,Account #,Appears On Your Statement As
+01/15/2025,DELTA AIRLINES,425.00,Flight booking,Travel,John Smith,XXXX-1234,DELTA AIR LINES
+01/16/2025,UBER TRIP,32.50,Airport transfer,Travel,John Smith,XXXX-1234,UBER *TRIP
+01/17/2025,HILTON HOTELS,189.00,1 night stay,Travel,John Smith,XXXX-1234,HILTON GARDEN INN
+01/18/2025,PAYMENT RECEIVED,-500.00,Thank you,Payment,John Smith,XXXX-1234,PAYMENT
+01/19/2025,WHOLE FOODS MARKET,78.45,Groceries,Merchandise & Supplies,John Smith,XXXX-1234,WHOLE FOODS
+01/20/2025,APPLE.COM/BILL,14.99,iCloud storage,Business Services,John Smith,XXXX-1234,APPLE.COM/BILL

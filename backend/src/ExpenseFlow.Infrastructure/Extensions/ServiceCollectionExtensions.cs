@@ -46,6 +46,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IThumbnailService, ThumbnailService>();
         services.AddScoped<IReceiptProcessingJob, ProcessReceiptJob>();
 
+        // Sprint 4: Statement Import & Fingerprinting
+        services.AddScoped<ITransactionRepository, TransactionRepository>();
+        services.AddScoped<IStatementImportRepository, StatementImportRepository>();
+        services.AddScoped<IStatementParsingService, StatementParsingService>();
+        services.AddScoped<IColumnMappingInferenceService, ColumnMappingInferenceService>();
+        services.AddSingleton<AnalysisSessionCache>();
+
         return services;
     }
 }

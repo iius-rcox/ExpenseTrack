@@ -34,4 +34,12 @@ public interface IBlobStorageService
     /// <param name="blobUrl">Full URL to the blob</param>
     /// <returns>Stream containing the blob content</returns>
     Task<Stream> DownloadAsync(string blobUrl);
+
+    /// <summary>
+    /// Generates the standard blob path for a receipt.
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <param name="originalFilename">Original filename</param>
+    /// <returns>Blob path in format: receipts/{userId}/{year}/{month}/{uuid}_{filename}</returns>
+    string GenerateReceiptPath(Guid userId, string originalFilename);
 }
