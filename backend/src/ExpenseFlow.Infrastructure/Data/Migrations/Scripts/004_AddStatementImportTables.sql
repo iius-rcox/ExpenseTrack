@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     post_date DATE,
     description VARCHAR(500) NOT NULL,
     original_description VARCHAR(500) NOT NULL,
-    amount NUMERIC(12, 2) NOT NULL,
+    amount NUMERIC(18, 2) NOT NULL,
     category VARCHAR(100),
     memo VARCHAR(500),
     reference VARCHAR(100),

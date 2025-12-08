@@ -86,7 +86,7 @@ namespace ExpenseFlow.Infrastructure.Data.Migrations
                     post_date = table.Column<DateOnly>(type: "date", nullable: true),
                     description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     original_description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    amount = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
+                    amount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     category = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     memo = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     reference = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),

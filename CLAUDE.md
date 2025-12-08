@@ -101,7 +101,7 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - 003-receipt-pipeline: Added .NET 8 with C# 12 + ASP.NET Core Web API + Entity Framework Core 8, Npgsql, Hangfire, Azure.AI.FormRecognizer, Azure.Storage.Blobs, SkiaSharp
 - 002-core-backend-auth: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Microsoft.Identity.Web, Polly
 
-### 001-infrastructure-setup (Current)
+### 001-infrastructure-setup
 
 ## Key Decisions
 
