@@ -39,9 +39,22 @@ builder.Services.AddDbContext<ExpenseFlowDbContext>(options =>
         });
 });
 
-// Configure Authentication with Entra ID
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+// Configure Authentication
+var useDevAuth = builder.Configuration.GetValue<bool>("UseDevAuth", false);
+if (useDevAuth && builder.Environment.IsDevelopment())
+{
+    // Development-only: Use mock authentication (NEVER use in production)
+    builder.Services.AddAuthentication(ExpenseFlow.Api.Middleware.DevAuthenticationHandler.SchemeName)
+        .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ExpenseFlow.Api.Middleware.DevAuthenticationHandler>(
+            ExpenseFlow.Api.Middleware.DevAuthenticationHandler.SchemeName, null);
+    Log.Warning("DEV AUTH ENABLED - This should NEVER be used in production!");
+}
+else
+{
+    // Production: Use Entra ID authentication
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+}
 
 // Configure Authorization policies
 builder.Services.AddAuthorizationBuilder()
@@ -60,6 +73,9 @@ builder.Services.AddHangfireServer(options =>
 {
     options.WorkerCount = builder.Configuration.GetValue("Hangfire:WorkerCount", 2);
 });
+
+// Add memory cache for session storage
+builder.Services.AddMemoryCache();
 
 // Register application services
 builder.Services.AddExpenseFlowServices(builder.Configuration);

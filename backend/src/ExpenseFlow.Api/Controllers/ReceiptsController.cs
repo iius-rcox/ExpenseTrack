@@ -414,7 +414,7 @@ public class ReceiptsController : ApiControllerBase
             OriginalFilename = receipt.OriginalFilename,
             Status = receipt.Status,
             Vendor = receipt.VendorExtracted,
-            Date = receipt.DateExtracted,
+            Date = receipt.DateExtracted?.ToDateTime(TimeOnly.MinValue),
             Amount = receipt.AmountExtracted,
             Currency = receipt.Currency ?? "USD",
             CreatedAt = receipt.CreatedAt
@@ -430,7 +430,7 @@ public class ReceiptsController : ApiControllerBase
             OriginalFilename = receipt.OriginalFilename,
             Status = receipt.Status,
             Vendor = receipt.VendorExtracted,
-            Date = receipt.DateExtracted,
+            Date = receipt.DateExtracted?.ToDateTime(TimeOnly.MinValue),
             Amount = receipt.AmountExtracted,
             Currency = receipt.Currency ?? "USD",
             CreatedAt = receipt.CreatedAt,

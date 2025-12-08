@@ -123,6 +123,10 @@ public class BlobStorageService : IBlobStorageService
         return containerClient.GetBlobClient(blobPath);
     }
 
+    /// <inheritdoc />
+    string IBlobStorageService.GenerateReceiptPath(Guid userId, string originalFilename)
+        => GenerateReceiptPath(userId, originalFilename);
+
     /// <summary>
     /// Generates the standard blob path for a receipt.
     /// </summary>

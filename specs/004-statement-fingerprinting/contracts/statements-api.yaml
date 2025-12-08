@@ -1,0 +1,524 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Statements API
+  description: API for importing credit card statements with automatic column detection
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: Base API path
+
+tags:
+  - name: Statements
+    description: Statement import operations
+  - name: Transactions
+    description: Transaction management
+
+paths:
+  /statements/analyze:
+    post:
+      tags:
+        - Statements
+      summary: Analyze uploaded statement file
+      description: |
+        Uploads a statement file and analyzes it to detect column mappings.
+        Returns fingerprint match (Tier 1) or AI-inferred mapping (Tier 3).
+        If both user and system fingerprints match, returns both options.
+      operationId: analyzeStatement
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV or Excel file (.csv, .xlsx, .xls)
+      responses:
+        '200':
+          description: Analysis complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatementAnalyzeResponse'
+        '400':
+          description: Invalid file format or missing header row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: AI service unavailable (for unknown formats)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /statements/import:
+    post:
+      tags:
+        - Statements
+      summary: Import transactions with confirmed mapping
+      description: |
+        Imports transactions from the analyzed file using the specified column mapping.
+        Automatically skips duplicates and rows missing required fields.
+        Creates or updates fingerprint based on confirmed mapping.
+      operationId: importStatement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatementImportRequest'
+      responses:
+        '200':
+          description: Import complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatementImportResponse'
+        '400':
+          description: Invalid mapping or expired analysis session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /statements/imports:
+    get:
+      tags:
+        - Statements
+      summary: List recent import history
+      description: Returns paginated list of statement imports for the current user
+      operationId: listImports
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Import history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatementImportListResponse'
+
+  /statements/fingerprints:
+    get:
+      tags:
+        - Statements
+      summary: List user's saved fingerprints
+      description: Returns all fingerprints available to the user (user-specific + system)
+      operationId: listFingerprints
+      responses:
+        '200':
+          description: List of fingerprints
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FingerprintListResponse'
+
+  /transactions:
+    get:
+      tags:
+        - Transactions
+      summary: List transactions
+      description: Returns paginated list of imported transactions
+      operationId: listTransactions
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: matched
+          in: query
+          schema:
+            type: boolean
+          description: Filter by receipt match status
+        - name: importId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by specific import batch
+      responses:
+        '200':
+          description: Transaction list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionListResponse'
+
+  /transactions/{id}:
+    get:
+      tags:
+        - Transactions
+      summary: Get transaction details
+      operationId: getTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionDetail'
+        '404':
+          description: Transaction not found
+
+    delete:
+      tags:
+        - Transactions
+      summary: Delete a transaction
+      operationId: deleteTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Transaction deleted
+        '404':
+          description: Transaction not found
+
+components:
+  schemas:
+    StatementAnalyzeResponse:
+      type: object
+      required:
+        - analysisId
+        - headers
+        - sampleRows
+        - mappingOptions
+      properties:
+        analysisId:
+          type: string
+          format: uuid
+          description: Temporary ID for this analysis session (expires in 30 minutes)
+        fileName:
+          type: string
+          description: Original filename
+        rowCount:
+          type: integer
+          description: Total rows in file (excluding header)
+        headers:
+          type: array
+          items:
+            type: string
+          description: Column headers from file
+        sampleRows:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+          maxItems: 5
+          description: First 5 data rows for preview
+        mappingOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/MappingOption'
+          description: Available mapping options (may include both fingerprint and AI)
+
+    MappingOption:
+      type: object
+      required:
+        - source
+        - tier
+        - columnMapping
+      properties:
+        source:
+          type: string
+          enum: [system_fingerprint, user_fingerprint, ai_inference]
+        tier:
+          type: integer
+          enum: [1, 3]
+          description: 1 = cached fingerprint, 3 = AI inference
+        fingerprintId:
+          type: string
+          format: uuid
+          description: Present for fingerprint sources
+        sourceName:
+          type: string
+          description: Friendly name (e.g., "Chase Business Card")
+        columnMapping:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [date, post_date, description, amount, category, memo, reference, ignore]
+        dateFormat:
+          type: string
+          description: Expected date format pattern
+        amountSign:
+          type: string
+          enum: [negative_charges, positive_charges]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: AI confidence score (for ai_inference source only)
+
+    StatementImportRequest:
+      type: object
+      required:
+        - analysisId
+        - columnMapping
+        - amountSign
+      properties:
+        analysisId:
+          type: string
+          format: uuid
+          description: From analyze response
+        columnMapping:
+          type: object
+          additionalProperties:
+            type: string
+          description: Confirmed column mapping
+        dateFormat:
+          type: string
+          description: Date format to use for parsing
+        amountSign:
+          type: string
+          enum: [negative_charges, positive_charges]
+        saveAsFingerprint:
+          type: boolean
+          default: true
+          description: Save mapping as user fingerprint for future use
+        fingerprintName:
+          type: string
+          description: Custom name for saved fingerprint
+
+    StatementImportResponse:
+      type: object
+      required:
+        - importId
+        - tierUsed
+        - imported
+        - skipped
+        - duplicates
+      properties:
+        importId:
+          type: string
+          format: uuid
+        tierUsed:
+          type: integer
+          enum: [1, 3]
+        imported:
+          type: integer
+          description: Successfully imported transaction count
+        skipped:
+          type: integer
+          description: Rows skipped due to missing required fields
+        duplicates:
+          type: integer
+          description: Duplicate rows not imported
+        fingerprintSaved:
+          type: boolean
+          description: Whether fingerprint was created/updated
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionSummary'
+          description: First 10 imported transactions as preview
+
+    StatementImportListResponse:
+      type: object
+      required:
+        - imports
+        - totalCount
+        - page
+        - pageSize
+      properties:
+        imports:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportSummary'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    ImportSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        fileName:
+          type: string
+        sourceName:
+          type: string
+          description: Fingerprint source name or "AI Detected"
+        tierUsed:
+          type: integer
+        transactionCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    FingerprintListResponse:
+      type: object
+      required:
+        - fingerprints
+      properties:
+        fingerprints:
+          type: array
+          items:
+            $ref: '#/components/schemas/FingerprintSummary'
+
+    FingerprintSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceName:
+          type: string
+        isSystem:
+          type: boolean
+        hitCount:
+          type: integer
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    TransactionListResponse:
+      type: object
+      required:
+        - transactions
+        - totalCount
+        - page
+        - pageSize
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionSummary'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        unmatchedCount:
+          type: integer
+          description: Total transactions without matched receipts
+
+    TransactionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        transactionDate:
+          type: string
+          format: date
+        description:
+          type: string
+        amount:
+          type: number
+        hasMatchedReceipt:
+          type: boolean
+
+    TransactionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        transactionDate:
+          type: string
+          format: date
+        postDate:
+          type: string
+          format: date
+          nullable: true
+        description:
+          type: string
+        originalDescription:
+          type: string
+        amount:
+          type: number
+        matchedReceiptId:
+          type: string
+          format: uuid
+          nullable: true
+        importId:
+          type: string
+          format: uuid
+        importFileName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Entra ID JWT token
+
+security:
+  - bearerAuth: []

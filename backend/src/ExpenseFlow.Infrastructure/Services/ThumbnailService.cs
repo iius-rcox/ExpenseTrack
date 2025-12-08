@@ -61,18 +61,18 @@ public class ThumbnailService : IThumbnailService
         using (image)
         {
             // Resize maintaining aspect ratio, then crop to exact size
-            image.Thumbnail(new MagickGeometry(width, height)
+            image.Thumbnail(new MagickGeometry((uint)width, (uint)height)
             {
                 IgnoreAspectRatio = false,
                 FillArea = true
             });
 
             // Center crop to exact dimensions
-            if (image.Width > width || image.Height > height)
+            if (image.Width > (uint)width || image.Height > (uint)height)
             {
-                var xOffset = (image.Width - width) / 2;
-                var yOffset = (image.Height - height) / 2;
-                image.Crop(new MagickGeometry(xOffset, yOffset, width, height));
+                var xOffset = (int)((image.Width - (uint)width) / 2);
+                var yOffset = (int)((image.Height - (uint)height) / 2);
+                image.Crop(new MagickGeometry(xOffset, yOffset, (uint)width, (uint)height));
             }
 
             // Convert to JPEG

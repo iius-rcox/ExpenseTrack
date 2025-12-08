@@ -38,16 +38,16 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
 
         try
         {
-            // Use the prebuilt receipt model
-            var content = new AnalyzeDocumentContent
-            {
-                Base64Source = await ConvertToBase64Async(documentStream)
-            };
+            // Use the prebuilt receipt model with BinaryData
+            using var memoryStream = new MemoryStream();
+            await documentStream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+            var binaryData = BinaryData.FromStream(memoryStream);
 
             var operation = await _client.AnalyzeDocumentAsync(
                 WaitUntil.Completed,
                 "prebuilt-receipt",
-                content);
+                binaryData);
 
             var analyzeResult = operation.Value;
 
@@ -95,7 +95,7 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
         // Extract TransactionDate
         if (receipt.Fields.TryGetValue("TransactionDate", out var dateField) && dateField.ValueDate.HasValue)
         {
-            result.TransactionDate = dateField.ValueDate.Value.ToDateTime(TimeOnly.MinValue);
+            result.TransactionDate = dateField.ValueDate.Value.DateTime;
             if (dateField.Confidence.HasValue)
             {
                 result.ConfidenceScores["TransactionDate"] = dateField.Confidence.Value;
@@ -128,9 +128,9 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
         {
             foreach (var item in itemsField.ValueList)
             {
-                if (item.ValueObject != null)
+                if (item.ValueDictionary != null)
                 {
-                    var lineItem = ExtractLineItem(item.ValueObject);
+                    var lineItem = ExtractLineItem(item.ValueDictionary);
                     if (lineItem != null)
                     {
                         result.LineItems.Add(lineItem);
@@ -152,9 +152,9 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
             hasData = true;
         }
 
-        if (itemFields.TryGetValue("Quantity", out var qtyField) && qtyField.ValueNumber.HasValue)
+        if (itemFields.TryGetValue("Quantity", out var qtyField) && qtyField.ValueDouble.HasValue)
         {
-            lineItem.Quantity = (decimal)qtyField.ValueNumber.Value;
+            lineItem.Quantity = (decimal)qtyField.ValueDouble.Value;
             hasData = true;
         }
 

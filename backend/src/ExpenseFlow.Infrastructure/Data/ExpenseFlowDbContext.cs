@@ -32,6 +32,10 @@ public class ExpenseFlowDbContext : DbContext
     // Sprint 3: Receipt Upload Pipeline
     public DbSet<Receipt> Receipts => Set<Receipt>();
 
+    // Sprint 4: Statement Import & Fingerprinting
+    public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<StatementImport> StatementImports => Set<StatementImport>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

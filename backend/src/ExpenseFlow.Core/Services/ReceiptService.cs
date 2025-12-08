@@ -83,7 +83,7 @@ public class ReceiptService : IReceiptService
 
         // Generate blob path and upload
         uploadStream.Position = 0;
-        var blobPath = Infrastructure.Services.BlobStorageService.GenerateReceiptPath(userId, finalFilename);
+        var blobPath = _blobStorageService.GenerateReceiptPath(userId, finalFilename);
         var blobUrl = await _blobStorageService.UploadAsync(uploadStream, blobPath, finalContentType);
 
         // Create receipt entity
@@ -201,7 +201,7 @@ public class ReceiptService : IReceiptService
 
         // Update fields if provided
         if (request.Vendor != null) receipt.VendorExtracted = request.Vendor;
-        if (request.Date.HasValue) receipt.DateExtracted = request.Date;
+        if (request.Date.HasValue) receipt.DateExtracted = DateOnly.FromDateTime(request.Date.Value);
         if (request.Amount.HasValue) receipt.AmountExtracted = request.Amount;
         if (request.Tax.HasValue) receipt.TaxExtracted = request.Tax;
         if (request.Currency != null) receipt.Currency = request.Currency;

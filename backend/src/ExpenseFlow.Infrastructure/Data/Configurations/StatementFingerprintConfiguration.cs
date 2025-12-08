@@ -19,9 +19,10 @@ public class StatementFingerprintConfiguration : IEntityTypeConfiguration<Statem
             .HasColumnName("id")
             .HasDefaultValueSql("gen_random_uuid()");
 
+        // UserId is nullable for system fingerprints
         builder.Property(s => s.UserId)
             .HasColumnName("user_id")
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(s => s.SourceName)
             .HasColumnName("source_name")
@@ -48,18 +49,32 @@ public class StatementFingerprintConfiguration : IEntityTypeConfiguration<Statem
             .HasDefaultValue("negative_charges")
             .IsRequired();
 
+        builder.Property(s => s.HitCount)
+            .HasColumnName("hit_count")
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(s => s.LastUsedAt)
+            .HasColumnName("last_used_at")
+            .IsRequired(false);
+
         builder.Property(s => s.CreatedAt)
             .HasColumnName("created_at")
             .HasDefaultValueSql("NOW()")
             .IsRequired();
 
-        // Relationships
+        // Ignore computed property
+        builder.Ignore(s => s.IsSystem);
+
+        // Relationships - optional User for system fingerprints
         builder.HasOne(s => s.User)
             .WithMany(u => u.StatementFingerprints)
             .HasForeignKey(s => s.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired(false);
 
-        // Unique constraint
+        // Unique constraint with NULLS NOT DISTINCT for PostgreSQL
+        // This ensures system fingerprints (UserId=NULL) also have unique header hashes
         builder.HasIndex(s => new { s.UserId, s.HeaderHash })
             .IsUnique()
             .HasDatabaseName("ix_statement_fingerprints_user_hash");

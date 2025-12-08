@@ -1,0 +1,164 @@
+using ExpenseFlow.Core.Interfaces;
+using ExpenseFlow.Shared.DTOs;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace ExpenseFlow.Api.Controllers;
+
+/// <summary>
+/// Controller for transaction management operations.
+/// </summary>
+[Authorize]
+public class TransactionsController : ApiControllerBase
+{
+    private readonly ITransactionRepository _transactionRepository;
+    private readonly IStatementImportRepository _importRepository;
+    private readonly IUserService _userService;
+    private readonly ILogger<TransactionsController> _logger;
+
+    public TransactionsController(
+        ITransactionRepository transactionRepository,
+        IStatementImportRepository importRepository,
+        IUserService userService,
+        ILogger<TransactionsController> logger)
+    {
+        _transactionRepository = transactionRepository;
+        _importRepository = importRepository;
+        _userService = userService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Gets paginated list of transactions with optional filters.
+    /// </summary>
+    /// <param name="page">Page number (1-based, default 1).</param>
+    /// <param name="pageSize">Page size (default 50, max 200).</param>
+    /// <param name="startDate">Optional start date filter.</param>
+    /// <param name="endDate">Optional end date filter.</param>
+    /// <param name="matched">Optional filter by receipt match status.</param>
+    /// <param name="importId">Optional filter by specific import batch.</param>
+    /// <returns>Paginated list of transactions.</returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(TransactionListResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<TransactionListResponse>> GetTransactions(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] DateOnly? startDate = null,
+        [FromQuery] DateOnly? endDate = null,
+        [FromQuery] bool? matched = null,
+        [FromQuery] Guid? importId = null)
+    {
+        // Validate pagination parameters
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 50;
+        if (pageSize > 200) pageSize = 200;
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        var (transactions, totalCount, unmatchedCount) = await _transactionRepository.GetPagedAsync(
+            user.Id,
+            page,
+            pageSize,
+            startDate,
+            endDate,
+            matched,
+            importId);
+
+        var response = new TransactionListResponse
+        {
+            Transactions = transactions.Select(t => new TransactionSummaryDto
+            {
+                Id = t.Id,
+                TransactionDate = t.TransactionDate,
+                Description = t.Description,
+                Amount = t.Amount,
+                HasMatchedReceipt = t.MatchedReceiptId.HasValue
+            }).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+            UnmatchedCount = unmatchedCount
+        };
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Gets transaction details by ID.
+    /// </summary>
+    /// <param name="id">Transaction ID.</param>
+    /// <returns>Transaction details or 404 if not found.</returns>
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(TransactionDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TransactionDetailDto>> GetTransaction(Guid id)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        var transaction = await _transactionRepository.GetByIdAsync(user.Id, id);
+        if (transaction == null)
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Transaction not found",
+                Detail = $"No transaction found with ID {id}"
+            });
+        }
+
+        // Get import info for the filename
+        var importFileName = string.Empty;
+        if (transaction.ImportId != Guid.Empty)
+        {
+            var import = await _importRepository.GetByIdAsync(user.Id, transaction.ImportId);
+            importFileName = import?.FileName ?? string.Empty;
+        }
+
+        var response = new TransactionDetailDto
+        {
+            Id = transaction.Id,
+            TransactionDate = transaction.TransactionDate,
+            PostDate = transaction.PostDate,
+            Description = transaction.Description,
+            OriginalDescription = transaction.OriginalDescription,
+            Amount = transaction.Amount,
+            MatchedReceiptId = transaction.MatchedReceiptId,
+            ImportId = transaction.ImportId,
+            ImportFileName = importFileName,
+            CreatedAt = transaction.CreatedAt
+        };
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Deletes a transaction.
+    /// </summary>
+    /// <param name="id">Transaction ID.</param>
+    /// <returns>204 No Content on success, 404 if not found.</returns>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteTransaction(Guid id)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        var transaction = await _transactionRepository.GetByIdAsync(user.Id, id);
+        if (transaction == null)
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Transaction not found",
+                Detail = $"No transaction found with ID {id}"
+            });
+        }
+
+        await _transactionRepository.DeleteAsync(transaction);
+        await _transactionRepository.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Deleted transaction {TransactionId} for user {UserId}",
+            id, user.Id);
+
+        return NoContent();
+    }
+}

@@ -19,7 +19,7 @@ RUN dotnet restore
 COPY src/ src/
 
 # Build and publish
-RUN dotnet publish src/ExpenseFlow.Api/ExpenseFlow.Api.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish src/ExpenseFlow.Api/ExpenseFlow.Api.csproj -c Release -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
