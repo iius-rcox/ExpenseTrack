@@ -64,6 +64,13 @@ public class Receipt : BaseEntity
     /// <summary>Extraction completion timestamp</summary>
     public DateTime? ProcessedAt { get; set; }
 
-    // Navigation property
+    /// <summary>Linked transaction ID (set when match is confirmed)</summary>
+    public Guid? MatchedTransactionId { get; set; }
+
+    /// <summary>Match status: Unmatched=0, Proposed=1, Matched=2</summary>
+    public MatchStatus MatchStatus { get; set; } = MatchStatus.Unmatched;
+
+    // Navigation properties
     public User User { get; set; } = null!;
+    public Transaction? MatchedTransaction { get; set; }
 }

@@ -1,3 +1,5 @@
+using ExpenseFlow.Shared.Enums;
+
 namespace ExpenseFlow.Core.Entities;
 
 /// <summary>
@@ -49,6 +51,11 @@ public class Transaction : BaseEntity
     /// Linked receipt ID (FK to Receipts, nullable). Sprint 5 scope.
     /// </summary>
     public Guid? MatchedReceiptId { get; set; }
+
+    /// <summary>
+    /// Match status: Unmatched=0, Proposed=1, Matched=2.
+    /// </summary>
+    public MatchStatus MatchStatus { get; set; } = MatchStatus.Unmatched;
 
     // Navigation properties
     public User User { get; set; } = null!;

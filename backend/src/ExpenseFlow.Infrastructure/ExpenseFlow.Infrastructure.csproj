@@ -28,6 +28,8 @@
     <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
     <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.0" />
+    <!-- Sprint 5: Matching Engine -->
+    <PackageReference Include="F23.StringSimilarity" Version="5.1.0" />
   </ItemGroup>
 
   <ItemGroup>

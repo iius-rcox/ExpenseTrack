@@ -1,0 +1,625 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Matching API
+  description: |
+    Receipt-to-transaction matching endpoints for Sprint 5.
+    All endpoints require Entra ID authentication.
+  version: 1.0.0
+  contact:
+    name: ExpenseFlow Team
+
+servers:
+  - url: /api
+    description: API base path
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Matching
+    description: Auto-match and manual matching operations
+  - name: Unmatched
+    description: View unmatched receipts and transactions
+
+paths:
+  /matching/auto:
+    post:
+      tags:
+        - Matching
+      operationId: runAutoMatch
+      summary: Run auto-match for all unmatched receipts
+      description: |
+        Analyzes all unmatched receipts against unmatched transactions
+        and creates proposed matches with confidence >= 70%.
+        FR-001, FR-004, FR-005
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutoMatchRequest'
+      responses:
+        '200':
+          description: Auto-match completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoMatchResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /matching/proposals:
+    get:
+      tags:
+        - Matching
+      operationId: getProposals
+      summary: Get all proposed matches for review
+      description: |
+        Returns matches in Proposed status awaiting user confirmation.
+        Ordered by confidence score descending.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Proposed matches
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /matching/{matchId}/confirm:
+    post:
+      tags:
+        - Matching
+      operationId: confirmMatch
+      summary: Confirm a proposed match
+      description: |
+        Confirms the match, links receipt to transaction, and creates/updates
+        vendor alias. FR-008, FR-009
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmMatchRequest'
+      responses:
+        '200':
+          description: Match confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /matching/{matchId}/reject:
+    post:
+      tags:
+        - Matching
+      operationId: rejectMatch
+      summary: Reject a proposed match
+      description: |
+        Rejects the proposed match. The receipt remains unmatched and
+        available for future auto-match runs or manual matching.
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+      responses:
+        '200':
+          description: Match rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /matching/manual:
+    post:
+      tags:
+        - Matching
+      operationId: createManualMatch
+      summary: Manually match a receipt to a transaction
+      description: |
+        Creates a confirmed match between specified receipt and transaction.
+        FR-013
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualMatchRequest'
+      responses:
+        '201':
+          description: Manual match created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /matching/{matchId}:
+    get:
+      tags:
+        - Matching
+      operationId: getMatch
+      summary: Get match details
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+      responses:
+        '200':
+          description: Match details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /matching/stats:
+    get:
+      tags:
+        - Matching
+      operationId: getMatchingStats
+      summary: Get matching statistics
+      description: |
+        Returns summary of matched, proposed, and unmatched items.
+      responses:
+        '200':
+          description: Matching statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchingStatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /receipts/unmatched:
+    get:
+      tags:
+        - Unmatched
+      operationId: getUnmatchedReceipts
+      summary: Get unmatched receipts
+      description: |
+        Returns receipts that have no confirmed match. FR-012
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Unmatched receipts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnmatchedReceiptsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /transactions/unmatched:
+    get:
+      tags:
+        - Unmatched
+      operationId: getUnmatchedTransactions
+      summary: Get unmatched transactions
+      description: |
+        Returns transactions that have no confirmed match. FR-012
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Unmatched transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnmatchedTransactionsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Entra ID access token
+
+  parameters:
+    MatchId:
+      name: matchId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Match record ID
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Conflict:
+      description: Concurrent modification conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://tools.ietf.org/html/rfc7231#section-6.5.8"
+            title: "Conflict"
+            status: 409
+            detail: "This match was modified by another user. Please refresh and try again."
+
+  schemas:
+    AutoMatchRequest:
+      type: object
+      properties:
+        receiptIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Optional list of specific receipt IDs to match. If empty, matches all unmatched.
+
+    AutoMatchResponse:
+      type: object
+      required:
+        - proposedCount
+        - processedCount
+        - ambiguousCount
+        - durationMs
+      properties:
+        proposedCount:
+          type: integer
+          description: Number of new proposed matches created
+        processedCount:
+          type: integer
+          description: Total receipts processed
+        ambiguousCount:
+          type: integer
+          description: Receipts with multiple close matches (flagged for review)
+        durationMs:
+          type: integer
+          description: Processing time in milliseconds
+        proposals:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchProposal'
+
+    ProposalListResponse:
+      type: object
+      required:
+        - items
+        - totalCount
+        - page
+        - pageSize
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchProposal'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    MatchProposal:
+      type: object
+      required:
+        - matchId
+        - receiptId
+        - transactionId
+        - confidenceScore
+        - status
+      properties:
+        matchId:
+          type: string
+          format: uuid
+        receiptId:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+          format: uuid
+        confidenceScore:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+        amountScore:
+          type: number
+          format: decimal
+        dateScore:
+          type: number
+          format: decimal
+        vendorScore:
+          type: number
+          format: decimal
+        matchReason:
+          type: string
+          example: "Amount: exact match ($425.00), Date: +2 days, Vendor: alias match (DELTA AIR)"
+        status:
+          $ref: '#/components/schemas/MatchStatus'
+        receipt:
+          $ref: '#/components/schemas/ReceiptSummary'
+        transaction:
+          $ref: '#/components/schemas/TransactionSummary'
+        createdAt:
+          type: string
+          format: date-time
+
+    MatchDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/MatchProposal'
+        - type: object
+          properties:
+            confirmedAt:
+              type: string
+              format: date-time
+            isManualMatch:
+              type: boolean
+            vendorAlias:
+              $ref: '#/components/schemas/VendorAliasSummary'
+
+    ConfirmMatchRequest:
+      type: object
+      properties:
+        vendorDisplayName:
+          type: string
+          description: Override vendor display name for new alias
+          maxLength: 255
+        defaultGLCode:
+          type: string
+          description: Set default GL code for vendor alias
+          maxLength: 10
+        defaultDepartment:
+          type: string
+          description: Set default department for vendor alias
+          maxLength: 20
+
+    ManualMatchRequest:
+      type: object
+      required:
+        - receiptId
+        - transactionId
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+          format: uuid
+        vendorDisplayName:
+          type: string
+          maxLength: 255
+        defaultGLCode:
+          type: string
+          maxLength: 10
+        defaultDepartment:
+          type: string
+          maxLength: 20
+
+    MatchingStatsResponse:
+      type: object
+      required:
+        - matchedCount
+        - proposedCount
+        - unmatchedReceiptsCount
+        - unmatchedTransactionsCount
+      properties:
+        matchedCount:
+          type: integer
+          description: Confirmed matches
+        proposedCount:
+          type: integer
+          description: Proposed matches awaiting review
+        unmatchedReceiptsCount:
+          type: integer
+          description: Receipts without any match
+        unmatchedTransactionsCount:
+          type: integer
+          description: Transactions without any match
+        autoMatchRate:
+          type: number
+          format: decimal
+          description: Percentage of receipts auto-matched (0-100)
+        averageConfidence:
+          type: number
+          format: decimal
+          description: Average confidence of proposed matches
+
+    UnmatchedReceiptsResponse:
+      type: object
+      required:
+        - items
+        - totalCount
+        - page
+        - pageSize
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceiptSummary'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    UnmatchedTransactionsResponse:
+      type: object
+      required:
+        - items
+        - totalCount
+        - page
+        - pageSize
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionSummary'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    ReceiptSummary:
+      type: object
+      required:
+        - id
+        - vendorExtracted
+        - dateExtracted
+        - amountExtracted
+      properties:
+        id:
+          type: string
+          format: uuid
+        vendorExtracted:
+          type: string
+        dateExtracted:
+          type: string
+          format: date
+        amountExtracted:
+          type: number
+          format: decimal
+        currency:
+          type: string
+          default: USD
+        thumbnailUrl:
+          type: string
+          format: uri
+        originalFilename:
+          type: string
+
+    TransactionSummary:
+      type: object
+      required:
+        - id
+        - description
+        - transactionDate
+        - amount
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        originalDescription:
+          type: string
+        transactionDate:
+          type: string
+          format: date
+        postDate:
+          type: string
+          format: date
+        amount:
+          type: number
+          format: decimal
+
+    VendorAliasSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        canonicalName:
+          type: string
+        displayName:
+          type: string
+        aliasPattern:
+          type: string
+        defaultGLCode:
+          type: string
+        defaultDepartment:
+          type: string
+        matchCount:
+          type: integer
+
+    MatchStatus:
+      type: string
+      enum:
+        - Proposed
+        - Confirmed
+        - Rejected
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string

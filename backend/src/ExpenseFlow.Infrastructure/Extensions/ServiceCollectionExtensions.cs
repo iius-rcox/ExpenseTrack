@@ -53,6 +53,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IColumnMappingInferenceService, ColumnMappingInferenceService>();
         services.AddSingleton<AnalysisSessionCache>();
 
+        // Sprint 5: Matching Engine
+        services.AddScoped<IMatchRepository, MatchRepository>();
+        services.AddScoped<IMatchingService, MatchingService>();
+        services.AddScoped<IFuzzyMatchingService, FuzzyMatchingService>();
+
         return services;
     }
 }
