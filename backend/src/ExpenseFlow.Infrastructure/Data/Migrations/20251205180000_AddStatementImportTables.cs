@@ -121,7 +121,8 @@ namespace ExpenseFlow.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_statement_fingerprints_user_hash",
                 table: "statement_fingerprints",
-                columns: new[] { "user_id", "header_hash" });
+                columns: new[] { "user_id", "header_hash" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_statement_fingerprints_header_hash",
