@@ -1,15 +1,21 @@
-# ExpenseTrack
+# SafetyAmp-PowerBI-Connector
 
-A personal expense tracking application.
+Extract training information from SafetyAmp for Power BI reporting via M Query or similar data connectors.
 
-## Description
+## Project Overview
 
-Track and manage your expenses with ease.
+This project provides a solution to pull training data from SafetyAmp and format it for direct consumption in Power BI through M Query or similar data connection methods.
+
+## Goals
+
+- Extract training information from SafetyAmp
+- Format data for Power BI reporting
+- Enable direct data connection via M Query or similar methods
 
 ## Getting Started
 
-Coming soon...
+_This project is in initial setup phase._
 
 ## License
 
-MIT
+_To be determined_

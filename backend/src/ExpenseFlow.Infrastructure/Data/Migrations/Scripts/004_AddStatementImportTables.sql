@@ -12,6 +12,10 @@ BEGIN;
 -- Make user_id nullable (for system fingerprints)
 ALTER TABLE statement_fingerprints ALTER COLUMN user_id DROP NOT NULL;
 
+-- Drop and recreate the unique index on (user_id, header_hash) to support nullable user_id
+DROP INDEX IF EXISTS ix_statement_fingerprints_user_hash;
+CREATE UNIQUE INDEX ix_statement_fingerprints_user_hash ON statement_fingerprints(user_id, header_hash);
+
 -- Add new columns
 ALTER TABLE statement_fingerprints ADD COLUMN IF NOT EXISTS hit_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE statement_fingerprints ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP WITH TIME ZONE;
