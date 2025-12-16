@@ -1,4 +1,4 @@
-﻿# ExpenseFlow Development Guidelines
+# ExpenseFlow Development Guidelines
 
 Auto-generated from feature plans. Last updated: 2025-12-16
 
@@ -15,6 +15,7 @@ Auto-generated from feature plans. Last updated: 2025-12-16
 - PostgreSQL 15+ with pgvector (Supabase self-hosted) for embedding similarity search (006-ai-categorization)
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire (recurring jobs for subscription alerts), System.Text.Json (JSON config storage) (007-advanced-features)
 - PostgreSQL 15+ with pgvector (Supabase self-hosted), Tier 1 rule-based detection (007-advanced-features)
+- .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, Semantic Kernel, Hangfire (008-draft-report-generation)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -103,15 +104,13 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 008-draft-report-generation: Added .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, Semantic Kernel, Hangfire
 - 007-advanced-features: Sprint 7 - Advanced Features (Travel Detection, Subscription Detection, Expense Splitting, Travel Timeline)
   - Entities: TravelPeriod, DetectedSubscription, SubscriptionAlert, SplitPattern, SplitAllocation
   - Services: TravelDetectionService, SubscriptionDetectionService, ExpenseSplittingService
   - Jobs: SubscriptionAlertJob (Hangfire monthly recurring)
   - All detection uses Tier 1 (rule-based) with logging for tier usage
 - 006-ai-categorization: Added Microsoft.SemanticKernel 1.25.0 for embeddings and chat completion, Microsoft.Extensions.Resilience for Polly v8 retry/circuit breaker, tiered categorization system (vendor alias → embedding similarity → AI inference), EmbeddingCleanupJob for monthly stale embedding purge
-- 005-matching-engine: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, F23.StringSimilarity (Levenshtein)
-- 004-statement-fingerprinting: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, CsvHelper, ClosedXML (Excel), Semantic Kernel, Azure.AI.OpenAI
-- 003-receipt-pipeline: Added .NET 8 with C# 12 + ASP.NET Core Web API + Entity Framework Core 8, Npgsql, Hangfire, Azure.AI.FormRecognizer, Azure.Storage.Blobs, SkiaSharp
 
 ### 001-infrastructure-setup
 

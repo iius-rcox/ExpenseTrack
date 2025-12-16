@@ -47,6 +47,10 @@ public class ExpenseFlowDbContext : DbContext
     public DbSet<DetectedSubscription> DetectedSubscriptions => Set<DetectedSubscription>();
     public DbSet<KnownSubscriptionVendor> KnownSubscriptionVendors => Set<KnownSubscriptionVendor>();
 
+    // Sprint 8: Draft Report Generation
+    public DbSet<ExpenseReport> ExpenseReports => Set<ExpenseReport>();
+    public DbSet<ExpenseLine> ExpenseLines => Set<ExpenseLine>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

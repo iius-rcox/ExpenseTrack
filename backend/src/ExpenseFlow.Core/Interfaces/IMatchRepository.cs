@@ -89,4 +89,14 @@ public interface IMatchRepository
     /// <param name="userId">Optional user ID for row-level security. If null, checks across all users (for constraint validation).</param>
     /// <returns>True if a confirmed match exists</returns>
     Task<bool> HasConfirmedMatchForTransactionAsync(Guid transactionId, Guid? userId = null);
+
+    /// <summary>
+    /// Gets confirmed matches for a user within a date range (for draft report generation).
+    /// Includes Receipt and Transaction navigation properties.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="startDate">Start of the period (inclusive)</param>
+    /// <param name="endDate">End of the period (inclusive)</param>
+    /// <returns>List of confirmed matches with related entities</returns>
+    Task<List<ReceiptTransactionMatch>> GetConfirmedByPeriodAsync(Guid userId, DateOnly startDate, DateOnly endDate);
 }

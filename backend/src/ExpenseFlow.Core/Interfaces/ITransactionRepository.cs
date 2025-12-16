@@ -59,4 +59,14 @@ public interface ITransactionRepository
     /// Saves all pending changes.
     /// </summary>
     Task SaveChangesAsync();
+
+    /// <summary>
+    /// Gets unmatched transactions for a user within a date range (for draft report generation).
+    /// Returns transactions that do not have a matched receipt.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="startDate">Start of the period (inclusive)</param>
+    /// <param name="endDate">End of the period (inclusive)</param>
+    /// <returns>List of unmatched transactions</returns>
+    Task<List<Transaction>> GetUnmatchedByPeriodAsync(Guid userId, DateOnly startDate, DateOnly endDate);
 }
