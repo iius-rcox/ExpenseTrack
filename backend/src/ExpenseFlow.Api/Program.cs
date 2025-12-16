@@ -220,6 +220,13 @@ RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.EmbeddingCleanupJob>(
     "0 3 1 * *", // First day of each month at 3 AM
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
+// Sprint 7: Subscription alert check job (monthly)
+RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.SubscriptionAlertJob>(
+    "subscription-alert-check",
+    job => job.ExecuteAsync(CancellationToken.None),
+    "0 4 1 * *", // First day of each month at 4 AM
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+
 app.MapControllers();
 
 // Health check endpoint (minimal API for simplicity alongside controllers)

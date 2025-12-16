@@ -1,4 +1,5 @@
 using ExpenseFlow.Core.Entities;
+using ExpenseFlow.Shared.Enums;
 
 namespace ExpenseFlow.Core.Interfaces;
 
@@ -13,6 +14,15 @@ public interface IVendorAliasService
     /// <param name="description">Transaction description to match.</param>
     /// <returns>The matching alias if found, null otherwise.</returns>
     Task<VendorAlias?> FindMatchingAliasAsync(string description);
+
+    /// <summary>
+    /// Finds a vendor alias matching the given description with specific categories.
+    /// Used for travel detection (Airline, Hotel) and subscription detection.
+    /// </summary>
+    /// <param name="description">Transaction description to match.</param>
+    /// <param name="categories">Categories to filter by.</param>
+    /// <returns>The matching alias if found, null otherwise.</returns>
+    Task<VendorAlias?> FindMatchingAliasAsync(string description, params VendorCategory[] categories);
 
     /// <summary>
     /// Gets a vendor alias by its canonical name.

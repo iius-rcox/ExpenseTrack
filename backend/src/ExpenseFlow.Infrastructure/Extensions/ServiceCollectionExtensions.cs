@@ -110,6 +110,16 @@ public static class ServiceCollectionExtensions
                 });
         });
 
+        // Sprint 7: Advanced Features (Repositories)
+        services.AddScoped<ITravelPeriodRepository, TravelPeriodRepository>();
+        services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<ISplitPatternRepository, SplitPatternRepository>();
+
+        // Sprint 7: Advanced Features (Services)
+        services.AddScoped<ITravelDetectionService, TravelDetectionService>();
+        services.AddScoped<ISubscriptionDetectionService, SubscriptionDetectionService>();
+        services.AddScoped<IExpenseSplittingService, ExpenseSplittingService>();
+
         return services;
     }
 }

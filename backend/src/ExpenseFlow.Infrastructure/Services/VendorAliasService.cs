@@ -1,6 +1,7 @@
 using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Infrastructure.Data;
+using ExpenseFlow.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -37,6 +38,32 @@ public class VendorAliasService : IVendorAliasService
             .OrderByDescending(v => v.Confidence)
             .ThenByDescending(v => v.MatchCount)
             .FirstOrDefaultAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task<VendorAlias?> FindMatchingAliasAsync(string description, params VendorCategory[] categories)
+    {
+        if (string.IsNullOrWhiteSpace(description) || categories.Length == 0)
+            return null;
+
+        var normalizedDescription = description.ToUpperInvariant();
+
+        var aliases = await _dbContext.VendorAliases
+            .AsNoTracking()
+            .Where(v => categories.Contains(v.Category))
+            .OrderByDescending(v => v.Confidence)
+            .ThenByDescending(v => v.MatchCount)
+            .ToListAsync();
+
+        foreach (var alias in aliases)
+        {
+            if (normalizedDescription.Contains(alias.AliasPattern.ToUpperInvariant()))
+            {
+                return alias;
+            }
+        }
+
+        return null;
     }
 
     /// <inheritdoc />

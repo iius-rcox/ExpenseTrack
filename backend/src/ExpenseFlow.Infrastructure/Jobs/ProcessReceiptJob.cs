@@ -1,5 +1,6 @@
 using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Infrastructure.Services;
+using ExpenseFlow.Shared.DTOs;
 using ExpenseFlow.Shared.Enums;
 using Hangfire;
 using Microsoft.Extensions.Configuration;
@@ -10,6 +11,7 @@ namespace ExpenseFlow.Infrastructure.Jobs;
 /// <summary>
 /// Hangfire background job for processing receipt images through Document Intelligence.
 /// Extracts vendor, date, amount, and line items from receipt images.
+/// Also triggers travel period detection for airline/hotel receipts.
 /// </summary>
 public class ProcessReceiptJob : IReceiptProcessingJob
 {
@@ -17,6 +19,7 @@ public class ProcessReceiptJob : IReceiptProcessingJob
     private readonly IBlobStorageService _blobStorageService;
     private readonly IDocumentIntelligenceService _documentIntelligenceService;
     private readonly IThumbnailService _thumbnailService;
+    private readonly ITravelDetectionService _travelDetectionService;
     private readonly ILogger<ProcessReceiptJob> _logger;
     private readonly double _confidenceThreshold;
     private readonly int _maxRetries;
@@ -26,6 +29,7 @@ public class ProcessReceiptJob : IReceiptProcessingJob
         IBlobStorageService blobStorageService,
         IDocumentIntelligenceService documentIntelligenceService,
         IThumbnailService thumbnailService,
+        ITravelDetectionService travelDetectionService,
         IConfiguration configuration,
         ILogger<ProcessReceiptJob> logger)
     {
@@ -33,6 +37,7 @@ public class ProcessReceiptJob : IReceiptProcessingJob
         _blobStorageService = blobStorageService;
         _documentIntelligenceService = documentIntelligenceService;
         _thumbnailService = thumbnailService;
+        _travelDetectionService = travelDetectionService;
         _logger = logger;
 
         _confidenceThreshold = configuration.GetValue<double>("ReceiptProcessing:ConfidenceThreshold", 0.60);
@@ -131,6 +136,9 @@ public class ProcessReceiptJob : IReceiptProcessingJob
                 extractionResult.OverallConfidence,
                 receipt.VendorExtracted ?? "Unknown",
                 receipt.AmountExtracted?.ToString("C") ?? "Unknown");
+
+            // Trigger travel period detection (Tier 1 - rule-based)
+            await DetectTravelPeriodAsync(receipt);
         }
         catch (Exception ex)
         {
@@ -142,6 +150,51 @@ public class ProcessReceiptJob : IReceiptProcessingJob
 
             // Re-throw to trigger Hangfire retry
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Attempts to detect a travel period from the processed receipt.
+    /// Uses Tier 1 (rule-based) detection for airline/hotel vendors.
+    /// </summary>
+    private async Task DetectTravelPeriodAsync(Core.Entities.Receipt receipt)
+    {
+        try
+        {
+            _logger.LogDebug(
+                "Tier 1 - Checking travel detection for receipt {ReceiptId}, vendor: {Vendor}",
+                receipt.Id,
+                receipt.VendorExtracted ?? "Unknown");
+
+            var result = await _travelDetectionService.DetectFromReceiptAsync(receipt);
+
+            if (result.Detected)
+            {
+                _logger.LogInformation(
+                    "Tier 1 - Travel period detection: {Action} for receipt {ReceiptId}. " +
+                    "Period: {StartDate} to {EndDate}, Destination: {Destination}, Confidence: {Confidence:P0}",
+                    result.Action,
+                    receipt.Id,
+                    result.TravelPeriod?.StartDate,
+                    result.TravelPeriod?.EndDate,
+                    result.ExtractedDestination ?? "Unknown",
+                    result.Confidence);
+            }
+            else
+            {
+                _logger.LogDebug(
+                    "Tier 1 - No travel period detected for receipt {ReceiptId}: {Message}",
+                    receipt.Id,
+                    result.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail the main receipt processing for travel detection failures
+            _logger.LogWarning(
+                ex,
+                "Tier 1 - Failed to detect travel period for receipt {ReceiptId}",
+                receipt.Id);
         }
     }
 }

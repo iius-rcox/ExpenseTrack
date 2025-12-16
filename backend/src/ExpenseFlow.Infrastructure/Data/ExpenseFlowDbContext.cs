@@ -42,6 +42,11 @@ public class ExpenseFlowDbContext : DbContext
     // Sprint 6: AI Categorization
     public DbSet<TierUsageLog> TierUsageLogs => Set<TierUsageLog>();
 
+    // Sprint 7: Advanced Features
+    public DbSet<TravelPeriod> TravelPeriods => Set<TravelPeriod>();
+    public DbSet<DetectedSubscription> DetectedSubscriptions => Set<DetectedSubscription>();
+    public DbSet<KnownSubscriptionVendor> KnownSubscriptionVendors => Set<KnownSubscriptionVendor>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

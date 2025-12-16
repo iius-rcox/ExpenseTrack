@@ -1,0 +1,420 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Travel Periods API
+  version: 1.0.0
+  description: API for managing travel period detection and manual travel entries
+
+paths:
+  /api/travel-periods:
+    get:
+      summary: List user's travel periods
+      operationId: listTravelPeriods
+      tags:
+        - Travel Periods
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter periods starting on or after this date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter periods ending on or before this date
+        - name: requiresReview
+          in: query
+          schema:
+            type: boolean
+          description: Filter by AI review flag
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: take
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: List of travel periods
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPeriodListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      summary: Manually create a travel period
+      operationId: createTravelPeriod
+      tags:
+        - Travel Periods
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTravelPeriodRequest'
+      responses:
+        '201':
+          description: Travel period created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPeriodDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/travel-periods/{id}:
+    get:
+      summary: Get travel period by ID
+      operationId: getTravelPeriod
+      tags:
+        - Travel Periods
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Travel period details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPeriodDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update travel period
+      operationId: updateTravelPeriod
+      tags:
+        - Travel Periods
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTravelPeriodRequest'
+      responses:
+        '200':
+          description: Travel period updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPeriodDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete travel period
+      operationId: deleteTravelPeriod
+      tags:
+        - Travel Periods
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Travel period deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/travel-periods/{id}/expenses:
+    get:
+      summary: Get expenses within travel period
+      operationId: getTravelPeriodExpenses
+      tags:
+        - Travel Periods
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: take
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Expenses within travel period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelExpenseListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/travel-periods/detect:
+    post:
+      summary: Trigger travel detection for a receipt
+      operationId: detectTravelFromReceipt
+      tags:
+        - Travel Periods
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetectTravelRequest'
+      responses:
+        '200':
+          description: Detection result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelDetectionResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  schemas:
+    TravelPeriodDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        destination:
+          type: string
+          nullable: true
+        source:
+          type: string
+          enum: [Flight, Hotel, Manual]
+        sourceReceiptId:
+          type: string
+          format: uuid
+          nullable: true
+        requiresAiReview:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - startDate
+        - endDate
+        - source
+        - requiresAiReview
+        - createdAt
+
+    TravelPeriodListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TravelPeriodDto'
+        totalCount:
+          type: integer
+        skip:
+          type: integer
+        take:
+          type: integer
+      required:
+        - items
+        - totalCount
+        - skip
+        - take
+
+    CreateTravelPeriodRequest:
+      type: object
+      properties:
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        destination:
+          type: string
+          maxLength: 100
+          nullable: true
+      required:
+        - startDate
+        - endDate
+
+    UpdateTravelPeriodRequest:
+      type: object
+      properties:
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        destination:
+          type: string
+          maxLength: 100
+          nullable: true
+        requiresAiReview:
+          type: boolean
+
+    DetectTravelRequest:
+      type: object
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+      required:
+        - receiptId
+
+    TravelDetectionResult:
+      type: object
+      properties:
+        detected:
+          type: boolean
+        travelPeriod:
+          $ref: '#/components/schemas/TravelPeriodDto'
+        action:
+          type: string
+          enum: [Created, Extended, NoAction, RequiresReview]
+        message:
+          type: string
+      required:
+        - detected
+        - action
+
+    TravelExpenseListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TravelExpenseDto'
+        totalCount:
+          type: integer
+      required:
+        - items
+        - totalCount
+
+    TravelExpenseDto:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+        amount:
+          type: number
+          format: decimal
+        suggestedGlCode:
+          type: string
+        isLinkedToTravel:
+          type: boolean
+      required:
+        - transactionId
+        - date
+        - description
+        - amount
+        - isLinkedToTravel
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        traceId:
+          type: string

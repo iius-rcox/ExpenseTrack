@@ -19,6 +19,10 @@ public class SplitPatternConfiguration : IEntityTypeConfiguration<SplitPattern>
             .HasColumnName("id")
             .HasDefaultValueSql("gen_random_uuid()");
 
+        builder.Property(s => s.UserId)
+            .HasColumnName("user_id")
+            .IsRequired();
+
         builder.Property(s => s.VendorAliasId)
             .HasColumnName("vendor_alias_id");
 
@@ -41,9 +45,21 @@ public class SplitPatternConfiguration : IEntityTypeConfiguration<SplitPattern>
             .IsRequired();
 
         // Relationships
+        builder.HasOne(s => s.User)
+            .WithMany()
+            .HasForeignKey(s => s.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasOne(s => s.VendorAlias)
             .WithMany(v => v.SplitPatterns)
             .HasForeignKey(s => s.VendorAliasId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Indexes
+        builder.HasIndex(s => s.UserId)
+            .HasDatabaseName("ix_split_patterns_user_id");
+
+        builder.HasIndex(s => new { s.UserId, s.VendorAliasId })
+            .HasDatabaseName("ix_split_patterns_user_vendor");
     }
 }

@@ -1,0 +1,518 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Expense Splitting API
+  version: 1.0.0
+  description: API for splitting expenses across multiple GL codes and departments
+
+paths:
+  /api/expenses/{id}/split:
+    get:
+      summary: Get split suggestion for expense
+      operationId: getSplitSuggestion
+      tags:
+        - Expense Splitting
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Transaction or expense ID
+      responses:
+        '200':
+          description: Split suggestion (if pattern exists)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SplitSuggestionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      summary: Apply split to expense
+      operationId: applySplit
+      tags:
+        - Expense Splitting
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Transaction or expense ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplySplitRequest'
+      responses:
+        '200':
+          description: Split applied successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SplitResultResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Remove split from expense (revert to single allocation)
+      operationId: removeSplit
+      tags:
+        - Expense Splitting
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Split removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/split-patterns:
+    get:
+      summary: List user's split patterns
+      operationId: listSplitPatterns
+      tags:
+        - Split Patterns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vendorAliasId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by vendor alias
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: take
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: List of split patterns
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SplitPatternListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      summary: Create a new split pattern
+      operationId: createSplitPattern
+      tags:
+        - Split Patterns
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSplitPatternRequest'
+      responses:
+        '201':
+          description: Split pattern created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SplitPatternDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/split-patterns/{id}:
+    get:
+      summary: Get split pattern by ID
+      operationId: getSplitPattern
+      tags:
+        - Split Patterns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Split pattern details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SplitPatternDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update split pattern
+      operationId: updateSplitPattern
+      tags:
+        - Split Patterns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSplitPatternRequest'
+      responses:
+        '200':
+          description: Split pattern updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SplitPatternDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete split pattern
+      operationId: deleteSplitPattern
+      tags:
+        - Split Patterns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Split pattern deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  schemas:
+    AllocationDto:
+      type: object
+      properties:
+        glCode:
+          type: string
+          maxLength: 10
+        glDescription:
+          type: string
+          description: Human-readable GL code description
+        department:
+          type: string
+          maxLength: 10
+          nullable: true
+        departmentName:
+          type: string
+          nullable: true
+        project:
+          type: string
+          maxLength: 20
+          nullable: true
+        percentage:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+        fixedAmount:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+          description: Alternative to percentage for fixed amount splits
+        calculatedAmount:
+          type: number
+          format: decimal
+          description: Calculated amount based on percentage or fixed
+      required:
+        - glCode
+        - percentage
+
+    SplitSuggestionResponse:
+      type: object
+      properties:
+        hasPattern:
+          type: boolean
+        patternId:
+          type: string
+          format: uuid
+          nullable: true
+        vendorName:
+          type: string
+          nullable: true
+        suggestedAllocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/AllocationDto'
+        patternUsageCount:
+          type: integer
+          description: Number of times this pattern has been used
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - hasPattern
+
+    ApplySplitRequest:
+      type: object
+      properties:
+        allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/AllocationInputDto'
+          minItems: 2
+          description: At least 2 allocations required for a split
+        saveAsPattern:
+          type: boolean
+          default: false
+          description: Save this split as a pattern for future suggestions
+        vendorAliasId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Associate pattern with vendor (required if saveAsPattern=true)
+      required:
+        - allocations
+
+    AllocationInputDto:
+      type: object
+      properties:
+        glCode:
+          type: string
+          maxLength: 10
+        department:
+          type: string
+          maxLength: 10
+          nullable: true
+        project:
+          type: string
+          maxLength: 20
+          nullable: true
+        percentage:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+        fixedAmount:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+      required:
+        - glCode
+        - percentage
+
+    SplitResultResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        originalExpenseId:
+          type: string
+          format: uuid
+        splitLines:
+          type: array
+          items:
+            $ref: '#/components/schemas/SplitLineDto'
+        patternSaved:
+          type: boolean
+        patternId:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+        - success
+        - originalExpenseId
+        - splitLines
+        - patternSaved
+
+    SplitLineDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        glCode:
+          type: string
+        department:
+          type: string
+          nullable: true
+        project:
+          type: string
+          nullable: true
+        amount:
+          type: number
+          format: decimal
+        percentage:
+          type: number
+          format: decimal
+      required:
+        - id
+        - glCode
+        - amount
+        - percentage
+
+    SplitPatternDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        vendorAliasId:
+          type: string
+          format: uuid
+          nullable: true
+        vendorName:
+          type: string
+          nullable: true
+        allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/AllocationDto'
+        usageCount:
+          type: integer
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - allocations
+        - usageCount
+        - createdAt
+
+    SplitPatternListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SplitPatternDto'
+        totalCount:
+          type: integer
+        skip:
+          type: integer
+        take:
+          type: integer
+      required:
+        - items
+        - totalCount
+        - skip
+        - take
+
+    CreateSplitPatternRequest:
+      type: object
+      properties:
+        vendorAliasId:
+          type: string
+          format: uuid
+          nullable: true
+        allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/AllocationInputDto'
+          minItems: 2
+      required:
+        - allocations
+
+    UpdateSplitPatternRequest:
+      type: object
+      properties:
+        allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/AllocationInputDto'
+          minItems: 2
+      required:
+        - allocations
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        traceId:
+          type: string
