@@ -5,6 +5,7 @@ using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -14,9 +15,11 @@ using Pgvector;
 namespace ExpenseFlow.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(ExpenseFlowDbContext))]
-    partial class ExpenseFlowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251216155326_AddCategorizationEntities")]
+    partial class AddCategorizationEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

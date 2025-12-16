@@ -33,4 +33,18 @@ public interface IReferenceDataService
     /// </summary>
     /// <returns>Number of records updated.</returns>
     Task<(int GLAccounts, int Departments, int Projects)> SyncAllAsync();
+
+    /// <summary>
+    /// Gets a GL account by its code.
+    /// </summary>
+    /// <param name="code">The GL account code.</param>
+    /// <returns>The GL account if found, null otherwise.</returns>
+    Task<GLAccount?> GetGLAccountByCodeAsync(string code);
+
+    /// <summary>
+    /// Gets a department by its code.
+    /// </summary>
+    /// <param name="code">The department code.</param>
+    /// <returns>The department if found, null otherwise.</returns>
+    Task<Department?> GetDepartmentByCodeAsync(string code);
 }

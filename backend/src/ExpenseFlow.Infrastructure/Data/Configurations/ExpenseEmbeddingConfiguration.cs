@@ -19,6 +19,13 @@ public class ExpenseEmbeddingConfiguration : IEntityTypeConfiguration<ExpenseEmb
             .HasColumnName("id")
             .HasDefaultValueSql("gen_random_uuid()");
 
+        builder.Property(e => e.UserId)
+            .HasColumnName("user_id")
+            .IsRequired();
+
+        builder.Property(e => e.TransactionId)
+            .HasColumnName("transaction_id");
+
         builder.Property(e => e.ExpenseLineId)
             .HasColumnName("expense_line_id");
 
@@ -54,10 +61,32 @@ public class ExpenseEmbeddingConfiguration : IEntityTypeConfiguration<ExpenseEmb
             .HasDefaultValueSql("NOW()")
             .IsRequired();
 
+        builder.Property(e => e.ExpiresAt)
+            .HasColumnName("expires_at");
+
+        // Navigation properties
+        builder.HasOne(e => e.User)
+            .WithMany()
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(e => e.Transaction)
+            .WithMany()
+            .HasForeignKey(e => e.TransactionId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Indexes
         // IVFFlat index for vector similarity search
         // Note: This index is created via raw SQL in migration because EF Core
         // doesn't support IVFFlat index creation directly
         builder.HasIndex(e => e.Embedding)
             .HasDatabaseName("ix_expense_embeddings_vector");
+
+        builder.HasIndex(e => new { e.Verified, e.UserId })
+            .HasDatabaseName("ix_expense_embeddings_verified_user");
+
+        builder.HasIndex(e => e.ExpiresAt)
+            .HasDatabaseName("ix_expense_embeddings_expires")
+            .HasFilter("expires_at IS NOT NULL");
     }
 }

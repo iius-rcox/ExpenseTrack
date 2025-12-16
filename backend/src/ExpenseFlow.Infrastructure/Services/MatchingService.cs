@@ -75,25 +75,59 @@ public partial class MatchingService : IMatchingService
 
         var receipts = await receiptsQuery.ToListAsync();
 
-        // Get unmatched transactions
+        if (!receipts.Any())
+        {
+            _logger.LogInformation("No receipts to match for user {UserId}", userId);
+            return new AutoMatchResult(0, 0, 0, stopwatch.ElapsedMilliseconds, new List<ReceiptTransactionMatch>());
+        }
+
+        // Calculate date range from receipts (±7 days from min/max receipt dates)
+        var receiptDates = receipts.Select(r => r.DateExtracted!.Value).ToList();
+        var minDate = receiptDates.Min().AddDays(-7);
+        var maxDate = receiptDates.Max().AddDays(7);
+
+        // Get unmatched transactions within date range (pre-filter for performance)
         var transactions = await _context.Transactions
-            .Where(t => t.UserId == userId && t.MatchStatus == MatchStatus.Unmatched)
+            .Where(t => t.UserId == userId
+                && t.MatchStatus == MatchStatus.Unmatched
+                && t.TransactionDate >= minDate
+                && t.TransactionDate <= maxDate)
             .ToListAsync();
 
-        _logger.LogInformation("Found {ReceiptCount} receipts and {TransactionCount} transactions to match",
-            receipts.Count, transactions.Count);
+        _logger.LogInformation("Found {ReceiptCount} receipts and {TransactionCount} transactions to match (date range: {MinDate} to {MaxDate})",
+            receipts.Count, transactions.Count, minDate, maxDate);
+
+        if (!transactions.Any())
+        {
+            _logger.LogInformation("No transactions in date range for user {UserId}", userId);
+            return new AutoMatchResult(0, receipts.Count, 0, stopwatch.ElapsedMilliseconds, new List<ReceiptTransactionMatch>());
+        }
+
+        // Pre-compute alias matches for all unique transaction descriptions (O(m) instead of O(n*m))
+        var aliasCache = await BuildAliasCacheAsync(transactions);
+        _logger.LogDebug("Built alias cache with {CacheSize} entries", aliasCache.Count);
 
         var proposals = new List<ReceiptTransactionMatch>();
         var ambiguousCount = 0;
 
         foreach (var receipt in receipts)
         {
-            var matchResult = await FindBestMatchAsync(receipt, transactions, userId);
+            // Filter transactions by amount tolerance before detailed scoring
+            var candidateTransactions = transactions
+                .Where(t => Math.Abs(receipt.AmountExtracted!.Value - Math.Abs(t.Amount)) <= AmountNearTolerance)
+                .ToList();
+
+            if (!candidateTransactions.Any())
+            {
+                continue;
+            }
+
+            var matchResult = FindBestMatchWithCache(receipt, candidateTransactions, userId, aliasCache);
 
             if (matchResult.IsAmbiguous)
             {
                 ambiguousCount++;
-                _logger.LogInformation("Receipt {ReceiptId} has ambiguous matches", receipt.Id);
+                _logger.LogDebug("Receipt {ReceiptId} has ambiguous matches", receipt.Id);
                 continue;
             }
 
@@ -109,11 +143,11 @@ public partial class MatchingService : IMatchingService
             }
         }
 
-        // Save all proposals
+        // Save all proposals in a single batch
         if (proposals.Any())
         {
             await _matchRepository.AddRangeAsync(proposals);
-            await _context.SaveChangesAsync();
+            // Note: AddRangeAsync already calls SaveChangesAsync, no duplicate save needed
         }
 
         stopwatch.Stop();
@@ -127,6 +161,150 @@ public partial class MatchingService : IMatchingService
             ambiguousCount,
             stopwatch.ElapsedMilliseconds,
             proposals);
+    }
+
+    /// <summary>
+    /// Pre-builds a cache of alias matches for all transaction descriptions.
+    /// Reduces O(n*m) alias lookups to O(m) by computing once per unique description.
+    /// </summary>
+    private async Task<Dictionary<string, VendorAlias?>> BuildAliasCacheAsync(List<Transaction> transactions)
+    {
+        var cache = new Dictionary<string, VendorAlias?>(StringComparer.OrdinalIgnoreCase);
+        var uniqueDescriptions = transactions
+            .Select(t => t.Description)
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var description in uniqueDescriptions)
+        {
+            if (!cache.ContainsKey(description))
+            {
+                cache[description] = await _vendorAliasService.FindMatchingAliasAsync(description);
+            }
+        }
+
+        return cache;
+    }
+
+    /// <summary>
+    /// Finds the best match using pre-computed alias cache (no async DB calls).
+    /// </summary>
+    private MatchFindResult FindBestMatchWithCache(
+        Receipt receipt,
+        List<Transaction> transactions,
+        Guid userId,
+        Dictionary<string, VendorAlias?> aliasCache)
+    {
+        var candidates = new List<(Transaction Transaction, decimal Score, string Reason, Guid? AliasId)>();
+
+        foreach (var transaction in transactions)
+        {
+            var scoreResult = CalculateConfidenceScoreWithCache(receipt, transaction, aliasCache);
+
+            if (scoreResult.TotalScore >= MinimumConfidenceThreshold)
+            {
+                candidates.Add((transaction, scoreResult.TotalScore, scoreResult.Reason, scoreResult.MatchedAliasId));
+            }
+        }
+
+        if (!candidates.Any())
+        {
+            return new MatchFindResult(null, false);
+        }
+
+        // Sort by score descending
+        candidates = candidates.OrderByDescending(c => c.Score).ToList();
+
+        // Check for ambiguous matches (multiple matches within threshold)
+        if (candidates.Count > 1)
+        {
+            var topScore = candidates[0].Score;
+            var secondScore = candidates[1].Score;
+
+            if (topScore - secondScore <= AmbiguousThreshold)
+            {
+                return new MatchFindResult(null, true);
+            }
+        }
+
+        // Create match proposal
+        var best = candidates[0];
+        var match = new ReceiptTransactionMatch
+        {
+            ReceiptId = receipt.Id,
+            TransactionId = best.Transaction.Id,
+            UserId = userId,
+            Status = MatchProposalStatus.Proposed,
+            ConfidenceScore = best.Score,
+            AmountScore = CalculateAmountScore(receipt.AmountExtracted!.Value, best.Transaction.Amount),
+            DateScore = CalculateDateScore(receipt.DateExtracted!.Value, best.Transaction.TransactionDate),
+            VendorScore = CalculateVendorScoreWithCache(receipt.VendorExtracted, best.Transaction.Description, aliasCache).Score,
+            MatchReason = best.Reason,
+            MatchedVendorAliasId = best.AliasId,
+            IsManualMatch = false
+        };
+
+        return new MatchFindResult(match, false);
+    }
+
+    /// <summary>
+    /// Calculates confidence score using pre-computed alias cache.
+    /// </summary>
+    private ScoreResult CalculateConfidenceScoreWithCache(
+        Receipt receipt,
+        Transaction transaction,
+        Dictionary<string, VendorAlias?> aliasCache)
+    {
+        var amountScore = CalculateAmountScore(receipt.AmountExtracted!.Value, transaction.Amount);
+        var dateScore = CalculateDateScore(receipt.DateExtracted!.Value, transaction.TransactionDate);
+        var (vendorScore, aliasId) = CalculateVendorScoreWithCache(receipt.VendorExtracted, transaction.Description, aliasCache);
+
+        var totalScore = amountScore + dateScore + vendorScore;
+        var reason = BuildMatchReason(receipt, transaction, amountScore, dateScore, vendorScore);
+
+        return new ScoreResult(totalScore, reason, aliasId);
+    }
+
+    /// <summary>
+    /// Calculates vendor score using pre-computed alias cache.
+    /// </summary>
+    private (decimal Score, Guid? AliasId) CalculateVendorScoreWithCache(
+        string? receiptVendor,
+        string transactionDescription,
+        Dictionary<string, VendorAlias?> aliasCache)
+    {
+        if (string.IsNullOrWhiteSpace(receiptVendor))
+        {
+            return (0m, null);
+        }
+
+        // Look up alias from cache
+        aliasCache.TryGetValue(transactionDescription, out var alias);
+
+        if (alias != null)
+        {
+            // Check if the alias canonical name matches the receipt vendor
+            var similarity = _fuzzyMatchingService.CalculateSimilarity(
+                receiptVendor,
+                alias.CanonicalName);
+
+            if (similarity >= FuzzyMatchThreshold)
+            {
+                return (VendorAliasPoints, alias.Id);
+            }
+        }
+
+        // Fall back to fuzzy matching between receipt vendor and transaction description
+        var extractedPattern = ExtractVendorPattern(transactionDescription);
+        var fuzzySimilarity = _fuzzyMatchingService.CalculateSimilarity(receiptVendor, extractedPattern);
+
+        if (fuzzySimilarity >= FuzzyMatchThreshold)
+        {
+            return (VendorFuzzyPoints, null);
+        }
+
+        return (0m, null);
     }
 
     /// <summary>
@@ -461,8 +639,9 @@ public partial class MatchingService : IMatchingService
             }
         }
 
+        // UpdateAsync already calls SaveChangesAsync, which saves all tracked changes
+        // including receipt and transaction updates
         await _matchRepository.UpdateAsync(match);
-        await _context.SaveChangesAsync();
 
         _logger.LogInformation("Match {MatchId} confirmed by user {UserId}", matchId, userId);
 
@@ -492,8 +671,8 @@ public partial class MatchingService : IMatchingService
             receipt.MatchStatus = MatchStatus.Unmatched;
         }
 
+        // UpdateAsync already calls SaveChangesAsync, which saves all tracked changes
         await _matchRepository.UpdateAsync(match);
-        await _context.SaveChangesAsync();
 
         _logger.LogInformation("Match {MatchId} rejected by user {UserId}", matchId, userId);
 
@@ -565,8 +744,8 @@ public partial class MatchingService : IMatchingService
             match.MatchedVendorAliasId = savedAlias.Id;
         }
 
+        // AddAsync already calls SaveChangesAsync, which saves all tracked changes
         await _matchRepository.AddAsync(match);
-        await _context.SaveChangesAsync();
 
         _logger.LogInformation("Manual match created by user {UserId}: Receipt {ReceiptId} -> Transaction {TransactionId}",
             userId, receiptId, transactionId);

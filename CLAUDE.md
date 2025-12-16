@@ -1,6 +1,6 @@
 # ExpenseFlow Development Guidelines
 
-Auto-generated from feature plans. Last updated: 2025-12-03
+Auto-generated from feature plans. Last updated: 2025-12-16
 
 ## Active Technologies
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Microsoft.Identity.Web, Polly (002-core-backend-auth)
@@ -11,6 +11,8 @@ Auto-generated from feature plans. Last updated: 2025-12-03
 - PostgreSQL 15+ with pgvector (Supabase self-hosted), Azure Blob Storage (ccproctemp2025) (004-statement-fingerprinting)
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, F23.StringSimilarity (Levenshtein) (005-matching-engine)
 - PostgreSQL 15+ (Supabase self-hosted with pgvector), Azure Blob Storage (ccproctemp2025) (005-matching-engine)
+- .NET 8 with C# 12, ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Microsoft.SemanticKernel 1.25.0, Microsoft.SemanticKernel.Connectors.AzureOpenAI, Microsoft.Extensions.Resilience (Polly v8) (006-ai-categorization)
+- PostgreSQL 15+ with pgvector (Supabase self-hosted) for embedding similarity search (006-ai-categorization)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -99,9 +101,9 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 006-ai-categorization: Added Microsoft.SemanticKernel 1.25.0 for embeddings and chat completion, Microsoft.Extensions.Resilience for Polly v8 retry/circuit breaker, tiered categorization system (vendor alias → embedding similarity → AI inference), EmbeddingCleanupJob for monthly stale embedding purge
 - 005-matching-engine: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, F23.StringSimilarity (Levenshtein)
 - 004-statement-fingerprinting: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, CsvHelper, ClosedXML (Excel), Semantic Kernel, Azure.AI.OpenAI
-- 003-receipt-pipeline: Added .NET 8 with C# 12 + ASP.NET Core Web API + Entity Framework Core 8, Npgsql, Hangfire, Azure.AI.FormRecognizer, Azure.Storage.Blobs, SkiaSharp
 
 ### 001-infrastructure-setup
 

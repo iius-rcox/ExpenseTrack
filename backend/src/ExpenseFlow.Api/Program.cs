@@ -213,6 +213,13 @@ RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.AliasConfidenceDecayJob
     "0 2 * * 0", // Every Sunday at 2 AM
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
+// Sprint 6: Stale embedding cleanup job (monthly)
+RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.EmbeddingCleanupJob>(
+    "embedding-cleanup",
+    job => job.ExecuteAsync(CancellationToken.None),
+    "0 3 1 * *", // First day of each month at 3 AM
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+
 app.MapControllers();
 
 // Health check endpoint (minimal API for simplicity alongside controllers)

@@ -124,27 +124,37 @@ public class MatchRepository : IMatchRepository
 
     public async Task<decimal> GetAverageConfidenceAsync(Guid userId)
     {
-        var proposed = await _context.ReceiptTransactionMatches
+        // Use database-side aggregation instead of loading all records into memory
+        return await _context.ReceiptTransactionMatches
             .Where(m => m.UserId == userId && m.Status == MatchProposalStatus.Proposed)
-            .ToListAsync();
+            .AverageAsync(m => (decimal?)m.ConfidenceScore) ?? 0m;
+    }
 
-        if (!proposed.Any())
+    public async Task<bool> HasConfirmedMatchForReceiptAsync(Guid receiptId, Guid? userId = null)
+    {
+        var query = _context.ReceiptTransactionMatches
+            .Where(m => m.ReceiptId == receiptId && m.Status == MatchProposalStatus.Confirmed);
+
+        // Apply user filter if provided (for row-level security)
+        if (userId.HasValue)
         {
-            return 0m;
+            query = query.Where(m => m.UserId == userId.Value);
         }
 
-        return proposed.Average(m => m.ConfidenceScore);
+        return await query.AnyAsync();
     }
 
-    public async Task<bool> HasConfirmedMatchForReceiptAsync(Guid receiptId)
+    public async Task<bool> HasConfirmedMatchForTransactionAsync(Guid transactionId, Guid? userId = null)
     {
-        return await _context.ReceiptTransactionMatches
-            .AnyAsync(m => m.ReceiptId == receiptId && m.Status == MatchProposalStatus.Confirmed);
-    }
+        var query = _context.ReceiptTransactionMatches
+            .Where(m => m.TransactionId == transactionId && m.Status == MatchProposalStatus.Confirmed);
 
-    public async Task<bool> HasConfirmedMatchForTransactionAsync(Guid transactionId)
-    {
-        return await _context.ReceiptTransactionMatches
-            .AnyAsync(m => m.TransactionId == transactionId && m.Status == MatchProposalStatus.Confirmed);
+        // Apply user filter if provided (for row-level security)
+        if (userId.HasValue)
+        {
+            query = query.Where(m => m.UserId == userId.Value);
+        }
+
+        return await query.AnyAsync();
     }
 }

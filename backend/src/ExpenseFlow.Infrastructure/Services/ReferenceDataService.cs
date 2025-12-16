@@ -217,4 +217,20 @@ public class ReferenceDataService : IReferenceDataService
             throw;
         }
     }
+
+    /// <inheritdoc />
+    public async Task<GLAccount?> GetGLAccountByCodeAsync(string code)
+    {
+        return await _dbContext.GLAccounts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(g => g.Code == code);
+    }
+
+    /// <inheritdoc />
+    public async Task<Department?> GetDepartmentByCodeAsync(string code)
+    {
+        return await _dbContext.Departments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Code == code);
+    }
 }

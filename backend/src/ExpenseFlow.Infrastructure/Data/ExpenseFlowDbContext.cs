@@ -39,6 +39,9 @@ public class ExpenseFlowDbContext : DbContext
     // Sprint 5: Matching Engine
     public DbSet<ReceiptTransactionMatch> ReceiptTransactionMatches => Set<ReceiptTransactionMatch>();
 
+    // Sprint 6: AI Categorization
+    public DbSet<TierUsageLog> TierUsageLogs => Set<TierUsageLog>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

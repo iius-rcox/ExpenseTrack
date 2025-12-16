@@ -39,4 +39,17 @@ public interface IVendorAliasService
     /// </summary>
     /// <returns>Total entries and total matches.</returns>
     Task<(int TotalEntries, int TotalHits)> GetStatsAsync();
+
+    /// <summary>
+    /// Gets a vendor alias by vendor name pattern.
+    /// </summary>
+    /// <param name="vendorName">The vendor name to search for.</param>
+    /// <returns>The matching vendor alias if found, null otherwise.</returns>
+    Task<VendorAlias?> GetByVendorNameAsync(string vendorName);
+
+    /// <summary>
+    /// Updates an existing vendor alias.
+    /// </summary>
+    /// <param name="alias">The vendor alias to update.</param>
+    Task UpdateAsync(VendorAlias alias);
 }

@@ -42,6 +42,16 @@ public class VendorAliasConfiguration : IEntityTypeConfiguration<VendorAlias>
             .HasColumnName("default_department")
             .HasMaxLength(20);
 
+        builder.Property(v => v.GLConfirmCount)
+            .HasColumnName("gl_confirm_count")
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(v => v.DeptConfirmCount)
+            .HasColumnName("dept_confirm_count")
+            .HasDefaultValue(0)
+            .IsRequired();
+
         builder.Property(v => v.MatchCount)
             .HasColumnName("match_count")
             .HasDefaultValue(0)

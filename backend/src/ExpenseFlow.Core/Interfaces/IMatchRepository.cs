@@ -77,10 +77,16 @@ public interface IMatchRepository
     /// <summary>
     /// Checks if a receipt already has a confirmed match.
     /// </summary>
-    Task<bool> HasConfirmedMatchForReceiptAsync(Guid receiptId);
+    /// <param name="receiptId">Receipt ID to check</param>
+    /// <param name="userId">Optional user ID for row-level security. If null, checks across all users (for constraint validation).</param>
+    /// <returns>True if a confirmed match exists</returns>
+    Task<bool> HasConfirmedMatchForReceiptAsync(Guid receiptId, Guid? userId = null);
 
     /// <summary>
     /// Checks if a transaction already has a confirmed match.
     /// </summary>
-    Task<bool> HasConfirmedMatchForTransactionAsync(Guid transactionId);
+    /// <param name="transactionId">Transaction ID to check</param>
+    /// <param name="userId">Optional user ID for row-level security. If null, checks across all users (for constraint validation).</param>
+    /// <returns>True if a confirmed match exists</returns>
+    Task<bool> HasConfirmedMatchForTransactionAsync(Guid transactionId, Guid? userId = null);
 }
