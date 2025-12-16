@@ -31,6 +31,16 @@ public class VendorAlias : BaseEntity
     public string? DefaultDepartment { get; set; }
 
     /// <summary>
+    /// Number of times user confirmed this GL code (auto-update at 3+).
+    /// </summary>
+    public int GLConfirmCount { get; set; }
+
+    /// <summary>
+    /// Number of times user confirmed this department (auto-update at 3+).
+    /// </summary>
+    public int DeptConfirmCount { get; set; }
+
+    /// <summary>
     /// Number of times this alias matched.
     /// </summary>
     public int MatchCount { get; set; }

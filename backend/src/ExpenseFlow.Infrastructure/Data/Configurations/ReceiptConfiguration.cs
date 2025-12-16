@@ -46,16 +46,36 @@ public class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
         builder.Property(r => r.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
         builder.Property(r => r.ProcessedAt).HasColumnName("processed_at");
 
+        // Sprint 5: Matching fields
+        builder.Property(r => r.MatchedTransactionId)
+            .HasColumnName("matched_transaction_id")
+            .IsRequired(false);
+
+        builder.Property(r => r.MatchStatus)
+            .HasColumnName("match_status")
+            .HasDefaultValue(MatchStatus.Unmatched)
+            .IsRequired();
+
         // Indexes for efficient querying
         builder.HasIndex(r => r.UserId);
         builder.HasIndex(r => r.Status);
         builder.HasIndex(r => new { r.UserId, r.Status });
         builder.HasIndex(r => r.CreatedAt).IsDescending();
 
+        // Sprint 5: Match status index
+        builder.HasIndex(r => new { r.UserId, r.MatchStatus })
+            .HasDatabaseName("ix_receipts_match_status");
+
         // Relationship to User with CASCADE delete
         builder.HasOne(r => r.User)
             .WithMany()
             .HasForeignKey(r => r.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Sprint 5: Relationship to matched Transaction
+        builder.HasOne(r => r.MatchedTransaction)
+            .WithOne(t => t.MatchedReceipt)
+            .HasForeignKey<Receipt>(r => r.MatchedTransactionId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

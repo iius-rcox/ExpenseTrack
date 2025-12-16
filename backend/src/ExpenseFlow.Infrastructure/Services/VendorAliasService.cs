@@ -23,24 +23,20 @@ public class VendorAliasService : IVendorAliasService
     /// <inheritdoc />
     public async Task<VendorAlias?> FindMatchingAliasAsync(string description)
     {
-        // Case-insensitive pattern matching
-        var normalizedDescription = description.ToUpperInvariant();
-
-        var aliases = await _dbContext.VendorAliases
-            .AsNoTracking()
-            .OrderByDescending(v => v.Confidence)
-            .ThenByDescending(v => v.MatchCount)
-            .ToListAsync();
-
-        foreach (var alias in aliases)
+        if (string.IsNullOrWhiteSpace(description))
         {
-            if (normalizedDescription.Contains(alias.AliasPattern.ToUpperInvariant()))
-            {
-                return alias;
-            }
+            return null;
         }
 
-        return null;
+        // Database-side pattern matching using PostgreSQL ILIKE
+        // This checks if the description contains the alias pattern (case-insensitive)
+        // Pattern: description ILIKE '%' || alias_pattern || '%'
+        return await _dbContext.VendorAliases
+            .AsNoTracking()
+            .Where(v => EF.Functions.ILike(description, "%" + v.AliasPattern + "%"))
+            .OrderByDescending(v => v.Confidence)
+            .ThenByDescending(v => v.MatchCount)
+            .FirstOrDefaultAsync();
     }
 
     /// <inheritdoc />
@@ -93,5 +89,46 @@ public class VendorAliasService : IVendorAliasService
         var totalEntries = await _dbContext.VendorAliases.CountAsync();
         var totalHits = await _dbContext.VendorAliases.SumAsync(v => v.MatchCount);
         return (totalEntries, totalHits);
+    }
+
+    /// <inheritdoc />
+    public async Task<VendorAlias?> GetByVendorNameAsync(string vendorName)
+    {
+        if (string.IsNullOrWhiteSpace(vendorName))
+        {
+            return null;
+        }
+
+        // First try exact match on CanonicalName
+        var exact = await _dbContext.VendorAliases
+            .AsNoTracking()
+            .FirstOrDefaultAsync(v => v.CanonicalName == vendorName);
+
+        if (exact != null)
+        {
+            return exact;
+        }
+
+        // Fall back to pattern matching
+        return await FindMatchingAliasAsync(vendorName);
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateAsync(VendorAlias alias)
+    {
+        var existing = await _dbContext.VendorAliases.FindAsync(alias.Id);
+        if (existing is not null)
+        {
+            existing.DisplayName = alias.DisplayName;
+            existing.DefaultGLCode = alias.DefaultGLCode;
+            existing.DefaultDepartment = alias.DefaultDepartment;
+            existing.GLConfirmCount = alias.GLConfirmCount;
+            existing.DeptConfirmCount = alias.DeptConfirmCount;
+            existing.Confidence = alias.Confidence;
+            await _dbContext.SaveChangesAsync();
+
+            _logger.LogDebug("Updated vendor alias {CanonicalName}: GL={GLCode}, Dept={Dept}",
+                alias.CanonicalName, alias.DefaultGLCode, alias.DefaultDepartment);
+        }
     }
 }

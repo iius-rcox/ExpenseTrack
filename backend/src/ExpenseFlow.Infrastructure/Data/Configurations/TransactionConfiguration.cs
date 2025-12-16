@@ -1,4 +1,5 @@
 using ExpenseFlow.Core.Entities;
+using ExpenseFlow.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -59,6 +60,12 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .HasColumnName("matched_receipt_id")
             .IsRequired(false);
 
+        // Sprint 5: Match status
+        builder.Property(t => t.MatchStatus)
+            .HasColumnName("match_status")
+            .HasDefaultValue(MatchStatus.Unmatched)
+            .IsRequired();
+
         builder.Property(t => t.CreatedAt)
             .HasColumnName("created_at")
             .HasDefaultValueSql("NOW()")
@@ -75,10 +82,8 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .HasForeignKey(t => t.ImportId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne(t => t.MatchedReceipt)
-            .WithMany()
-            .HasForeignKey(t => t.MatchedReceiptId)
-            .OnDelete(DeleteBehavior.SetNull);
+        // Note: MatchedReceipt relationship defined in ReceiptConfiguration
+        // as a one-to-one relationship via Receipt.MatchedTransactionId
 
         // Indexes
         builder.HasIndex(t => t.UserId)
@@ -94,5 +99,9 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         // Composite index for date range queries
         builder.HasIndex(t => new { t.UserId, t.TransactionDate })
             .HasDatabaseName("ix_transactions_user_date");
+
+        // Sprint 5: Match status index
+        builder.HasIndex(t => new { t.UserId, t.MatchStatus })
+            .HasDatabaseName("ix_transactions_match_status");
     }
 }

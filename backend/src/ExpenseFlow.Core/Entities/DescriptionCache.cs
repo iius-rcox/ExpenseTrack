@@ -24,4 +24,9 @@ public class DescriptionCache : BaseEntity
     /// Number of cache hits for metrics.
     /// </summary>
     public int HitCount { get; set; }
+
+    /// <summary>
+    /// Last time this cache entry was accessed.
+    /// </summary>
+    public DateTime? LastAccessedAt { get; set; }
 }

@@ -8,6 +8,16 @@ namespace ExpenseFlow.Core.Entities;
 public class ExpenseEmbedding : BaseEntity
 {
     /// <summary>
+    /// Owner user for row-level security.
+    /// </summary>
+    public Guid UserId { get; set; }
+
+    /// <summary>
+    /// Source transaction reference.
+    /// </summary>
+    public Guid? TransactionId { get; set; }
+
+    /// <summary>
     /// Reference to source expense line (future).
     /// </summary>
     public Guid? ExpenseLineId { get; set; }
@@ -41,4 +51,13 @@ public class ExpenseEmbedding : BaseEntity
     /// Whether user verified this categorization.
     /// </summary>
     public bool Verified { get; set; }
+
+    /// <summary>
+    /// Auto-purge date. NULL for verified (never expires), CreatedAt + 6 months for unverified.
+    /// </summary>
+    public DateTime? ExpiresAt { get; set; }
+
+    // Navigation properties
+    public User User { get; set; } = null!;
+    public Transaction? Transaction { get; set; }
 }
