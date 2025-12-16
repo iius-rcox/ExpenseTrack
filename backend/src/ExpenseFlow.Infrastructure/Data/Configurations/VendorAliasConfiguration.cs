@@ -1,4 +1,5 @@
 using ExpenseFlow.Core.Entities;
+using ExpenseFlow.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -61,11 +62,19 @@ public class VendorAliasConfiguration : IEntityTypeConfiguration<VendorAlias>
             .HasDefaultValueSql("NOW()")
             .IsRequired();
 
+        builder.Property(v => v.Category)
+            .HasColumnName("category")
+            .HasDefaultValue(VendorCategory.Standard)
+            .IsRequired();
+
         // Indexes
         builder.HasIndex(v => v.AliasPattern)
             .HasDatabaseName("ix_vendor_aliases_pattern");
 
         builder.HasIndex(v => v.CanonicalName)
             .HasDatabaseName("ix_vendor_aliases_canonical");
+
+        builder.HasIndex(v => v.Category)
+            .HasDatabaseName("ix_vendor_aliases_category");
     }
 }

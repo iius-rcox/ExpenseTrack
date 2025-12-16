@@ -1,3 +1,5 @@
+using ExpenseFlow.Shared.Enums;
+
 namespace ExpenseFlow.Core.Entities;
 
 /// <summary>
@@ -44,6 +46,11 @@ public class VendorAlias : BaseEntity
     /// Confidence score (0.00-1.00).
     /// </summary>
     public decimal Confidence { get; set; } = 1.00m;
+
+    /// <summary>
+    /// Vendor classification for specialized processing (Airline, Hotel, Subscription).
+    /// </summary>
+    public VendorCategory Category { get; set; } = VendorCategory.Standard;
 
     // Navigation properties
     public ICollection<SplitPattern> SplitPatterns { get; set; } = new List<SplitPattern>();

@@ -1,0 +1,442 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Subscription Detection API
+  version: 1.0.0
+  description: API for managing detected subscriptions and missing charge alerts
+
+paths:
+  /api/subscriptions:
+    get:
+      summary: List detected subscriptions
+      operationId: listSubscriptions
+      tags:
+        - Subscriptions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Active, Missing, Flagged]
+          description: Filter by subscription status
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: take
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: List of detected subscriptions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/subscriptions/{id}:
+    get:
+      summary: Get subscription details
+      operationId: getSubscription
+      tags:
+        - Subscriptions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Subscription details with occurrence history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionDetailDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Dismiss/ignore a detected subscription
+      operationId: dismissSubscription
+      tags:
+        - Subscriptions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Subscription dismissed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/subscriptions/{id}/confirm:
+    post:
+      summary: Confirm subscription amount variation is expected
+      operationId: confirmSubscriptionAmount
+      tags:
+        - Subscriptions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmSubscriptionRequest'
+      responses:
+        '200':
+          description: Subscription confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/subscriptions/alerts:
+    get:
+      summary: Get missing subscription alerts
+      operationId: getSubscriptionAlerts
+      tags:
+        - Subscriptions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+          description: Filter by month (YYYY-MM format)
+      responses:
+        '200':
+          description: List of missing subscription alerts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionAlertListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/subscriptions/alerts/{id}/acknowledge:
+    post:
+      summary: Acknowledge a missing subscription alert
+      operationId: acknowledgeAlert
+      tags:
+        - Subscriptions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcknowledgeAlertRequest'
+      responses:
+        '200':
+          description: Alert acknowledged
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/subscriptions/detect:
+    post:
+      summary: Trigger subscription detection for current user
+      operationId: detectSubscriptions
+      tags:
+        - Subscriptions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetectSubscriptionsRequest'
+      responses:
+        '200':
+          description: Detection results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionDetectionResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  schemas:
+    SubscriptionDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        vendorName:
+          type: string
+        averageAmount:
+          type: number
+          format: decimal
+        lastSeenDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [Active, Missing, Flagged]
+        detectionSource:
+          type: string
+          enum: [PatternMatch, SeedData]
+        occurrenceCount:
+          type: integer
+      required:
+        - id
+        - vendorName
+        - averageAmount
+        - lastSeenDate
+        - status
+        - detectionSource
+        - occurrenceCount
+
+    SubscriptionDetailDto:
+      allOf:
+        - $ref: '#/components/schemas/SubscriptionDto'
+        - type: object
+          properties:
+            vendorAliasId:
+              type: string
+              format: uuid
+              nullable: true
+            occurrenceMonths:
+              type: array
+              items:
+                type: string
+                pattern: '^\d{4}-\d{2}$'
+            expectedNextDate:
+              type: string
+              format: date
+              nullable: true
+            amountHistory:
+              type: array
+              items:
+                $ref: '#/components/schemas/SubscriptionAmountHistory'
+            createdAt:
+              type: string
+              format: date-time
+
+    SubscriptionAmountHistory:
+      type: object
+      properties:
+        month:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+        amount:
+          type: number
+          format: decimal
+        varianceFromAverage:
+          type: number
+          format: decimal
+          description: Percentage variance from average (e.g., 0.05 = 5%)
+      required:
+        - month
+        - amount
+        - varianceFromAverage
+
+    SubscriptionListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionDto'
+        totalCount:
+          type: integer
+        skip:
+          type: integer
+        take:
+          type: integer
+      required:
+        - items
+        - totalCount
+        - skip
+        - take
+
+    SubscriptionAlertDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        subscriptionId:
+          type: string
+          format: uuid
+        vendorName:
+          type: string
+        expectedAmount:
+          type: number
+          format: decimal
+        expectedMonth:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+        alertType:
+          type: string
+          enum: [Missing, UnusualAmount]
+        actualAmount:
+          type: number
+          format: decimal
+          nullable: true
+          description: Only set for UnusualAmount alerts
+        isAcknowledged:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - subscriptionId
+        - vendorName
+        - expectedAmount
+        - expectedMonth
+        - alertType
+        - isAcknowledged
+        - createdAt
+
+    SubscriptionAlertListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionAlertDto'
+        totalCount:
+          type: integer
+      required:
+        - items
+        - totalCount
+
+    ConfirmSubscriptionRequest:
+      type: object
+      properties:
+        newAverageAmount:
+          type: number
+          format: decimal
+          nullable: true
+          description: Update average if amount change is permanent
+
+    AcknowledgeAlertRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum: [Cancelled, Skipped, BillingChange, Other]
+        note:
+          type: string
+          maxLength: 500
+          nullable: true
+      required:
+        - reason
+
+    DetectSubscriptionsRequest:
+      type: object
+      properties:
+        lookbackMonths:
+          type: integer
+          minimum: 2
+          maximum: 12
+          default: 6
+
+    SubscriptionDetectionResult:
+      type: object
+      properties:
+        newSubscriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionDto'
+        updatedSubscriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionDto'
+        totalDetected:
+          type: integer
+      required:
+        - newSubscriptions
+        - updatedSubscriptions
+        - totalDetected
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        traceId:
+          type: string

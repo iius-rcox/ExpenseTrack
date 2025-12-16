@@ -36,6 +36,11 @@ public class ExpenseFlowDbContext : DbContext
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<StatementImport> StatementImports => Set<StatementImport>();
 
+    // Sprint 7: Advanced Features
+    public DbSet<TravelPeriod> TravelPeriods => Set<TravelPeriod>();
+    public DbSet<DetectedSubscription> DetectedSubscriptions => Set<DetectedSubscription>();
+    public DbSet<KnownSubscriptionVendor> KnownSubscriptionVendors => Set<KnownSubscriptionVendor>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
