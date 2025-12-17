@@ -14,15 +14,21 @@ public class ReportsController : ApiControllerBase
 {
     private readonly IReportService _reportService;
     private readonly IUserService _userService;
+    private readonly IExcelExportService _excelExportService;
+    private readonly IPdfGenerationService _pdfGenerationService;
     private readonly ILogger<ReportsController> _logger;
 
     public ReportsController(
         IReportService reportService,
         IUserService userService,
+        IExcelExportService excelExportService,
+        IPdfGenerationService pdfGenerationService,
         ILogger<ReportsController> logger)
     {
         _reportService = reportService;
         _userService = userService;
+        _excelExportService = excelExportService;
+        _pdfGenerationService = pdfGenerationService;
         _logger = logger;
     }
 
@@ -197,6 +203,111 @@ public class ReportsController : ApiControllerBase
         }
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Exports a report to Excel format matching the AP department template.
+    /// </summary>
+    /// <param name="reportId">Report ID to export</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Excel file as downloadable attachment</returns>
+    [HttpGet("{reportId:guid}/export/excel")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ExportExcel(Guid reportId, CancellationToken ct)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        // Verify user owns the report
+        var report = await _reportService.GetByIdAsync(user.Id, reportId, ct);
+        if (report == null)
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = $"Report with ID {reportId} was not found"
+            });
+        }
+
+        _logger.LogInformation(
+            "Exporting report {ReportId} to Excel for user {UserId}",
+            reportId, user.Id);
+
+        try
+        {
+            var excelBytes = await _excelExportService.GenerateExcelAsync(reportId, ct);
+
+            var fileName = $"ExpenseReport_{report.Period}_{DateTime.UtcNow:yyyyMMdd}.xlsx";
+
+            return File(
+                excelBytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileName);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("template"))
+        {
+            _logger.LogError(ex, "Excel template not found for export");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ProblemDetailsResponse
+            {
+                Title = "Service Unavailable",
+                Detail = "Excel template is not configured. Please contact administrator."
+            });
+        }
+    }
+
+    /// <summary>
+    /// Exports a consolidated PDF of all receipts for a report.
+    /// Includes placeholder pages for missing receipts with justification details.
+    /// </summary>
+    /// <param name="reportId">Report ID to export</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>PDF file as downloadable attachment</returns>
+    [HttpGet("{reportId:guid}/export/receipts")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/pdf")]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ExportReceiptsPdf(Guid reportId, CancellationToken ct)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        // Verify user owns the report
+        var report = await _reportService.GetByIdAsync(user.Id, reportId, ct);
+        if (report == null)
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = $"Report with ID {reportId} was not found"
+            });
+        }
+
+        _logger.LogInformation(
+            "Exporting receipts PDF for report {ReportId} for user {UserId}",
+            reportId, user.Id);
+
+        try
+        {
+            var pdfResult = await _pdfGenerationService.GenerateReceiptPdfAsync(reportId, ct);
+
+            // Add custom headers with metadata
+            Response.Headers.Append("X-Page-Count", pdfResult.PageCount.ToString());
+            Response.Headers.Append("X-Placeholder-Count", pdfResult.PlaceholderCount.ToString());
+
+            return File(
+                pdfResult.FileContents,
+                pdfResult.ContentType,
+                pdfResult.FileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "Failed to generate receipts PDF for report {ReportId}", reportId);
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = ex.Message
+            });
+        }
     }
 }
 

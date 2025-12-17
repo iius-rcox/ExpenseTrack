@@ -36,6 +36,15 @@ public interface IBlobStorageService
     Task<Stream> DownloadAsync(string blobUrl);
 
     /// <summary>
+    /// Downloads a blob from a specific container.
+    /// </summary>
+    /// <param name="containerName">Name of the container</param>
+    /// <param name="blobName">Name of the blob within the container</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Stream containing the blob content</returns>
+    Task<Stream> DownloadAsync(string containerName, string blobName, CancellationToken ct = default);
+
+    /// <summary>
     /// Generates the standard blob path for a receipt.
     /// </summary>
     /// <param name="userId">User ID</param>

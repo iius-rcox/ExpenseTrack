@@ -22,6 +22,8 @@ public class ReportsControllerTests
 {
     private readonly Mock<IReportService> _reportServiceMock;
     private readonly Mock<IUserService> _userServiceMock;
+    private readonly Mock<IExcelExportService> _excelExportServiceMock;
+    private readonly Mock<IPdfGenerationService> _pdfGenerationServiceMock;
     private readonly Mock<ILogger<ReportsController>> _loggerMock;
     private readonly ReportsController _controller;
     private readonly User _testUser;
@@ -30,6 +32,8 @@ public class ReportsControllerTests
     {
         _reportServiceMock = new Mock<IReportService>();
         _userServiceMock = new Mock<IUserService>();
+        _excelExportServiceMock = new Mock<IExcelExportService>();
+        _pdfGenerationServiceMock = new Mock<IPdfGenerationService>();
         _loggerMock = new Mock<ILogger<ReportsController>>();
 
         _testUser = new User
@@ -48,6 +52,8 @@ public class ReportsControllerTests
         _controller = new ReportsController(
             _reportServiceMock.Object,
             _userServiceMock.Object,
+            _excelExportServiceMock.Object,
+            _pdfGenerationServiceMock.Object,
             _loggerMock.Object);
 
         // Set up HttpContext with a user

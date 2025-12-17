@@ -93,7 +93,7 @@ public class ReportService : IReportService
 
             var line = new ExpenseLine
             {
-                ReportId = report.Id,
+                // ReportId will be set automatically by EF Core via navigation property
                 ReceiptId = receipt.Id,
                 TransactionId = transaction.Id,
                 LineOrder = lineOrder++,
@@ -125,6 +125,7 @@ public class ReportService : IReportService
                 line.DepartmentCode = deptSuggestion.Code; // Pre-fill with suggestion
                 line.DepartmentTier = deptSuggestion.Tier;
                 line.DepartmentSource = deptSuggestion.Source;
+                UpdateTierCounts(deptSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
             }
 
             lines.Add(line);
@@ -141,7 +142,7 @@ public class ReportService : IReportService
 
             var line = new ExpenseLine
             {
-                ReportId = report.Id,
+                // ReportId will be set automatically by EF Core via navigation property
                 ReceiptId = null,
                 TransactionId = transaction.Id,
                 LineOrder = lineOrder++,
@@ -174,6 +175,7 @@ public class ReportService : IReportService
                 line.DepartmentCode = deptSuggestion.Code;
                 line.DepartmentTier = deptSuggestion.Tier;
                 line.DepartmentSource = deptSuggestion.Source;
+                UpdateTierCounts(deptSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
             }
 
             missingReceiptCount++;
