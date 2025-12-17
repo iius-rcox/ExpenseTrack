@@ -1,6 +1,9 @@
 using ExpenseFlow.Api.Middleware;
+using ExpenseFlow.Api.Validators;
 using ExpenseFlow.Infrastructure.Data;
 using ExpenseFlow.Infrastructure.Extensions;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -87,6 +90,10 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
     });
+
+// Add FluentValidation
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<GenerateDraftRequestValidator>();
 
 // Configure Problem Details
 builder.Services.AddProblemDetails(options =>
@@ -250,3 +257,6 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+// Required for WebApplicationFactory in integration tests
+public partial class Program { }

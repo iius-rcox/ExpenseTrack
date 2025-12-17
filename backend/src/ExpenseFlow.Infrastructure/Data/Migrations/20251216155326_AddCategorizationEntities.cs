@@ -11,129 +11,8 @@ namespace ExpenseFlow.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_receipts_users_UserId",
-                table: "receipts");
-
-            migrationBuilder.RenameColumn(
-                name: "Status",
-                table: "receipts",
-                newName: "status");
-
-            migrationBuilder.RenameColumn(
-                name: "Currency",
-                table: "receipts",
-                newName: "currency");
-
-            migrationBuilder.RenameColumn(
-                name: "Id",
-                table: "receipts",
-                newName: "id");
-
-            migrationBuilder.RenameColumn(
-                name: "VendorExtracted",
-                table: "receipts",
-                newName: "vendor_extracted");
-
-            migrationBuilder.RenameColumn(
-                name: "UserId",
-                table: "receipts",
-                newName: "user_id");
-
-            migrationBuilder.RenameColumn(
-                name: "ThumbnailUrl",
-                table: "receipts",
-                newName: "thumbnail_url");
-
-            migrationBuilder.RenameColumn(
-                name: "TaxExtracted",
-                table: "receipts",
-                newName: "tax_extracted");
-
-            migrationBuilder.RenameColumn(
-                name: "RetryCount",
-                table: "receipts",
-                newName: "retry_count");
-
-            migrationBuilder.RenameColumn(
-                name: "ProcessedAt",
-                table: "receipts",
-                newName: "processed_at");
-
-            migrationBuilder.RenameColumn(
-                name: "PageCount",
-                table: "receipts",
-                newName: "page_count");
-
-            migrationBuilder.RenameColumn(
-                name: "OriginalFilename",
-                table: "receipts",
-                newName: "original_filename");
-
-            migrationBuilder.RenameColumn(
-                name: "LineItems",
-                table: "receipts",
-                newName: "line_items");
-
-            migrationBuilder.RenameColumn(
-                name: "FileSize",
-                table: "receipts",
-                newName: "file_size");
-
-            migrationBuilder.RenameColumn(
-                name: "ErrorMessage",
-                table: "receipts",
-                newName: "error_message");
-
-            migrationBuilder.RenameColumn(
-                name: "DateExtracted",
-                table: "receipts",
-                newName: "date_extracted");
-
-            migrationBuilder.RenameColumn(
-                name: "CreatedAt",
-                table: "receipts",
-                newName: "created_at");
-
-            migrationBuilder.RenameColumn(
-                name: "ContentType",
-                table: "receipts",
-                newName: "content_type");
-
-            migrationBuilder.RenameColumn(
-                name: "ConfidenceScores",
-                table: "receipts",
-                newName: "confidence_scores");
-
-            migrationBuilder.RenameColumn(
-                name: "BlobUrl",
-                table: "receipts",
-                newName: "blob_url");
-
-            migrationBuilder.RenameColumn(
-                name: "AmountExtracted",
-                table: "receipts",
-                newName: "amount_extracted");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_receipts_Status",
-                table: "receipts",
-                newName: "IX_receipts_status");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_receipts_UserId_Status",
-                table: "receipts",
-                newName: "IX_receipts_user_id_status");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_receipts_UserId",
-                table: "receipts",
-                newName: "IX_receipts_user_id");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_receipts_CreatedAt",
-                table: "receipts",
-                newName: "IX_receipts_created_at");
+            // Note: Receipt table columns and indexes are already snake_case from CreateReceiptsTable migration
+            // Skipping redundant rename operations
 
             migrationBuilder.AddColumn<int>(
                 name: "dept_confirm_count",
@@ -527,13 +406,7 @@ namespace ExpenseFlow.Infrastructure.Data.Migrations
                 principalColumn: "id",
                 onDelete: ReferentialAction.SetNull);
 
-            migrationBuilder.AddForeignKey(
-                name: "FK_receipts_users_user_id",
-                table: "receipts",
-                column: "user_id",
-                principalTable: "users",
-                principalColumn: "id",
-                onDelete: ReferentialAction.Cascade);
+            // Note: FK_receipts_users_user_id already exists from CreateReceiptsTable migration
         }
 
         /// <inheritdoc />
@@ -549,10 +422,6 @@ namespace ExpenseFlow.Infrastructure.Data.Migrations
 
             migrationBuilder.DropForeignKey(
                 name: "FK_receipts_transactions_matched_transaction_id",
-                table: "receipts");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_receipts_users_user_id",
                 table: "receipts");
 
             migrationBuilder.DropTable(
