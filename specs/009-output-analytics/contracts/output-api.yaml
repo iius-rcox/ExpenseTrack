@@ -1,0 +1,401 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Output & Analytics API
+  description: |
+    Excel export, PDF receipt consolidation, month-over-month comparison,
+    and cache statistics endpoints for Sprint 9.
+  version: 1.0.0
+  contact:
+    name: ExpenseFlow Team
+
+servers:
+  - url: /api
+    description: API base path
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Reports Export
+    description: Excel and PDF export operations
+  - name: Analytics
+    description: Month-over-month comparison and cache statistics
+
+paths:
+  /reports/{reportId}/excel:
+    get:
+      tags: [Reports Export]
+      summary: Export report to Excel
+      description: |
+        Generates an Excel file matching the AP department template format.
+        Includes header section with employee name and period, expense rows
+        with formulas preserved, and totals row.
+      operationId: exportReportToExcel
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: Excel file generated successfully
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="2025-01-expense-report.xlsx"'
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Report has zero expense lines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reports/{reportId}/receipts.pdf:
+    get:
+      tags: [Reports Export]
+      summary: Download consolidated receipt PDF
+      description: |
+        Generates a single PDF containing all receipts in expense line order.
+        Missing receipts are replaced with placeholder pages showing expense
+        details and justification. Supports PDF, JPG, and PNG source files.
+      operationId: downloadReceiptsPdf
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: PDF generated successfully
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="2025-01-receipts.pdf"'
+            X-Page-Count:
+              description: Total pages in PDF
+              schema:
+                type: integer
+            X-Placeholder-Count:
+              description: Number of missing receipt placeholders
+              schema:
+                type: integer
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: |
+            Report exceeds receipt limit (100) or missing receipt justifications incomplete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /analytics/comparison:
+    get:
+      tags: [Analytics]
+      summary: Get month-over-month spending comparison
+      description: |
+        Compares spending between two periods identifying:
+        - New vendors (in current but not previous)
+        - Missing recurring (expected but absent)
+        - Significant changes (>50% variance)
+      operationId: getMonthlyComparison
+      parameters:
+        - name: current
+          in: query
+          required: true
+          description: Current period in YYYY-MM format
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+            example: '2025-01'
+        - name: previous
+          in: query
+          required: true
+          description: Previous period in YYYY-MM format
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+            example: '2024-12'
+      responses:
+        '200':
+          description: Comparison data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyComparisonDto'
+        '400':
+          description: Invalid period format or current equals previous
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: No data for one or both periods
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /analytics/cache-stats:
+    get:
+      tags: [Analytics]
+      summary: Get cache tier usage statistics
+      description: |
+        Returns cache hit rates and AI cost estimates for the specified period.
+        Includes warning indicator when Tier 1 hit rate falls below 50% target.
+      operationId: getCacheStatistics
+      parameters:
+        - name: period
+          in: query
+          description: |
+            Period for statistics. Options:
+            - "YYYY-MM" for specific month
+            - "last30days" for rolling 30-day window (default)
+            - "last7days" for rolling 7-day window
+          schema:
+            type: string
+            default: 'last30days'
+            example: '2025-01'
+        - name: groupBy
+          in: query
+          description: Group statistics by operation type
+          schema:
+            type: string
+            enum: ['none', 'operation']
+            default: 'none'
+      responses:
+        '200':
+          description: Cache statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CacheStatisticsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Entra ID JWT token
+
+  parameters:
+    ReportId:
+      name: reportId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  schemas:
+    MonthlyComparisonDto:
+      type: object
+      properties:
+        currentPeriod:
+          type: string
+          example: '2025-01'
+        previousPeriod:
+          type: string
+          example: '2024-12'
+        summary:
+          $ref: '#/components/schemas/ComparisonSummaryDto'
+        newVendors:
+          type: array
+          description: Vendors appearing in current period but not previous
+          items:
+            $ref: '#/components/schemas/VendorAmountDto'
+        missingRecurring:
+          type: array
+          description: Recurring vendors (2+ consecutive months) missing from current
+          items:
+            $ref: '#/components/schemas/VendorAmountDto'
+        significantChanges:
+          type: array
+          description: Vendors with >50% spending change
+          items:
+            $ref: '#/components/schemas/VendorChangeDto'
+
+    ComparisonSummaryDto:
+      type: object
+      properties:
+        currentTotal:
+          type: number
+          format: decimal
+          example: 1250.00
+        previousTotal:
+          type: number
+          format: decimal
+          example: 980.00
+        change:
+          type: number
+          format: decimal
+          example: 270.00
+        changePercent:
+          type: number
+          format: decimal
+          example: 27.55
+
+    VendorAmountDto:
+      type: object
+      properties:
+        vendorName:
+          type: string
+          example: 'Cursor AI'
+        amount:
+          type: number
+          format: decimal
+          example: 20.00
+
+    VendorChangeDto:
+      type: object
+      properties:
+        vendorName:
+          type: string
+          example: 'Amazon Web Services'
+        currentAmount:
+          type: number
+          format: decimal
+          example: 150.00
+        previousAmount:
+          type: number
+          format: decimal
+          example: 85.00
+        change:
+          type: number
+          format: decimal
+          example: 65.00
+        changePercent:
+          type: number
+          format: decimal
+          example: 76.47
+
+    CacheStatisticsResponse:
+      type: object
+      properties:
+        period:
+          type: string
+          description: Statistics period
+          example: 'last30days'
+        overall:
+          $ref: '#/components/schemas/CacheStatisticsDto'
+        byOperation:
+          type: array
+          description: Statistics grouped by operation type (when groupBy=operation)
+          items:
+            $ref: '#/components/schemas/CacheStatsByOperationDto'
+          nullable: true
+
+    CacheStatisticsDto:
+      type: object
+      properties:
+        tier1Hits:
+          type: integer
+          description: Count of Tier 1 (cache) hits
+          example: 180
+        tier2Hits:
+          type: integer
+          description: Count of Tier 2 (embedding) hits
+          example: 50
+        tier3Hits:
+          type: integer
+          description: Count of Tier 3 (AI) hits
+          example: 20
+        totalOperations:
+          type: integer
+          example: 250
+        tier1HitRate:
+          type: number
+          format: decimal
+          description: Percentage of operations resolved by Tier 1
+          example: 72.00
+        tier2HitRate:
+          type: number
+          format: decimal
+          example: 20.00
+        tier3HitRate:
+          type: number
+          format: decimal
+          example: 8.00
+        estimatedMonthlyCost:
+          type: number
+          format: decimal
+          description: Projected AI API cost in USD based on usage
+          example: 7.50
+        avgResponseTimeMs:
+          type: integer
+          description: Average response time across all tiers
+          example: 145
+        belowTarget:
+          type: boolean
+          description: True if Tier 1 hit rate is below 50% target
+          example: false
+
+    CacheStatsByOperationDto:
+      type: object
+      properties:
+        operationType:
+          type: string
+          enum: ['normalization', 'gl_suggestion', 'dept_suggestion']
+          example: 'gl_suggestion'
+        tier1Hits:
+          type: integer
+          example: 60
+        tier2Hits:
+          type: integer
+          example: 25
+        tier3Hits:
+          type: integer
+          example: 10
+        tier1HitRate:
+          type: number
+          format: decimal
+          example: 63.16
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        traceId:
+          type: string

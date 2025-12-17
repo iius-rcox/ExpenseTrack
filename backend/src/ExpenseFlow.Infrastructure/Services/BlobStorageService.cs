@@ -106,6 +106,18 @@ public class BlobStorageService : IBlobStorageService
         return response.Value.Content;
     }
 
+    public async Task<Stream> DownloadAsync(string containerName, string blobName, CancellationToken ct = default)
+    {
+        var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+        var blobClient = containerClient.GetBlobClient(blobName);
+
+        var response = await blobClient.DownloadAsync(ct);
+
+        _logger.LogDebug("Downloaded blob from container {Container}, blob {BlobName}", containerName, blobName);
+
+        return response.Value.Content;
+    }
+
     private BlobClient GetBlobClientFromUrl(string blobUrl)
     {
         var uri = new Uri(blobUrl);

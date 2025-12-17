@@ -1,5 +1,6 @@
 using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Core.Services;
+using ExpenseFlow.Infrastructure.Configuration;
 using ExpenseFlow.Infrastructure.Jobs;
 using ExpenseFlow.Infrastructure.Repositories;
 using ExpenseFlow.Infrastructure.Services;
@@ -123,6 +124,14 @@ public static class ServiceCollectionExtensions
         // Sprint 8: Draft Report Generation
         services.AddScoped<IExpenseReportRepository, ExpenseReportRepository>();
         services.AddScoped<IReportService, ReportService>();
+
+        // Sprint 9: Output Generation & Analytics
+        services.Configure<ExportOptions>(configuration.GetSection(ExportOptions.SectionName));
+        services.Configure<AnalyticsOptions>(configuration.GetSection(AnalyticsOptions.SectionName));
+        services.AddScoped<IExcelExportService, ExcelExportService>();
+        services.AddScoped<IPdfGenerationService, PdfGenerationService>();
+        services.AddScoped<IComparisonService, MonthlyComparisonService>();
+        services.AddScoped<ICacheStatisticsService, CacheStatisticsService>();
 
         return services;
     }
