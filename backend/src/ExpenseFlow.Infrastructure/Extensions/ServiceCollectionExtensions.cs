@@ -120,6 +120,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISubscriptionDetectionService, SubscriptionDetectionService>();
         services.AddScoped<IExpenseSplittingService, ExpenseSplittingService>();
 
+        // Sprint 8: Draft Report Generation
+        services.AddScoped<IExpenseReportRepository, ExpenseReportRepository>();
+        services.AddScoped<IReportService, ReportService>();
+
         return services;
     }
 }

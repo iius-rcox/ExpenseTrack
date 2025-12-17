@@ -157,4 +157,20 @@ public class MatchRepository : IMatchRepository
 
         return await query.AnyAsync();
     }
+
+    public async Task<List<ReceiptTransactionMatch>> GetConfirmedByPeriodAsync(
+        Guid userId,
+        DateOnly startDate,
+        DateOnly endDate)
+    {
+        return await _context.ReceiptTransactionMatches
+            .Include(m => m.Receipt)
+            .Include(m => m.Transaction)
+            .Include(m => m.MatchedVendorAlias)
+            .Where(m => m.UserId == userId && m.Status == MatchProposalStatus.Confirmed)
+            .Where(m => m.Transaction.TransactionDate >= startDate && m.Transaction.TransactionDate <= endDate)
+            .OrderBy(m => m.Transaction.TransactionDate)
+            .ThenBy(m => m.CreatedAt)
+            .ToListAsync();
+    }
 }

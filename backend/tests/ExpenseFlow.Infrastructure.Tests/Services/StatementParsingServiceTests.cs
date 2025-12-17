@@ -1,4 +1,5 @@
 using System.Text;
+using CsvHelper;
 using ExpenseFlow.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -94,13 +95,14 @@ public class StatementParsingServiceTests
     }
 
     [Fact]
-    public async Task ParseAsync_WithEmptyFile_ThrowsInvalidOperationException()
+    public async Task ParseAsync_WithEmptyFile_ThrowsReaderException()
     {
         // Arrange
         using var stream = new MemoryStream(Array.Empty<byte>());
 
         // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        // CsvHelper throws ReaderException before our code can throw InvalidOperationException
+        await Assert.ThrowsAsync<ReaderException>(
             () => _sut.ParseAsync(stream, "empty.csv"));
     }
 

@@ -97,4 +97,18 @@ public class TransactionRepository : ITransactionRepository
     {
         await _context.SaveChangesAsync();
     }
+
+    public async Task<List<Transaction>> GetUnmatchedByPeriodAsync(
+        Guid userId,
+        DateOnly startDate,
+        DateOnly endDate)
+    {
+        return await _context.Transactions
+            .Where(t => t.UserId == userId)
+            .Where(t => t.MatchedReceiptId == null)
+            .Where(t => t.TransactionDate >= startDate && t.TransactionDate <= endDate)
+            .OrderBy(t => t.TransactionDate)
+            .ThenBy(t => t.CreatedAt)
+            .ToListAsync();
+    }
 }

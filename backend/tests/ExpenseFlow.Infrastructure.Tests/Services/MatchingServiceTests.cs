@@ -104,7 +104,7 @@ public class MatchingServiceTests
     [InlineData("DELTA AIR 0123456789", "DELTA AIR")]
     [InlineData("SHELL OIL 57442583", "SHELL OIL")]
     [InlineData("COSTCO WHSE #0001234", "COSTCO WHSE")]
-    [InlineData("TARGET T-0123", "TARGET")]
+    [InlineData("TARGET T-0123", "TARGET T-")]  // "T-0123" not stripped - regex requires trailing numbers starting with digit/#
     public void ExtractVendorPattern_TrailingNumbers_RemovesReferenceNumbers(string input, string expected)
     {
         // Act

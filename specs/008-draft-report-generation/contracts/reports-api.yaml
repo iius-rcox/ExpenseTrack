@@ -1,0 +1,498 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Reports API
+  description: Draft expense report generation and management endpoints
+  version: 1.0.0
+  contact:
+    name: ExpenseFlow Team
+
+servers:
+  - url: /api
+    description: API base path
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Reports
+    description: Expense report operations
+
+paths:
+  /reports/draft:
+    post:
+      tags: [Reports]
+      summary: Generate draft report
+      description: |
+        Creates a draft expense report for the specified period by aggregating
+        matched receipt-transaction pairs and unmatched transactions. Pre-populates
+        GL codes and departments using tiered categorization.
+      operationId: generateDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateDraftRequest'
+      responses:
+        '201':
+          description: Draft report created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseReportDto'
+        '400':
+          description: Invalid period format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Draft already exists for period (set replaceExisting=true to replace)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reports:
+    get:
+      tags: [Reports]
+      summary: List user's reports
+      description: Returns all expense reports for the authenticated user
+      operationId: listReports
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ReportStatus'
+        - name: period
+          in: query
+          description: Filter by period (YYYY-MM)
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reports/{reportId}:
+    get:
+      tags: [Reports]
+      summary: Get report details
+      description: Returns full report with all expense lines
+      operationId: getReport
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: Report details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseReportDto'
+        '404':
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags: [Reports]
+      summary: Delete draft report
+      description: Soft-deletes a draft report
+      operationId: deleteReport
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '204':
+          description: Report deleted
+        '404':
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reports/{reportId}/lines/{lineId}:
+    put:
+      tags: [Reports]
+      summary: Update expense line
+      description: |
+        Updates GL code, department, description, or missing receipt justification
+        for an expense line. Triggers cache learning when categorization is changed.
+      operationId: updateLine
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+        - $ref: '#/components/parameters/LineId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLineRequest'
+      responses:
+        '200':
+          description: Line updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseLineDto'
+        '400':
+          description: Invalid update data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Report or line not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reports/{reportId}/summary:
+    get:
+      tags: [Reports]
+      summary: Get report summary
+      description: Returns summary statistics for the report
+      operationId: getReportSummary
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: Report summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSummaryDto'
+        '404':
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Entra ID JWT token
+
+  parameters:
+    ReportId:
+      name: reportId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    LineId:
+      name: lineId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  schemas:
+    GenerateDraftRequest:
+      type: object
+      required:
+        - period
+      properties:
+        period:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          example: '2025-01'
+          description: Reporting period in YYYY-MM format
+        replaceExisting:
+          type: boolean
+          default: false
+          description: If true, replaces existing draft for the period
+
+    ExpenseReportDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        period:
+          type: string
+          example: '2025-01'
+        status:
+          $ref: '#/components/schemas/ReportStatus'
+        totalAmount:
+          type: number
+          format: decimal
+          example: 1250.00
+        lineCount:
+          type: integer
+          example: 25
+        missingReceiptCount:
+          type: integer
+          example: 3
+        tier1HitCount:
+          type: integer
+          example: 18
+        tier2HitCount:
+          type: integer
+          example: 5
+        tier3HitCount:
+          type: integer
+          example: 2
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseLineDto'
+
+    ExpenseLineDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lineOrder:
+          type: integer
+          example: 1
+        expenseDate:
+          type: string
+          format: date
+          example: '2025-01-15'
+        amount:
+          type: number
+          format: decimal
+          example: 425.00
+        originalDescription:
+          type: string
+          example: 'DELTA AIR 0062363598531'
+        normalizedDescription:
+          type: string
+          example: 'Delta Airlines Flight'
+        vendorName:
+          type: string
+          example: 'Delta Airlines'
+          nullable: true
+        glCode:
+          type: string
+          example: '66300'
+          nullable: true
+        glCodeSuggested:
+          type: string
+          example: '66300'
+          nullable: true
+        glCodeTier:
+          type: integer
+          enum: [1, 2, 3]
+          nullable: true
+        glCodeSource:
+          type: string
+          enum: ['VendorAlias', 'EmbeddingSimilarity', 'AIInference']
+          nullable: true
+        departmentCode:
+          type: string
+          example: '07'
+          nullable: true
+        departmentSuggested:
+          type: string
+          example: '07'
+          nullable: true
+        departmentTier:
+          type: integer
+          enum: [1, 2, 3]
+          nullable: true
+        departmentSource:
+          type: string
+          enum: ['VendorAlias', 'EmbeddingSimilarity', 'AIInference']
+          nullable: true
+        hasReceipt:
+          type: boolean
+        receiptId:
+          type: string
+          format: uuid
+          nullable: true
+        receiptThumbnailUrl:
+          type: string
+          format: uri
+          nullable: true
+        transactionId:
+          type: string
+          format: uuid
+          nullable: true
+        missingReceiptJustification:
+          $ref: '#/components/schemas/MissingReceiptJustification'
+        justificationNote:
+          type: string
+          nullable: true
+        isUserEdited:
+          type: boolean
+
+    UpdateLineRequest:
+      type: object
+      properties:
+        glCode:
+          type: string
+          maxLength: 10
+          nullable: true
+        departmentCode:
+          type: string
+          maxLength: 20
+          nullable: true
+        normalizedDescription:
+          type: string
+          maxLength: 500
+          nullable: true
+        missingReceiptJustification:
+          $ref: '#/components/schemas/MissingReceiptJustification'
+        justificationNote:
+          type: string
+          maxLength: 500
+          nullable: true
+
+    ReportSummaryDto:
+      type: object
+      properties:
+        reportId:
+          type: string
+          format: uuid
+        period:
+          type: string
+        totalAmount:
+          type: number
+          format: decimal
+        lineCount:
+          type: integer
+        missingReceiptCount:
+          type: integer
+        linesWithJustification:
+          type: integer
+          description: Missing receipt lines that have justification set
+        tier1HitRate:
+          type: number
+          format: decimal
+          description: Percentage of suggestions from Tier 1 (cache)
+          example: 72.0
+        tier2HitRate:
+          type: number
+          format: decimal
+          example: 20.0
+        tier3HitRate:
+          type: number
+          format: decimal
+          example: 8.0
+        glCodeCompletionRate:
+          type: number
+          format: decimal
+          description: Percentage of lines with GL code set
+          example: 100.0
+        departmentCompletionRate:
+          type: number
+          format: decimal
+          example: 96.0
+
+    ReportListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportListItemDto'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    ReportListItemDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        period:
+          type: string
+        status:
+          $ref: '#/components/schemas/ReportStatus'
+        totalAmount:
+          type: number
+          format: decimal
+        lineCount:
+          type: integer
+        missingReceiptCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    ReportStatus:
+      type: string
+      enum: ['Draft']
+      description: Report status (Draft only in Sprint 8)
+
+    MissingReceiptJustification:
+      type: string
+      enum: ['None', 'NotProvided', 'Lost', 'DigitalSubscription', 'UnderThreshold', 'Other']
+      nullable: true
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        traceId:
+          type: string
