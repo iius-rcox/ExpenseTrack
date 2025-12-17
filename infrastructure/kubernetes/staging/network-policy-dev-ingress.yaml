@@ -1,0 +1,21 @@
+# This policy must be applied to expenseflow-dev namespace
+# It allows staging pods to connect to the Supabase database
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-staging-to-dev-db
+  namespace: expenseflow-dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: supabase-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: expenseflow-staging
+      ports:
+        - protocol: TCP
+          port: 5432

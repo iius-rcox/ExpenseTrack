@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: expenseflow-staging
+
+resources:
+  - serviceaccount.yaml
+  - configmap.yaml
+  - secret-provider-class.yaml
+  - deployment.yaml
+  - network-policies.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: expenseflow
+      app.kubernetes.io/instance: staging
+      app.kubernetes.io/component: api
