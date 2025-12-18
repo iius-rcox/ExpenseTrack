@@ -13,10 +13,10 @@ spec:
   ingressClassName: webapprouting.kubernetes.azure.com
   tls:
     - hosts:
-        - expenseflow-staging.iius.dev
+        - staging.expense.ii-us.com
       secretName: expenseflow-staging-tls
   rules:
-    - host: expenseflow-staging.iius.dev
+    - host: staging.expense.ii-us.com
       http:
         paths:
           - path: /
