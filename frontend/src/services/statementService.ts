@@ -147,27 +147,17 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
-async function getAuthHeaders(): Promise<HeadersInit> {
-  // Get token from auth context - implementation depends on auth setup
-  const token = localStorage.getItem('auth_token');
-  return {
-    'Authorization': token ? `Bearer ${token}` : '',
-    'Content-Type': 'application/json',
-  };
-}
-
 /**
  * Analyze a statement file to detect column mappings
  */
-export async function analyzeStatement(file: File): Promise<StatementAnalyzeResponse> {
+export async function analyzeStatement(file: File, token: string): Promise<StatementAnalyzeResponse> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const token = localStorage.getItem('auth_token');
   const response = await fetch(`${API_BASE}/statements/analyze`, {
     method: 'POST',
     headers: {
-      'Authorization': token ? `Bearer ${token}` : '',
+      'Authorization': `Bearer ${token}`,
       // Don't set Content-Type for FormData - browser sets it with boundary
     },
     body: formData,
@@ -180,12 +170,15 @@ export async function analyzeStatement(file: File): Promise<StatementAnalyzeResp
  * Import transactions using confirmed column mapping
  */
 export async function importStatement(
-  request: StatementImportRequest
+  request: StatementImportRequest,
+  token: string
 ): Promise<StatementImportResponse> {
-  const headers = await getAuthHeaders();
   const response = await fetch(`${API_BASE}/statements/import`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(request),
   });
 
@@ -197,16 +190,18 @@ export async function importStatement(
  */
 export async function getImports(
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  token: string
 ): Promise<StatementImportListResponse> {
-  const headers = await getAuthHeaders();
   const params = new URLSearchParams({
     page: page.toString(),
     pageSize: pageSize.toString(),
   });
 
   const response = await fetch(`${API_BASE}/statements/imports?${params}`, {
-    headers,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
   });
 
   return handleResponse<StatementImportListResponse>(response);
@@ -215,10 +210,11 @@ export async function getImports(
 /**
  * Get list of available fingerprints (user + system)
  */
-export async function getFingerprints(): Promise<FingerprintListResponse> {
-  const headers = await getAuthHeaders();
+export async function getFingerprints(token: string): Promise<FingerprintListResponse> {
   const response = await fetch(`${API_BASE}/statements/fingerprints`, {
-    headers,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
   });
 
   return handleResponse<FingerprintListResponse>(response);
@@ -234,8 +230,7 @@ export async function getTransactions(params: {
   endDate?: string;
   matched?: boolean;
   importId?: string;
-}): Promise<TransactionListResponse> {
-  const headers = await getAuthHeaders();
+}, token: string): Promise<TransactionListResponse> {
   const searchParams = new URLSearchParams();
 
   if (params.page) searchParams.set('page', params.page.toString());
@@ -246,7 +241,9 @@ export async function getTransactions(params: {
   if (params.importId) searchParams.set('importId', params.importId);
 
   const response = await fetch(`${API_BASE}/transactions?${searchParams}`, {
-    headers,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
   });
 
   return handleResponse<TransactionListResponse>(response);
@@ -255,10 +252,11 @@ export async function getTransactions(params: {
 /**
  * Get transaction details by ID
  */
-export async function getTransaction(id: string): Promise<TransactionDetail> {
-  const headers = await getAuthHeaders();
+export async function getTransaction(id: string, token: string): Promise<TransactionDetail> {
   const response = await fetch(`${API_BASE}/transactions/${id}`, {
-    headers,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
   });
 
   return handleResponse<TransactionDetail>(response);
@@ -267,11 +265,12 @@ export async function getTransaction(id: string): Promise<TransactionDetail> {
 /**
  * Delete a transaction
  */
-export async function deleteTransaction(id: string): Promise<void> {
-  const headers = await getAuthHeaders();
+export async function deleteTransaction(id: string, token: string): Promise<void> {
   const response = await fetch(`${API_BASE}/transactions/${id}`, {
     method: 'DELETE',
-    headers,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
   });
 
   if (!response.ok && response.status !== 204) {

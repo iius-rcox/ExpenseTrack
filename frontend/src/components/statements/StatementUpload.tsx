@@ -1,4 +1,6 @@
 import React, { useCallback, useState } from 'react';
+import { useMsal } from '@azure/msal-react';
+import { apiScopes } from '../../auth/authConfig';
 import { analyzeStatement, StatementAnalyzeResponse, ApiError } from '../../services/statementService';
 
 export interface StatementUploadProps {
@@ -10,6 +12,7 @@ const ACCEPTED_FILE_TYPES = '.csv,.xlsx,.xls';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export function StatementUpload({ onAnalysisComplete, onError }: StatementUploadProps) {
+  const { instance, accounts } = useMsal();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -25,6 +28,22 @@ export function StatementUpload({ onAnalysisComplete, onError }: StatementUpload
     return null;
   };
 
+  const getToken = async (): Promise<string | null> => {
+    if (accounts.length === 0) {
+      return null;
+    }
+    try {
+      const response = await instance.acquireTokenSilent({
+        scopes: apiScopes.all,
+        account: accounts[0],
+      });
+      return response.accessToken;
+    } catch (error) {
+      console.error('Failed to acquire token:', error);
+      return null;
+    }
+  };
+
   const handleFileSelect = useCallback(async (file: File) => {
     const validationError = validateFile(file);
     if (validationError) {
@@ -36,11 +55,18 @@ export function StatementUpload({ onAnalysisComplete, onError }: StatementUpload
     setIsUploading(true);
 
     try {
-      const response = await analyzeStatement(file);
+      const token = await getToken();
+      if (!token) {
+        onError('Authentication required. Please sign in again.');
+        return;
+      }
+      const response = await analyzeStatement(file, token);
       onAnalysisComplete(response);
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 503) {
+        if (err.status === 401) {
+          onError('Session expired. Please sign in again.');
+        } else if (err.status === 503) {
           onError('AI service is currently unavailable. Please try again later or upload a known statement format.');
         } else {
           onError(err.detail || err.title);
@@ -51,7 +77,7 @@ export function StatementUpload({ onAnalysisComplete, onError }: StatementUpload
     } finally {
       setIsUploading(false);
     }
-  }, [onAnalysisComplete, onError]);
+  }, [onAnalysisComplete, onError, accounts, instance]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();

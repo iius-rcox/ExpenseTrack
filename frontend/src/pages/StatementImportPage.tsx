@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react';
+import { useMsal } from '@azure/msal-react';
+import { apiScopes } from '../auth/authConfig';
 import { StatementUpload } from '../components/statements/StatementUpload';
 import { ColumnMappingEditor } from '../components/statements/ColumnMappingEditor';
 import { ImportSummary } from '../components/statements/ImportSummary';
@@ -13,6 +15,7 @@ import {
 type WizardStep = 'upload' | 'mapping' | 'importing' | 'complete';
 
 export function StatementImportPage() {
+  const { instance, accounts } = useMsal();
   const [step, setStep] = useState<WizardStep>('upload');
   const [error, setError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<StatementAnalyzeResponse | null>(null);
@@ -28,6 +31,20 @@ export function StatementImportPage() {
     setError(errorMessage);
   }, []);
 
+  const getToken = async (): Promise<string | null> => {
+    if (accounts.length === 0) return null;
+    try {
+      const response = await instance.acquireTokenSilent({
+        scopes: apiScopes.all,
+        account: accounts[0],
+      });
+      return response.accessToken;
+    } catch (error) {
+      console.error('Failed to acquire token:', error);
+      return null;
+    }
+  };
+
   const handleConfirmMapping = useCallback(
     async (
       mapping: Record<string, ColumnFieldType>,
@@ -40,18 +57,27 @@ export function StatementImportPage() {
       setError(null);
 
       try {
+        const token = await getToken();
+        if (!token) {
+          setError('Authentication required. Please sign in again.');
+          setStep('mapping');
+          return;
+        }
         const result = await importStatement({
           analysisId: analysisResult.analysisId,
           columnMapping: mapping,
           amountSign,
           saveAsFingerprint: fingerprintName !== undefined || true,
           fingerprintName,
-        });
+        }, token);
         setImportResult(result);
         setStep('complete');
       } catch (err) {
         if (err instanceof ApiError) {
-          if (err.status === 400 && err.detail?.includes('expired')) {
+          if (err.status === 401) {
+            setError('Session expired. Please sign in again.');
+            setStep('mapping');
+          } else if (err.status === 400 && err.detail?.includes('expired')) {
             setError('Analysis session expired. Please upload the file again.');
             setStep('upload');
           } else {
@@ -64,7 +90,7 @@ export function StatementImportPage() {
         }
       }
     },
-    [analysisResult]
+    [analysisResult, accounts, instance]
   );
 
   const handleCancel = useCallback(() => {
