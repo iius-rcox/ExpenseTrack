@@ -1,6 +1,6 @@
 # ExpenseFlow Development Guidelines
 
-Auto-generated from feature plans. Last updated: 2025-12-16
+Auto-generated from feature plans. Last updated: 2025-12-17
 
 ## Active Technologies
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Microsoft.Identity.Web, Polly (002-core-backend-auth)
@@ -17,6 +17,7 @@ Auto-generated from feature plans. Last updated: 2025-12-16
 - PostgreSQL 15+ with pgvector (Supabase self-hosted), Tier 1 rule-based detection (007-advanced-features)
 - .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, Semantic Kernel, Hangfire (008-draft-report-generation)
 - .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, ClosedXML (Excel), PdfSharpCore (PDF), SixLabors.ImageSharp (image conversion) (009-output-analytics)
+- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Semantic Kernel (for embedding generation), NBomber or k6 (for load testing) (010-testing-cache-warming)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -105,9 +106,16 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 010-testing-cache-warming: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Semantic Kernel, NBomber, ClosedXML
+  - Entities: ImportJob (for tracking cache warming import jobs)
+  - Services: CacheWarmingService (historical data import, job management)
+  - Jobs: CacheWarmingJob (Hangfire background processing)
+  - Controller: CacheWarmingController (import upload, job tracking, cache statistics)
+  - Load Tests: NBomber scenarios for batch receipt processing (50 in 5min) and concurrent users (20 users, <2s P95)
+  - UAT: 7 test cases (TC-001 through TC-007) covering all Sprint 3-9 features
+  - InMemory Database: DbContext conditionally ignores pgvector/jsonb properties for testing
 - 009-output-analytics: Added .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, ClosedXML (Excel), PdfSharpCore (PDF), SixLabors.ImageSharp (image conversion)
 - 008-draft-report-generation: Added .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, Semantic Kernel, Hangfire
-- 007-advanced-features: Sprint 7 - Advanced Features (Travel Detection, Subscription Detection, Expense Splitting, Travel Timeline)
   - Entities: TravelPeriod, DetectedSubscription, SubscriptionAlert, SplitPattern, SplitAllocation
   - Services: TravelDetectionService, SubscriptionDetectionService, ExpenseSplittingService
   - Jobs: SubscriptionAlertJob (Hangfire monthly recurring)

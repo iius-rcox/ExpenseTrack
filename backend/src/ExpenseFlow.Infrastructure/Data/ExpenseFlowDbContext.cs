@@ -51,15 +51,34 @@ public class ExpenseFlowDbContext : DbContext
     public DbSet<ExpenseReport> ExpenseReports => Set<ExpenseReport>();
     public DbSet<ExpenseLine> ExpenseLines => Set<ExpenseLine>();
 
+    // Sprint 10: Cache Warming
+    public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Enable pgvector extension
-        modelBuilder.HasPostgresExtension("vector");
+        var isNpgsql = Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL";
+
+        // Enable pgvector extension only when using Npgsql (not InMemory)
+        if (isNpgsql)
+        {
+            modelBuilder.HasPostgresExtension("vector");
+        }
 
         // Apply all configurations from this assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ExpenseFlowDbContext).Assembly);
+
+        // For InMemory provider, ignore properties that require PostgreSQL-specific types
+        if (!isNpgsql)
+        {
+            // Ignore Vector type (pgvector)
+            modelBuilder.Entity<ExpenseEmbedding>().Ignore(e => e.Embedding);
+
+            // Ignore complex types that use jsonb column type
+            modelBuilder.Entity<Receipt>().Ignore(r => r.ConfidenceScores);
+            modelBuilder.Entity<Receipt>().Ignore(r => r.LineItems);
+        }
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

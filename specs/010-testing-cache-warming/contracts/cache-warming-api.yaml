@@ -1,0 +1,511 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Cache Warming API
+  description: |
+    API endpoints for cache warming operations including historical data import,
+    job status tracking, and cache statistics.
+  version: 1.0.0
+  contact:
+    name: ExpenseFlow Team
+
+servers:
+  - url: /api
+    description: Base API path
+
+tags:
+  - name: Cache Warming
+    description: Historical data import and cache population
+  - name: Cache Statistics
+    description: Cache metrics and hit rates
+
+paths:
+  /cache-warming/import:
+    post:
+      tags:
+        - Cache Warming
+      summary: Upload historical data for cache warming
+      description: |
+        Uploads an Excel file containing historical expense data and queues
+        a background job to process it. The job extracts descriptions, creates
+        vendor aliases, and generates embeddings.
+      operationId: uploadHistoricalData
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Excel file (.xlsx) with historical expense data
+      responses:
+        '202':
+          description: Import job queued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportJobResponse'
+        '400':
+          description: Invalid file format or missing required columns
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: Unauthorized
+        '413':
+          description: File too large (max 10MB)
+
+  /cache-warming/jobs:
+    get:
+      tags:
+        - Cache Warming
+      summary: List import jobs
+      description: Returns a paginated list of cache warming import jobs for the current user.
+      operationId: listImportJobs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Filter by job status
+          schema:
+            type: string
+            enum: [Pending, Processing, Completed, Failed, Cancelled]
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: List of import jobs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportJobListResponse'
+        '401':
+          description: Unauthorized
+
+  /cache-warming/jobs/{jobId}:
+    get:
+      tags:
+        - Cache Warming
+      summary: Get import job details
+      description: Returns detailed status and progress of a specific import job.
+      operationId: getImportJob
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Import job ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Import job details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportJobResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Job not found
+
+    delete:
+      tags:
+        - Cache Warming
+      summary: Cancel import job
+      description: |
+        Cancels a pending or processing import job. Jobs that have already
+        completed, failed, or been cancelled cannot be cancelled again.
+      operationId: cancelImportJob
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Import job ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Job cancelled successfully
+        '400':
+          description: Job cannot be cancelled (already terminal state)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Job not found
+
+  /cache-warming/jobs/{jobId}/errors:
+    get:
+      tags:
+        - Cache Warming
+      summary: Get import job errors
+      description: Returns detailed error log for records that were skipped during import.
+      operationId: getImportJobErrors
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Import job ID
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          description: Errors per page
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: Error details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportErrorListResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Job not found
+
+  /cache/statistics:
+    get:
+      tags:
+        - Cache Statistics
+      summary: Get cache statistics
+      description: |
+        Returns aggregate statistics about cache contents including counts
+        and hit rates. Used to verify cache warming effectiveness.
+      operationId: getCacheStatistics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          description: Period for hit rate calculation (YYYY-MM format)
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+            example: '2025-01'
+      responses:
+        '200':
+          description: Cache statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CacheStatisticsResponse'
+        '400':
+          description: Invalid period format
+        '401':
+          description: Unauthorized
+
+  /cache/statistics/warming-summary:
+    get:
+      tags:
+        - Cache Statistics
+      summary: Get cache warming summary
+      description: |
+        Returns a summary of cache contents specifically for warming validation,
+        including counts by source (historical import vs runtime learning).
+      operationId: getWarmingSummary
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Warming summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CacheWarmingSummaryResponse'
+        '401':
+          description: Unauthorized
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Entra ID JWT token
+
+  schemas:
+    ImportJobResponse:
+      type: object
+      required:
+        - id
+        - status
+        - sourceFileName
+        - startedAt
+        - progress
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [Pending, Processing, Completed, Failed, Cancelled]
+        sourceFileName:
+          type: string
+          example: "historical_expenses_2024.xlsx"
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        progress:
+          $ref: '#/components/schemas/ImportProgress'
+
+    ImportProgress:
+      type: object
+      required:
+        - totalRecords
+        - processedRecords
+        - cachedDescriptions
+        - createdAliases
+        - generatedEmbeddings
+        - skippedRecords
+        - percentComplete
+      properties:
+        totalRecords:
+          type: integer
+          minimum: 0
+        processedRecords:
+          type: integer
+          minimum: 0
+        cachedDescriptions:
+          type: integer
+          minimum: 0
+        createdAliases:
+          type: integer
+          minimum: 0
+        generatedEmbeddings:
+          type: integer
+          minimum: 0
+        skippedRecords:
+          type: integer
+          minimum: 0
+        percentComplete:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+
+    ImportJobListResponse:
+      type: object
+      required:
+        - items
+        - totalCount
+        - page
+        - pageSize
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportJobResponse'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    ImportError:
+      type: object
+      required:
+        - lineNumber
+        - errorMessage
+      properties:
+        lineNumber:
+          type: integer
+          description: Row number in source file (1-based)
+        errorMessage:
+          type: string
+          description: Description of the validation error
+        rawData:
+          type: string
+          description: The problematic row content (truncated)
+
+    ImportErrorListResponse:
+      type: object
+      required:
+        - errors
+        - totalCount
+        - page
+        - pageSize
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportError'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    CacheStatisticsResponse:
+      type: object
+      required:
+        - period
+        - overall
+      properties:
+        period:
+          type: string
+          example: "2025-01"
+        overall:
+          $ref: '#/components/schemas/CacheStatisticsDto'
+        byOperation:
+          type: array
+          items:
+            $ref: '#/components/schemas/CacheStatsByOperationDto'
+
+    CacheStatisticsDto:
+      type: object
+      required:
+        - totalOperations
+        - tier1Hits
+        - tier2Hits
+        - tier3Hits
+        - tier1HitRate
+        - tier2HitRate
+        - tier3HitRate
+      properties:
+        totalOperations:
+          type: integer
+        tier1Hits:
+          type: integer
+        tier2Hits:
+          type: integer
+        tier3Hits:
+          type: integer
+        tier1HitRate:
+          type: number
+          format: decimal
+        tier2HitRate:
+          type: number
+          format: decimal
+        tier3HitRate:
+          type: number
+          format: decimal
+        estimatedMonthlyCost:
+          type: number
+          format: decimal
+        avgResponseTimeMs:
+          type: integer
+        belowTarget:
+          type: boolean
+
+    CacheStatsByOperationDto:
+      type: object
+      required:
+        - operationType
+        - tier1Hits
+        - tier2Hits
+        - tier3Hits
+        - tier1HitRate
+      properties:
+        operationType:
+          type: string
+        tier1Hits:
+          type: integer
+        tier2Hits:
+          type: integer
+        tier3Hits:
+          type: integer
+        tier1HitRate:
+          type: number
+          format: decimal
+
+    CacheWarmingSummaryResponse:
+      type: object
+      required:
+        - descriptionCache
+        - vendorAliases
+        - expenseEmbeddings
+        - expectedHitRate
+      properties:
+        descriptionCache:
+          $ref: '#/components/schemas/CacheCountBySource'
+        vendorAliases:
+          $ref: '#/components/schemas/CacheCountBySource'
+        expenseEmbeddings:
+          $ref: '#/components/schemas/CacheCountBySource'
+        expectedHitRate:
+          type: number
+          format: decimal
+          description: Estimated Tier 1 hit rate based on cache contents
+        lastImportJob:
+          $ref: '#/components/schemas/ImportJobResponse'
+
+    CacheCountBySource:
+      type: object
+      required:
+        - total
+        - fromImport
+        - fromRuntime
+      properties:
+        total:
+          type: integer
+          description: Total entries in cache
+        fromImport:
+          type: integer
+          description: Entries created from historical import
+        fromRuntime:
+          type: integer
+          description: Entries created from user interactions
+
+    ProblemDetails:
+      type: object
+      properties:
+        title:
+          type: string
+        detail:
+          type: string
+        status:
+          type: integer
+        instance:
+          type: string
+
+security:
+  - bearerAuth: []

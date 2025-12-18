@@ -133,6 +133,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IComparisonService, MonthlyComparisonService>();
         services.AddScoped<ICacheStatisticsService, CacheStatisticsService>();
 
+        // Sprint 10: Cache Warming
+        services.AddScoped<ICacheWarmingService, CacheWarmingService>();
+        services.AddScoped<CacheWarmingJob>();
+
         return services;
     }
 }
