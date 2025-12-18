@@ -51,6 +51,17 @@ spec:
                 configMapKeyRef:
                   key: azure-audience
                   name: expenseflow-config
+            # EF Core query logging for performance analysis
+            - name: Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command
+              valueFrom:
+                configMapKeyRef:
+                  key: logging-efcore-command
+                  name: expenseflow-config
+            - name: Logging__LogLevel__Microsoft.EntityFrameworkCore
+              valueFrom:
+                configMapKeyRef:
+                  key: logging-efcore-query
+                  name: expenseflow-config
           volumeMounts:
             - name: secrets-store
               mountPath: "/mnt/secrets-store"
