@@ -181,8 +181,8 @@ app.UseSerilogRequestLogging(options =>
     };
 });
 
-// Swagger UI in development
-if (app.Environment.IsDevelopment())
+// Swagger UI in development and staging
+if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 {
     app.UseSwagger();
     app.UseSwaggerUI(options =>
