@@ -1,0 +1,44 @@
+# Network policies for cross-namespace database access
+# Allows staging namespace to connect to dev namespace's Supabase database
+
+# Ingress policy - allows traffic INTO dev namespace from staging
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-staging-to-dev-db
+  namespace: expenseflow-dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: supabase-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: expenseflow-staging
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# Egress policy - allows traffic OUT OF staging namespace to dev
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-dev-db
+  namespace: expenseflow-staging
+spec:
+  podSelector:
+    matchLabels:
+      app: expenseflow-api
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: expenseflow-dev
+      ports:
+        - protocol: TCP
+          port: 5432

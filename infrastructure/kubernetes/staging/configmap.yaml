@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: expenseflow-config
+  namespace: expenseflow-staging
+  labels:
+    app: expenseflow-api
+    environment: staging
+data:
+  azure-tenant-id: "953922e6-5370-4a01-a3d5-773a30df726b"
+  azure-client-id: "00435dee-8aff-429b-bab6-762973c091c4"
+  azure-audience: "api://00435dee-8aff-429b-bab6-762973c091c4"

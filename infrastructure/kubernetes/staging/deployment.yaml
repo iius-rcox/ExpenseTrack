@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: expenseflow-api
+  namespace: expenseflow-staging
+  labels:
+    app: expenseflow-api
+    environment: staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: expenseflow-api
+      environment: staging
+  template:
+    metadata:
+      labels:
+        app: expenseflow-api
+        environment: staging
+    spec:
+      serviceAccountName: expenseflow-api
+      containers:
+        - name: api
+          image: iiusacr.azurecr.io/expenseflow-api:v1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Staging
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__PostgreSQL
+              valueFrom:
+                secretKeyRef:
+                  key: postgresql-connection-string
+                  name: expenseflow-secrets
+            - name: AzureAd__TenantId
+              valueFrom:
+                configMapKeyRef:
+                  key: azure-tenant-id
+                  name: expenseflow-config
+            - name: AzureAd__ClientId
+              valueFrom:
+                configMapKeyRef:
+                  key: azure-client-id
+                  name: expenseflow-config
+            - name: AzureAd__Audience
+              valueFrom:
+                configMapKeyRef:
+                  key: azure-audience
+                  name: expenseflow-config
+          volumeMounts:
+            - name: secrets-store
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: azure-keyvault-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: expenseflow-api
+  namespace: expenseflow-staging
+  labels:
+    app: expenseflow-api
+    environment: staging
+spec:
+  selector:
+    app: expenseflow-api
+    environment: staging
+  ports:
+    - port: 80
+      targetPort: 8080
+      name: http
+  type: ClusterIP

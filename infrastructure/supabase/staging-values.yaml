@@ -1,0 +1,142 @@
+# Supabase Staging Values Override
+# Extends base values.yaml with staging-specific configuration
+
+# PostgreSQL Database (core component)
+db:
+  enabled: true
+  image:
+    tag: "15.1.0.147"
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: managed-premium
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# Supabase Studio (graphical database explorer)
+studio:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# REST API (PostgREST)
+rest:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Realtime (websocket subscriptions)
+realtime:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Auth - DISABLED (using Entra ID per constitution)
+auth:
+  enabled: false
+
+# Storage - DISABLED (using Azure Blob Storage per constitution)
+storage:
+  enabled: false
+
+# Meta (database migrations)
+meta:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# Kong API Gateway
+kong:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+# Analytics
+analytics:
+  enabled: false
+
+# Functions (Edge Functions)
+functions:
+  enabled: false
+
+# Image Proxy
+imgproxy:
+  enabled: false
+
+# Vector (logging)
+vector:
+  enabled: false
+
+# Global settings
+secret:
+  jwt:
+    anonKey: ""
+    serviceKey: ""
+    secret: ""
+  dashboard:
+    username: "admin"
+    password: ""
+  db:
+    username: "postgres"
+    password: ""
+    database: "expenseflow"
+  smtp:
+    adminEmail: ""
+    host: ""
+    port: 587
+    user: ""
+    pass: ""
+    senderName: "ExpenseFlow Staging"
+
+# pgvector extension must be enabled
+# This is done via init container or post-install hook
+db:
+  initContainers:
+    - name: enable-pgvector
+      image: postgres:15
+      command:
+        - /bin/sh
+        - -c
+        - |
+          until pg_isready -h localhost -p 5432; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+          psql -U postgres -d expenseflow -c "CREATE EXTENSION IF NOT EXISTS vector;"
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
