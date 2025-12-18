@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: expenseflow-api
+  namespace: expenseflow-staging
+  labels:
+    app: expenseflow-api
+    environment: staging
+  annotations:
+    kubernetes.io/ingress.class: webapprouting.kubernetes.azure.com
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: webapprouting.kubernetes.azure.com
+  tls:
+    - hosts:
+        - expenseflow-staging.iius.dev
+      secretName: expenseflow-staging-tls
+  rules:
+    - host: expenseflow-staging.iius.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: expenseflow-api
+                port:
+                  number: 80

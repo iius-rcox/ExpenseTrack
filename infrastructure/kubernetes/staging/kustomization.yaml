@@ -9,6 +9,7 @@ resources:
   - secret-provider-class.yaml
   - deployment.yaml
   - network-policies.yaml
+  - ingress.yaml
 
 labels:
   - pairs:
