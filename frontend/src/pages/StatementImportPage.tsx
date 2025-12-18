@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { StatementUpload } from '../components/statements/StatementUpload';
 import { ColumnMappingEditor } from '../components/statements/ColumnMappingEditor';
 import { ImportSummary } from '../components/statements/ImportSummary';

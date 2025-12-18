@@ -1,4 +1,3 @@
-import React from 'react';
 import { StatementImportResponse, TransactionSummary } from '../../services/statementService';
 
 export interface ImportSummaryProps {
@@ -12,8 +11,6 @@ export function ImportSummary({
   onViewTransactions,
   onImportAnother,
 }: ImportSummaryProps) {
-  const totalProcessed = result.imported + result.skipped + result.duplicates;
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
