@@ -19,10 +19,33 @@ spec:
     - host: staging.expense.ii-us.com
       http:
         paths:
-          - path: /
+          # API routes - must come first (more specific)
+          - path: /api
             pathType: Prefix
             backend:
               service:
                 name: expenseflow-api
+                port:
+                  number: 80
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: expenseflow-api
+                port:
+                  number: 80
+          - path: /swagger
+            pathType: Prefix
+            backend:
+              service:
+                name: expenseflow-api
+                port:
+                  number: 80
+          # Frontend - catch all
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: expenseflow-frontend
                 port:
                   number: 80
