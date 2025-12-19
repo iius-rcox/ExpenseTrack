@@ -25,6 +25,8 @@ Auto-generated from feature plans. Last updated: 2025-12-17
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Semantic Kernel (for embedding generation), NBomber or k6 (for load testing) (010-testing-cache-warming)
 - TypeScript 5.7+ with React 18.3+ (011-unified-frontend)
 - N/A (frontend consumes existing backend APIs) (011-unified-frontend)
+- .NET 8 with C# 12 (cleanup endpoint), JSON (expected values file) + ExpenseFlow.Api (existing), test-data folder, staging API (012-automated-uat-testing)
+- `test-data/receipts/` (19 images), `test-data/statements/chase.csv`, `test-data/expected-values.json` (new) (012-automated-uat-testing)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -113,6 +115,7 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 012-automated-uat-testing: Added .NET 8 with C# 12 (cleanup endpoint), JSON (expected values file) + ExpenseFlow.Api (existing), test-data folder, staging API
 - 011-unified-frontend: Added TypeScript 5.7+ with React 18.3+
 - 010-testing-cache-warming: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Semantic Kernel, NBomber, ClosedXML
   - Entities: ImportJob (for tracking cache warming import jobs)
@@ -122,7 +125,6 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
   - Load Tests: NBomber scenarios for batch receipt processing (50 in 5min) and concurrent users (20 users, <2s P95)
   - UAT: 7 test cases (TC-001 through TC-007) covering all Sprint 3-9 features
   - InMemory Database: DbContext conditionally ignores pgvector/jsonb properties for testing
-- 009-output-analytics: Added .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, ClosedXML (Excel), PdfSharpCore (PDF), SixLabors.ImageSharp (image conversion)
   - Entities: TravelPeriod, DetectedSubscription, SubscriptionAlert, SplitPattern, SplitAllocation
   - Services: TravelDetectionService, SubscriptionDetectionService, ExpenseSplittingService
   - Jobs: SubscriptionAlertJob (Hangfire monthly recurring)
