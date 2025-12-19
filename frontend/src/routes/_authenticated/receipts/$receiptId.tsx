@@ -1,7 +1,7 @@
 "use client"
 
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useReceiptDetail, useDeleteReceipt, useRetryReceipt } from '@/hooks/queries/use-receipts'
+import { useReceiptDetail, useDeleteReceipt, useRetryReceipt, useProcessReceipt } from '@/hooks/queries/use-receipts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -49,6 +49,7 @@ function ReceiptDetailPage() {
   const { data: receipt, isLoading, error } = useReceiptDetail(receiptId)
   const { mutate: deleteReceipt, isPending: isDeleting } = useDeleteReceipt()
   const { mutate: retryReceipt, isPending: isRetrying } = useRetryReceipt()
+  const { mutate: processReceipt, isPending: isProcessing } = useProcessReceipt()
 
   const handleDelete = () => {
     deleteReceipt(receiptId, {
@@ -58,6 +59,17 @@ function ReceiptDetailPage() {
       },
       onError: (error) => {
         toast.error(`Failed to delete receipt: ${error.message}`)
+      },
+    })
+  }
+
+  const handleProcess = () => {
+    processReceipt(receiptId, {
+      onSuccess: () => {
+        toast.success('Receipt processing started')
+      },
+      onError: (error) => {
+        toast.error(`Failed to start processing: ${error.message}`)
       },
     })
   }
@@ -121,6 +133,20 @@ function ReceiptDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {receipt.status === 'Uploaded' && (
+            <Button
+              variant="default"
+              onClick={handleProcess}
+              disabled={isProcessing}
+            >
+              {isProcessing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Process Receipt
+            </Button>
+          )}
           {receipt.status === 'Error' && (
             <Button
               variant="outline"

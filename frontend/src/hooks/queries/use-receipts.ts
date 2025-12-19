@@ -109,3 +109,18 @@ export function useRetryReceipt() {
     },
   })
 }
+
+export function useProcessReceipt() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      return apiFetch<ReceiptSummary>(`/receipts/${id}/process`, { method: 'POST' })
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: receiptKeys.detail(id) })
+      queryClient.invalidateQueries({ queryKey: receiptKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: receiptKeys.statusCounts() })
+    },
+  })
+}
