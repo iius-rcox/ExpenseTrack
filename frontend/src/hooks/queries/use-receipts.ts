@@ -71,7 +71,7 @@ export function useUploadReceipts() {
         formData.append('files', file)
       })
 
-      return apiUpload<UploadResponse>('/receipts/upload', formData, onProgress)
+      return apiUpload<UploadResponse>('/receipts', formData, onProgress)
     },
     onSuccess: () => {
       // Invalidate receipt lists and status counts
