@@ -15,18 +15,22 @@ public class ReceiptsController : ApiControllerBase
 {
     private readonly IReceiptService _receiptService;
     private readonly IUserService _userService;
+    private readonly IBlobStorageService _blobStorageService;
     private readonly ILogger<ReceiptsController> _logger;
     private readonly int _maxBatchSize;
     private readonly int _maxFileSizeBytes;
+    private static readonly TimeSpan DefaultSasExpiry = TimeSpan.FromHours(1);
 
     public ReceiptsController(
         IReceiptService receiptService,
         IUserService userService,
+        IBlobStorageService blobStorageService,
         IConfiguration configuration,
         ILogger<ReceiptsController> logger)
     {
         _receiptService = receiptService;
         _userService = userService;
+        _blobStorageService = blobStorageService;
         _logger = logger;
 
         _maxBatchSize = configuration.GetValue<int>("ReceiptProcessing:MaxBatchSize", 20);
@@ -141,6 +145,9 @@ public class ReceiptsController : ApiControllerBase
 
         response.TotalUploaded = response.Receipts.Count;
 
+        // Generate SAS URLs for thumbnail access (storage account has public access disabled)
+        await PopulateThumbnailSasUrlsAsync(response.Receipts);
+
         _logger.LogInformation(
             "Upload completed for user {UserId}: {Uploaded} successful, {Failed} failed",
             user.Id,
@@ -184,6 +191,9 @@ public class ReceiptsController : ApiControllerBase
             PageSize = pageSize
         };
 
+        // Generate SAS URLs for thumbnail access (storage account has public access disabled)
+        await PopulateThumbnailSasUrlsAsync(response.Items);
+
         return Ok(response);
     }
 
@@ -209,7 +219,19 @@ public class ReceiptsController : ApiControllerBase
             });
         }
 
-        return Ok(MapToDetailDto(receipt));
+        var dto = MapToDetailDto(receipt);
+
+        // Generate SAS URLs for blob access (storage account has public access disabled)
+        if (!string.IsNullOrEmpty(receipt.BlobUrl))
+        {
+            dto.BlobUrl = await _blobStorageService.GenerateSasUrlAsync(receipt.BlobUrl, DefaultSasExpiry);
+        }
+        if (!string.IsNullOrEmpty(receipt.ThumbnailUrl))
+        {
+            dto.ThumbnailUrl = await _blobStorageService.GenerateSasUrlAsync(receipt.ThumbnailUrl, DefaultSasExpiry);
+        }
+
+        return Ok(dto);
     }
 
     /// <summary>
@@ -312,6 +334,9 @@ public class ReceiptsController : ApiControllerBase
             PageSize = pageSize
         };
 
+        // Generate SAS URLs for thumbnail access (storage account has public access disabled)
+        await PopulateThumbnailSasUrlsAsync(response.Items);
+
         return Ok(response);
     }
 
@@ -366,7 +391,10 @@ public class ReceiptsController : ApiControllerBase
             });
         }
 
-        return Ok(MapToSummaryDto(retried));
+        var dto = MapToSummaryDto(retried);
+        await PopulateThumbnailSasUrlAsync(dto);
+
+        return Ok(dto);
     }
 
     /// <summary>
@@ -402,7 +430,19 @@ public class ReceiptsController : ApiControllerBase
             });
         }
 
-        return Ok(MapToDetailDto(updated));
+        var dto = MapToDetailDto(updated);
+
+        // Generate SAS URLs for blob access (storage account has public access disabled)
+        if (!string.IsNullOrEmpty(updated.BlobUrl))
+        {
+            dto.BlobUrl = await _blobStorageService.GenerateSasUrlAsync(updated.BlobUrl, DefaultSasExpiry);
+        }
+        if (!string.IsNullOrEmpty(updated.ThumbnailUrl))
+        {
+            dto.ThumbnailUrl = await _blobStorageService.GenerateSasUrlAsync(updated.ThumbnailUrl, DefaultSasExpiry);
+        }
+
+        return Ok(dto);
     }
 
     /// <summary>
@@ -447,7 +487,10 @@ public class ReceiptsController : ApiControllerBase
             });
         }
 
-        return Ok(MapToSummaryDto(processed));
+        var dto = MapToSummaryDto(processed);
+        await PopulateThumbnailSasUrlAsync(dto);
+
+        return Ok(dto);
     }
 
     private static ReceiptSummaryDto MapToSummaryDto(Receipt receipt)
@@ -497,5 +540,31 @@ public class ReceiptsController : ApiControllerBase
             PageCount = receipt.PageCount,
             ProcessedAt = receipt.ProcessedAt
         };
+    }
+
+    /// <summary>
+    /// Generates SAS URLs for thumbnail images in a list of receipt summary DTOs.
+    /// </summary>
+    private async Task PopulateThumbnailSasUrlsAsync(IEnumerable<ReceiptSummaryDto> dtos)
+    {
+        var tasks = dtos
+            .Where(d => !string.IsNullOrEmpty(d.ThumbnailUrl))
+            .Select(async d =>
+            {
+                d.ThumbnailUrl = await _blobStorageService.GenerateSasUrlAsync(d.ThumbnailUrl!, DefaultSasExpiry);
+            });
+
+        await Task.WhenAll(tasks);
+    }
+
+    /// <summary>
+    /// Generates SAS URL for thumbnail image in a single receipt summary DTO.
+    /// </summary>
+    private async Task PopulateThumbnailSasUrlAsync(ReceiptSummaryDto dto)
+    {
+        if (!string.IsNullOrEmpty(dto.ThumbnailUrl))
+        {
+            dto.ThumbnailUrl = await _blobStorageService.GenerateSasUrlAsync(dto.ThumbnailUrl, DefaultSasExpiry);
+        }
     }
 }
