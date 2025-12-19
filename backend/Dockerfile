@@ -2,6 +2,9 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
 WORKDIR /src
 
+# Build configuration (Release for production, Staging for staging/test)
+ARG BUILD_CONFIGURATION=Release
+
 # Copy solution and project files
 COPY ExpenseFlow.sln ./
 COPY src/ExpenseFlow.Api/ExpenseFlow.Api.csproj src/ExpenseFlow.Api/
@@ -19,7 +22,7 @@ RUN dotnet restore
 COPY src/ src/
 
 # Build and publish
-RUN dotnet publish src/ExpenseFlow.Api/ExpenseFlow.Api.csproj -c Release -o /app/publish
+RUN dotnet publish src/ExpenseFlow.Api/ExpenseFlow.Api.csproj -c ${BUILD_CONFIGURATION} -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
