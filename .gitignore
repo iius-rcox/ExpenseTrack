@@ -74,5 +74,5 @@ conversations/
 claude-exports/
 
 # test files
-.test-data/
-*.csv
+test-data/
+.mcp.json
