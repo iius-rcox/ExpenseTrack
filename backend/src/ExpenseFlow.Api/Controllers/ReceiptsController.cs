@@ -405,6 +405,51 @@ public class ReceiptsController : ApiControllerBase
         return Ok(MapToDetailDto(updated));
     }
 
+    /// <summary>
+    /// Triggers processing for a receipt with Uploaded status.
+    /// </summary>
+    /// <param name="id">Receipt ID</param>
+    /// <returns>Updated receipt</returns>
+    [HttpPost("{id:guid}/process")]
+    [ProducesResponseType(typeof(ReceiptSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ReceiptSummaryDto>> ProcessReceipt(Guid id)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+        var receipt = await _receiptService.GetReceiptAsync(id, user.Id);
+
+        if (receipt == null)
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Receipt not found",
+                Detail = $"Receipt with ID {id} was not found"
+            });
+        }
+
+        if (receipt.Status != ReceiptStatus.Uploaded)
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Invalid status",
+                Detail = $"Receipt has status {receipt.Status}. Only Uploaded receipts can be processed."
+            });
+        }
+
+        var processed = await _receiptService.TriggerProcessingAsync(id, user.Id);
+        if (processed == null)
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Processing failed",
+                Detail = "Unable to trigger receipt processing"
+            });
+        }
+
+        return Ok(MapToSummaryDto(processed));
+    }
+
     private static ReceiptSummaryDto MapToSummaryDto(Receipt receipt)
     {
         return new ReceiptSummaryDto

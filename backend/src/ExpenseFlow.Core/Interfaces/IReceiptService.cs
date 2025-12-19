@@ -55,6 +55,11 @@ public interface IReceiptService
     Task<Receipt?> RetryReceiptAsync(Guid id, Guid userId);
 
     /// <summary>
+    /// Triggers processing for an uploaded receipt.
+    /// </summary>
+    Task<Receipt?> TriggerProcessingAsync(Guid id, Guid userId);
+
+    /// <summary>
     /// Updates receipt data with manual corrections.
     /// </summary>
     Task<Receipt?> UpdateReceiptAsync(Guid id, Guid userId, Shared.DTOs.ReceiptUpdateRequestDto request);

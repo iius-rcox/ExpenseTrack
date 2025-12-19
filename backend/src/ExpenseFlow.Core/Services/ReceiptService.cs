@@ -191,6 +191,22 @@ public class ReceiptService : IReceiptService
         return receipt;
     }
 
+    public async Task<Receipt?> TriggerProcessingAsync(Guid id, Guid userId)
+    {
+        var receipt = await _receiptRepository.GetByIdAsync(id, userId);
+        if (receipt == null || receipt.Status != ReceiptStatus.Uploaded)
+        {
+            return null;
+        }
+
+        // Queue background processing job
+        _backgroundJobClient.Enqueue<IReceiptProcessingJob>(job => job.ProcessAsync(receipt.Id));
+
+        _logger.LogInformation("Receipt {ReceiptId} queued for processing", id);
+
+        return receipt;
+    }
+
     public async Task<Receipt?> UpdateReceiptAsync(Guid id, Guid userId, Shared.DTOs.ReceiptUpdateRequestDto request)
     {
         var receipt = await _receiptRepository.GetByIdAsync(id, userId);
