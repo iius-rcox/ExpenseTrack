@@ -21,7 +21,7 @@ export function useApiToken() {
 
     try {
       const response = await instance.acquireTokenSilent(request);
-      // Use idToken since we're using OIDC scopes (openid, profile, email)
+      // Use idToken since no API scope is exposed - backend validates ID tokens
       return response.idToken;
     } catch (error) {
       if (error instanceof InteractionRequiredAuthError) {

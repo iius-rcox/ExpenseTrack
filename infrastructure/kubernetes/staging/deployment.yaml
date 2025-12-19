@@ -51,6 +51,11 @@ spec:
                 configMapKeyRef:
                   key: azure-audience
                   name: expenseflow-config
+            - name: AzureAd__AllowWebApiToBeAuthorizedByACL
+              valueFrom:
+                configMapKeyRef:
+                  key: azure-allow-acl
+                  name: expenseflow-config
             # CORS allowed origins
             - name: Cors__AllowedOrigins__0
               valueFrom:

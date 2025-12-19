@@ -36,13 +36,13 @@ export const msalConfig: Configuration = {
   },
 };
 
-// Scopes for API access
-// Using OpenID Connect scopes - the ID token will be used for API auth
+// For API calls, we'll use the ID token since no API scope is exposed
+// The backend must be configured to accept ID tokens
 export const apiScopes = {
   all: ['openid', 'profile', 'email'],
 };
 
-// Login request configuration
+// Login request configuration - use openid for initial sign-in
 export const loginRequest = {
   scopes: ['openid', 'profile', 'email'],
 };

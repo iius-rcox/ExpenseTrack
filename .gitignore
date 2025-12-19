@@ -72,3 +72,7 @@ claude-suggestions/
 conversations/
 *.conversation
 claude-exports/
+
+# test files
+.test-data/
+*.csv
