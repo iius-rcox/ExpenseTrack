@@ -31,7 +31,7 @@ export function useReceiptList(params: ReceiptListParams = {}) {
     queryFn: async () => {
       const searchParams = new URLSearchParams()
       if (status) searchParams.set('status', status)
-      searchParams.set('page', String(page))
+      searchParams.set('pageNumber', String(page))
       searchParams.set('pageSize', String(pageSize))
 
       return apiFetch<ReceiptListResponse>(`/receipts?${searchParams}`)
@@ -50,7 +50,7 @@ export function useReceiptDetail(id: string) {
 export function useReceiptStatusCounts() {
   return useQuery({
     queryKey: receiptKeys.statusCounts(),
-    queryFn: () => apiFetch<ReceiptStatusCounts>('/receipts/status-counts'),
+    queryFn: () => apiFetch<ReceiptStatusCounts>('/receipts/counts'),
     staleTime: 30_000,
   })
 }
