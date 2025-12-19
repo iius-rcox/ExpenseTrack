@@ -1,0 +1,285 @@
+{
+  "$schema": "./expected-values.schema.json",
+  "version": "1.0",
+  "metadata": {
+    "createdAt": "2025-12-19",
+    "description": "Expected values for ExpenseFlow UAT testing with 19 receipts and Chase statement",
+    "lastUpdated": "2025-12-19",
+    "maintainer": "Claude Code UAT"
+  },
+  "receipts": {
+    "20251211_212334.jpg": {
+      "expectedAmount": 84.00,
+      "expectedDate": "2025-12-11",
+      "expectedVendor": "RDU Airport Parking",
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "RDU parking receipt - primary match test case"
+    },
+    "Receipt 2768.pdf": {
+      "expectedAmount": null,
+      "expectedDate": null,
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "PDF format test - values TBD after OCR processing"
+    },
+    "20251210_193001.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-12-10",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251209_181952.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-12-09",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251208_205349.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-12-08",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251208_171057.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-12-08",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251208_113659.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-12-08",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251114_183020.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-14",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251114_113835.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-14",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251112_143331.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-12",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251111_204113.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-11",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251110_123621.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-10",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251106_181304.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-06",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251106_122533.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-06",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251106_114930.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-06",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251105_180504.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-05",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251104_182721.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-04",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251103_092528.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-03",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    },
+    "20251103_075948.jpg": {
+      "expectedAmount": null,
+      "expectedDate": "2025-11-03",
+      "expectedVendor": null,
+      "expectedCurrency": "USD",
+      "minConfidence": 0.70,
+      "expectedStatus": "Ready",
+      "amountTolerance": 0.01,
+      "notes": "Placeholder - update after OCR validation"
+    }
+  },
+  "transactions": {
+    "rduParking_Dec11": {
+      "description": "RDUAA PUBLIC PARKING",
+      "amount": -84.00,
+      "date": "2025-12-11",
+      "expectedCategory": "Travel",
+      "expectedNormalizedVendor": "RDU Airport Parking",
+      "notes": "Primary match target for RDU parking receipt"
+    },
+    "rduParking_Nov14": {
+      "description": "RDUAA PUBLIC PARKING",
+      "amount": -73.50,
+      "date": "2025-11-14",
+      "expectedCategory": "Travel",
+      "expectedNormalizedVendor": "RDU Airport Parking",
+      "notes": "Secondary RDU parking transaction"
+    },
+    "rduParking_Nov06": {
+      "description": "RDUAA PUBLIC PARKING",
+      "amount": -84.00,
+      "date": "2025-11-06",
+      "expectedCategory": "Travel",
+      "expectedNormalizedVendor": "RDU Airport Parking",
+      "notes": "Third RDU parking transaction"
+    },
+    "amazonShopping": {
+      "description": "Amazon.com*ON92D6EI3",
+      "amount": -148.72,
+      "date": "2025-12-17",
+      "expectedCategory": "Shopping",
+      "expectedNormalizedVendor": "Amazon",
+      "notes": "Amazon vendor normalization test"
+    },
+    "doordashFood": {
+      "description": "DD *DOORDASH TAZAGRILL",
+      "amount": -23.55,
+      "date": "2025-12-17",
+      "expectedCategory": "Food & Drink",
+      "expectedNormalizedVendor": "DoorDash",
+      "notes": "DoorDash vendor normalization"
+    },
+    "chickFilA": {
+      "description": "CHICK-FIL-A  #01391",
+      "amount": -43.36,
+      "date": "2025-12-15",
+      "expectedCategory": "Food & Drink",
+      "expectedNormalizedVendor": "Chick-fil-A",
+      "notes": "Restaurant category validation"
+    }
+  },
+  "expectedMatches": [
+    {
+      "receiptFile": "20251211_212334.jpg",
+      "transactionDescription": "RDUAA PUBLIC PARKING",
+      "transactionAmount": -84.00,
+      "transactionDate": "2025-12-11",
+      "minConfidence": 0.80,
+      "notes": "Primary match test case - same amount ($84) and close date"
+    }
+  ],
+  "statementImport": {
+    "filename": "chase.csv",
+    "expectedRowCount": 484,
+    "expectedSkipped": 0,
+    "expectedFormat": {
+      "dateColumn": "Transaction Date",
+      "postDateColumn": "Post Date",
+      "amountColumn": "Amount",
+      "descriptionColumn": "Description",
+      "categoryColumn": "Category",
+      "typeColumn": "Type",
+      "memoColumn": "Memo"
+    },
+    "columnMapping": {
+      "Transaction Date": "date",
+      "Amount": "amount",
+      "Description": "description",
+      "Post Date": "postDate"
+    },
+    "dateFormat": "MM/dd/yyyy",
+    "amountSign": "negative_charges",
+    "notes": "Chase credit card statement format - 484 transactions + 1 header row"
+  }
+}

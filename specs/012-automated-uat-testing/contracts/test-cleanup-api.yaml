@@ -1,0 +1,192 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Test Cleanup API
+  description: |
+    API endpoint for cleaning up test data in staging/development environments.
+    This endpoint is NOT available in production builds.
+  version: 1.0.0
+  contact:
+    name: ExpenseFlow Team
+
+servers:
+  - url: https://staging.expense.ii-us.com/api
+    description: Staging environment
+
+security:
+  - bearerAuth: []
+
+paths:
+  /test/cleanup:
+    post:
+      summary: Clean up test data
+      description: |
+        Removes all test data (receipts, transactions, matches, imports) for the
+        authenticated user. Optionally filter by entity type or creation timestamp.
+
+        **Security**: Requires same authentication as other API endpoints.
+        **Availability**: Staging and development environments only.
+      operationId: cleanupTestData
+      tags:
+        - Test Utilities
+      requestBody:
+        description: Optional cleanup filters
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanupRequest'
+            examples:
+              cleanAll:
+                summary: Clean all test data
+                value: {}
+              cleanReceipts:
+                summary: Clean only receipts
+                value:
+                  entityTypes: ["receipts"]
+              cleanRecent:
+                summary: Clean data from last hour
+                value:
+                  createdAfter: "2025-12-19T09:00:00Z"
+      responses:
+        '200':
+          description: Cleanup completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupResponse'
+              example:
+                success: true
+                deletedCounts:
+                  receipts: 19
+                  transactions: 486
+                  matches: 1
+                  imports: 1
+                  blobsDeleted: 19
+                durationMs: 2340
+        '401':
+          description: Unauthorized - valid authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '403':
+          description: Forbidden - endpoint not available in this environment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal server error during cleanup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from Entra ID authentication
+
+  schemas:
+    CleanupRequest:
+      type: object
+      properties:
+        entityTypes:
+          type: array
+          description: |
+            Specific entity types to clean. If omitted, all entity types are cleaned.
+          items:
+            type: string
+            enum:
+              - receipts
+              - transactions
+              - matches
+              - imports
+          example: ["receipts", "transactions"]
+        createdAfter:
+          type: string
+          format: date-time
+          description: |
+            Only delete items created after this timestamp.
+            If omitted, all items for the user are deleted.
+          example: "2025-12-19T00:00:00Z"
+
+    CleanupResponse:
+      type: object
+      required:
+        - success
+        - deletedCounts
+        - durationMs
+      properties:
+        success:
+          type: boolean
+          description: Whether cleanup completed without errors
+          example: true
+        deletedCounts:
+          type: object
+          required:
+            - receipts
+            - transactions
+            - matches
+            - imports
+            - blobsDeleted
+          properties:
+            receipts:
+              type: integer
+              description: Number of receipts deleted
+              example: 19
+            transactions:
+              type: integer
+              description: Number of transactions deleted
+              example: 486
+            matches:
+              type: integer
+              description: Number of receipt-transaction matches deleted
+              example: 1
+            imports:
+              type: integer
+              description: Number of statement imports deleted
+              example: 1
+            blobsDeleted:
+              type: integer
+              description: Number of blob storage items deleted
+              example: 19
+        durationMs:
+          type: integer
+          description: Time taken to complete cleanup in milliseconds
+          example: 2340
+        warnings:
+          type: array
+          description: Non-fatal issues encountered during cleanup
+          items:
+            type: string
+          example:
+            - "Blob 'receipts/abc123.jpg' not found in storage"
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807 Problem Details response
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI reference identifying the problem type
+        title:
+          type: string
+          description: Short human-readable summary
+          example: "Unauthorized"
+        status:
+          type: integer
+          description: HTTP status code
+          example: 401
+        detail:
+          type: string
+          description: Detailed explanation of the error
+          example: "Valid authentication token required"
+        instance:
+          type: string
+          format: uri
+          description: URI reference identifying the specific occurrence
