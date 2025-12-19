@@ -86,6 +86,12 @@ spec:
                   name: expenseflow-secrets
             - name: AzureOpenAI__DeploymentName
               value: "gpt-4o-mini"
+            # Azure Blob Storage configuration
+            - name: BlobStorage__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  key: blob-storage-connection-string
+                  name: expenseflow-secrets
           volumeMounts:
             - name: secrets-store
               mountPath: "/mnt/secrets-store"
