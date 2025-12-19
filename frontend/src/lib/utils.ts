@@ -57,22 +57,29 @@ export function formatFileSize(bytes: number): string {
 }
 
 // Status badge variants
-export function getStatusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  switch (status.toLowerCase()) {
+export function getStatusVariant(status: string | number): 'default' | 'secondary' | 'destructive' | 'outline' {
+  // Handle numeric status values (backward compatibility)
+  const statusStr = String(status).toLowerCase()
+  switch (statusStr) {
     case 'matched':
     case 'confirmed':
     case 'approved':
     case 'completed':
+    case 'ready':
       return 'default'
     case 'pending':
     case 'processing':
     case 'proposed':
     case 'draft':
+    case 'uploaded':
       return 'secondary'
     case 'error':
     case 'rejected':
     case 'failed':
       return 'destructive'
+    case 'reviewrequired':
+    case 'unmatched':
+      return 'outline'
     default:
       return 'outline'
   }

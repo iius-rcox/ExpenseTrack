@@ -2,12 +2,13 @@
 
 // Receipt Types
 export type ReceiptStatus =
-  | 'Pending'
+  | 'Uploaded'
   | 'Processing'
-  | 'Processed'
+  | 'Ready'
+  | 'ReviewRequired'
+  | 'Error'
   | 'Unmatched'
   | 'Matched'
-  | 'Error'
 
 export interface ReceiptSummary {
   id: string

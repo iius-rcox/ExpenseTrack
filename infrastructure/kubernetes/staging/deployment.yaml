@@ -21,7 +21,7 @@ spec:
       serviceAccountName: expenseflow-api
       containers:
         - name: api
-          image: iiusacr.azurecr.io/expenseflow-api:v1.3.0-606b84c
+          image: iiusacr.azurecr.io/expenseflow-api:v1.4.0-5c60757
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -96,6 +96,8 @@ spec:
             - name: secrets-store
               mountPath: "/mnt/secrets-store"
               readOnly: true
+            - name: tmp
+              mountPath: "/tmp"
           resources:
             requests:
               cpu: 100m
@@ -136,6 +138,8 @@ spec:
             readOnly: true
             volumeAttributes:
               secretProviderClass: azure-keyvault-secrets
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
