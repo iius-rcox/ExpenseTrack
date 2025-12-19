@@ -37,13 +37,9 @@ export const msalConfig: Configuration = {
 };
 
 // Scopes for API access
+// Using GUID-based .default scope (required when app requests token for itself)
 export const apiScopes = {
-  read: ['api://00435dee-8aff-429b-bab6-762973c091c4/read'],
-  write: ['api://00435dee-8aff-429b-bab6-762973c091c4/write'],
-  all: [
-    'api://00435dee-8aff-429b-bab6-762973c091c4/read',
-    'api://00435dee-8aff-429b-bab6-762973c091c4/write',
-  ],
+  all: ['00435dee-8aff-429b-bab6-762973c091c4/.default'],
 };
 
 // Login request configuration
