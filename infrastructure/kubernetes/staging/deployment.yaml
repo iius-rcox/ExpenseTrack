@@ -51,6 +51,12 @@ spec:
                 configMapKeyRef:
                   key: azure-audience
                   name: expenseflow-config
+            # CORS allowed origins
+            - name: Cors__AllowedOrigins__0
+              valueFrom:
+                configMapKeyRef:
+                  key: cors-allowed-origin-0
+                  name: expenseflow-config
             # EF Core query logging for performance analysis
             - name: Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command
               valueFrom:
