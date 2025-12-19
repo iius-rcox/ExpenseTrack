@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { useMsal } from '@azure/msal-react';
-import { apiScopes } from '../../auth/authConfig';
+import { InteractionRequiredAuthError } from '@azure/msal-browser';
+import { apiScopes, loginRequest } from '../../auth/authConfig';
 import { analyzeStatement, StatementAnalyzeResponse, ApiError } from '../../services/statementService';
 
 export interface StatementUploadProps {
@@ -39,6 +40,11 @@ export function StatementUpload({ onAnalysisComplete, onError }: StatementUpload
       });
       return response.accessToken;
     } catch (error) {
+      if (error instanceof InteractionRequiredAuthError) {
+        // Token expired - redirect to login
+        await instance.loginRedirect(loginRequest);
+        return null;
+      }
       console.error('Failed to acquire token:', error);
       return null;
     }
