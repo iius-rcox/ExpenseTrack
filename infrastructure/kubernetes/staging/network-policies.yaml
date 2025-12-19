@@ -57,3 +57,20 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+---
+# Allow HTTPS egress to Azure services (AD, Blob Storage, Cognitive Services)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-https-egress
+  namespace: expenseflow-staging
+spec:
+  podSelector:
+    matchLabels:
+      app: expenseflow-api
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
