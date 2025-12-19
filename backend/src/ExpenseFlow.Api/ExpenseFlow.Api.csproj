@@ -7,6 +7,11 @@
     <RootNamespace>ExpenseFlow.Api</RootNamespace>
   </PropertyGroup>
 
+  <!-- Define STAGING constant for staging environment builds -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Staging'">
+    <DefineConstants>$(DefineConstants);STAGING</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
     <PackageReference Include="Microsoft.Identity.Web" Version="2.17.0" />
