@@ -73,6 +73,19 @@ spec:
                 configMapKeyRef:
                   key: logging-efcore-query
                   name: expenseflow-config
+            # Azure OpenAI configuration
+            - name: AzureOpenAI__Endpoint
+              valueFrom:
+                secretKeyRef:
+                  key: openai-endpoint
+                  name: expenseflow-secrets
+            - name: AzureOpenAI__ApiKey
+              valueFrom:
+                secretKeyRef:
+                  key: openai-apikey
+                  name: expenseflow-secrets
+            - name: AzureOpenAI__DeploymentName
+              value: "gpt-4o-mini"
           volumeMounts:
             - name: secrets-store
               mountPath: "/mnt/secrets-store"
