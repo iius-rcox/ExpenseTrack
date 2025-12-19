@@ -28,10 +28,17 @@ builder.Host.UseSerilog();
 // Add services to the container
 
 // Configure Entity Framework Core with PostgreSQL and pgvector
+// Use NpgsqlDataSourceBuilder to enable dynamic JSON serialization (required for Dictionary types in Npgsql 8.0+)
+var connectionString = builder.Configuration.GetConnectionString("PostgreSQL");
+var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
+dataSourceBuilder.EnableDynamicJson();
+
+var dataSource = dataSourceBuilder.Build();
+
 builder.Services.AddDbContext<ExpenseFlowDbContext>(options =>
 {
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("PostgreSQL"),
+        dataSource,
         npgsqlOptions =>
         {
             npgsqlOptions.UseVector();
