@@ -37,12 +37,12 @@ export const msalConfig: Configuration = {
 };
 
 // Scopes for API access
-// Using GUID-based .default scope (required when app requests token for itself)
+// Using OpenID Connect scopes - the ID token will be used for API auth
 export const apiScopes = {
-  all: ['00435dee-8aff-429b-bab6-762973c091c4/.default'],
+  all: ['openid', 'profile', 'email'],
 };
 
 // Login request configuration
 export const loginRequest = {
-  scopes: apiScopes.all,
+  scopes: ['openid', 'profile', 'email'],
 };
