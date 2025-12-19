@@ -7,10 +7,14 @@ import { RouterProvider } from '@tanstack/react-router'
 import { msalConfig } from './auth/authConfig'
 import { queryClient } from './lib/query-client'
 import { router } from './router'
+import { setMsalInstance } from './services/api'
 import './globals.css'
 
 // Create MSAL instance
 const msalInstance = new PublicClientApplication(msalConfig)
+
+// Share MSAL instance with API service
+setMsalInstance(msalInstance)
 
 // Handle redirect promise on page load
 msalInstance.initialize().then(() => {

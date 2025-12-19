@@ -34,7 +34,7 @@ export function useReportList(params: ReportListParams = {}) {
       searchParams.set('pageSize', String(pageSize))
       if (status) searchParams.set('status', status)
 
-      return apiFetch<ReportListResponse>(`/api/reports?${searchParams}`)
+      return apiFetch<ReportListResponse>(`/reports?${searchParams}`)
     },
   })
 }
@@ -42,7 +42,7 @@ export function useReportList(params: ReportListParams = {}) {
 export function useReportDetail(reportId: string) {
   return useQuery({
     queryKey: reportKeys.detail(reportId),
-    queryFn: () => apiFetch<ExpenseReport>(`/api/reports/${reportId}`),
+    queryFn: () => apiFetch<ExpenseReport>(`/reports/${reportId}`),
     enabled: !!reportId,
   })
 }
@@ -50,7 +50,7 @@ export function useReportDetail(reportId: string) {
 export function useReportPreview(period: string) {
   return useQuery({
     queryKey: reportKeys.preview(period),
-    queryFn: () => apiFetch<ExpenseLine[]>(`/api/reports/preview?period=${period}`),
+    queryFn: () => apiFetch<ExpenseLine[]>(`/reports/preview?period=${period}`),
     enabled: !!period,
     staleTime: 60_000,
   })
@@ -61,7 +61,7 @@ export function useGenerateReport() {
 
   return useMutation({
     mutationFn: async (data: GenerateDraftRequest) => {
-      return apiFetch<ExpenseReport>('/api/reports/generate', {
+      return apiFetch<ExpenseReport>('/reports/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -86,7 +86,7 @@ export function useUpdateReportLine() {
       lineId: string
       data: UpdateLineRequest
     }) => {
-      return apiFetch<ExpenseLine>(`/api/reports/${reportId}/lines/${lineId}`, {
+      return apiFetch<ExpenseLine>(`/reports/${reportId}/lines/${lineId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -103,7 +103,7 @@ export function useSubmitReport() {
 
   return useMutation({
     mutationFn: async (reportId: string) => {
-      return apiFetch<ExpenseReport>(`/api/reports/${reportId}/submit`, {
+      return apiFetch<ExpenseReport>(`/reports/${reportId}/submit`, {
         method: 'POST',
       })
     },
@@ -119,7 +119,7 @@ export function useDeleteReport() {
 
   return useMutation({
     mutationFn: async (reportId: string) => {
-      return apiFetch(`/api/reports/${reportId}`, {
+      return apiFetch(`/reports/${reportId}`, {
         method: 'DELETE',
       })
     },
@@ -138,7 +138,7 @@ export function useExportReport() {
       reportId: string
       format: 'pdf' | 'excel'
     }) => {
-      const response = await fetch(`/api/reports/${reportId}/export?format=${format}`, {
+      const response = await fetch(`/reports/${reportId}/export?format=${format}`, {
         method: 'GET',
         headers: {
           Accept: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

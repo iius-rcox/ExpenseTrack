@@ -38,7 +38,7 @@ export function useTransactionList(params: TransactionListParams = {}) {
       if (endDate) searchParams.set('endDate', endDate)
       if (search) searchParams.set('search', search)
 
-      return apiFetch<TransactionListResponse>(`/api/transactions?${searchParams}`)
+      return apiFetch<TransactionListResponse>(`/transactions?${searchParams}`)
     },
   })
 }
@@ -46,7 +46,7 @@ export function useTransactionList(params: TransactionListParams = {}) {
 export function useTransactionDetail(id: string) {
   return useQuery({
     queryKey: transactionKeys.detail(id),
-    queryFn: () => apiFetch<TransactionDetail>(`/api/transactions/${id}`),
+    queryFn: () => apiFetch<TransactionDetail>(`/transactions/${id}`),
     enabled: !!id,
   })
 }
@@ -54,7 +54,7 @@ export function useTransactionDetail(id: string) {
 export function useStatementImports() {
   return useQuery({
     queryKey: transactionKeys.imports(),
-    queryFn: () => apiFetch<StatementImport[]>('/api/statements/imports'),
+    queryFn: () => apiFetch<StatementImport[]>('/statements/imports'),
     staleTime: 60_000,
   })
 }
@@ -79,7 +79,7 @@ export function useImportStatement() {
       const formData = new FormData()
       formData.append('file', file)
 
-      return apiUpload<ImportStatementResult>('/api/statements/import', formData, onProgress)
+      return apiUpload<ImportStatementResult>('/statements/import', formData, onProgress)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() })

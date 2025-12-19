@@ -38,7 +38,7 @@ export function useMatchProposals(params: ProposalListParams = {}) {
       searchParams.set('pageSize', String(pageSize))
       if (status) searchParams.set('status', status)
 
-      return apiFetch<ProposalListResponse>(`/api/matching/proposals?${searchParams}`)
+      return apiFetch<ProposalListResponse>(`/matching/proposals?${searchParams}`)
     },
   })
 }
@@ -46,7 +46,7 @@ export function useMatchProposals(params: ProposalListParams = {}) {
 export function useMatchProposal(matchId: string) {
   return useQuery({
     queryKey: matchingKeys.proposal(matchId),
-    queryFn: () => apiFetch<MatchDetail>(`/api/matching/proposals/${matchId}`),
+    queryFn: () => apiFetch<MatchDetail>(`/matching/proposals/${matchId}`),
     enabled: !!matchId,
   })
 }
@@ -54,7 +54,7 @@ export function useMatchProposal(matchId: string) {
 export function useMatchingStats() {
   return useQuery({
     queryKey: matchingKeys.stats(),
-    queryFn: () => apiFetch<MatchingStats>('/api/matching/stats'),
+    queryFn: () => apiFetch<MatchingStats>('/matching/stats'),
     staleTime: 30_000,
   })
 }
@@ -62,7 +62,7 @@ export function useMatchingStats() {
 export function useUnmatchedReceipts() {
   return useQuery({
     queryKey: matchingKeys.unmatchedReceipts(),
-    queryFn: () => apiFetch<ReceiptSummary[]>('/api/matching/unmatched-receipts'),
+    queryFn: () => apiFetch<ReceiptSummary[]>('/matching/unmatched-receipts'),
     staleTime: 60_000,
   })
 }
@@ -70,7 +70,7 @@ export function useUnmatchedReceipts() {
 export function useUnmatchedTransactions() {
   return useQuery({
     queryKey: matchingKeys.unmatchedTransactions(),
-    queryFn: () => apiFetch<TransactionSummary[]>('/api/matching/unmatched-transactions'),
+    queryFn: () => apiFetch<TransactionSummary[]>('/matching/unmatched-transactions'),
     staleTime: 60_000,
   })
 }
@@ -80,7 +80,7 @@ export function useConfirmMatch() {
 
   return useMutation({
     mutationFn: async ({ matchId, data }: { matchId: string; data?: ConfirmMatchRequest }) => {
-      return apiFetch<MatchDetail>(`/api/matching/proposals/${matchId}/confirm`, {
+      return apiFetch<MatchDetail>(`/matching/proposals/${matchId}/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: data ? JSON.stringify(data) : undefined,
@@ -129,7 +129,7 @@ export function useRejectMatch() {
 
   return useMutation({
     mutationFn: async (matchId: string) => {
-      return apiFetch<MatchDetail>(`/api/matching/proposals/${matchId}/reject`, {
+      return apiFetch<MatchDetail>(`/matching/proposals/${matchId}/reject`, {
         method: 'POST',
       })
     },
@@ -172,7 +172,7 @@ export function useManualMatch() {
 
   return useMutation({
     mutationFn: async (data: ManualMatchRequest) => {
-      return apiFetch<MatchDetail>('/api/matching/manual', {
+      return apiFetch<MatchDetail>('/matching/manual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -189,7 +189,7 @@ export function useTriggerAutoMatch() {
 
   return useMutation({
     mutationFn: async () => {
-      return apiFetch<AutoMatchResponse>('/api/matching/auto-match', {
+      return apiFetch<AutoMatchResponse>('/matching/auto-match', {
         method: 'POST',
       })
     },

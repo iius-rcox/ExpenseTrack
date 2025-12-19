@@ -14,7 +14,7 @@ export const settingsKeys = {
 export function useUserInfo() {
   return useQuery({
     queryKey: settingsKeys.user(),
-    queryFn: () => apiFetch<UserInfo>('/api/user/me'),
+    queryFn: () => apiFetch<UserInfo>('/user/me'),
     staleTime: 5 * 60 * 1000,
   })
 }
@@ -22,7 +22,7 @@ export function useUserInfo() {
 export function useUserPreferences() {
   return useQuery({
     queryKey: settingsKeys.preferences(),
-    queryFn: () => apiFetch<UserPreferences>('/api/user/preferences'),
+    queryFn: () => apiFetch<UserPreferences>('/user/preferences'),
     staleTime: 5 * 60 * 1000,
   })
 }
@@ -32,7 +32,7 @@ export function useUpdatePreferences() {
 
   return useMutation({
     mutationFn: async (preferences: Partial<UserPreferences>) => {
-      return apiFetch<UserPreferences>('/api/user/preferences', {
+      return apiFetch<UserPreferences>('/user/preferences', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(preferences),
@@ -68,7 +68,7 @@ interface Category {
 export function useDepartments() {
   return useQuery({
     queryKey: settingsKeys.departments(),
-    queryFn: () => apiFetch<Department[]>('/api/settings/departments'),
+    queryFn: () => apiFetch<Department[]>('/settings/departments'),
     staleTime: 10 * 60 * 1000,
   })
 }
@@ -78,7 +78,7 @@ export function useProjects(departmentId?: string) {
     queryKey: [...settingsKeys.projects(), departmentId],
     queryFn: () => {
       const params = departmentId ? `?departmentId=${departmentId}` : ''
-      return apiFetch<Project[]>(`/api/settings/projects${params}`)
+      return apiFetch<Project[]>(`/settings/projects${params}`)
     },
     staleTime: 10 * 60 * 1000,
   })
@@ -87,7 +87,7 @@ export function useProjects(departmentId?: string) {
 export function useCategories() {
   return useQuery({
     queryKey: settingsKeys.categories(),
-    queryFn: () => apiFetch<Category[]>('/api/settings/categories'),
+    queryFn: () => apiFetch<Category[]>('/settings/categories'),
     staleTime: 10 * 60 * 1000,
   })
 }
@@ -97,7 +97,7 @@ export function useCreateCategory() {
 
   return useMutation({
     mutationFn: async (data: { name: string; description?: string }) => {
-      return apiFetch<Category>('/api/settings/categories', {
+      return apiFetch<Category>('/settings/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -114,7 +114,7 @@ export function useUpdateCategory() {
 
   return useMutation({
     mutationFn: async ({ id, ...data }: { id: string; name?: string; description?: string; isActive?: boolean }) => {
-      return apiFetch<Category>(`/api/settings/categories/${id}`, {
+      return apiFetch<Category>(`/settings/categories/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -131,7 +131,7 @@ export function useDeleteCategory() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      return apiFetch(`/api/settings/categories/${id}`, {
+      return apiFetch(`/settings/categories/${id}`, {
         method: 'DELETE',
       })
     },

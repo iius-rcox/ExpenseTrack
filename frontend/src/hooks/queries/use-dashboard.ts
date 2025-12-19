@@ -11,7 +11,7 @@ export const dashboardKeys = {
 export function useDashboardMetrics() {
   return useQuery({
     queryKey: dashboardKeys.metrics(),
-    queryFn: () => apiFetch<DashboardMetrics>('/api/dashboard/metrics'),
+    queryFn: () => apiFetch<DashboardMetrics>('/dashboard/metrics'),
     staleTime: 30_000, // 30 seconds
   })
 }
@@ -19,7 +19,7 @@ export function useDashboardMetrics() {
 export function useRecentActivity() {
   return useQuery({
     queryKey: dashboardKeys.activity(),
-    queryFn: () => apiFetch<RecentActivityItem[]>('/api/dashboard/activity'),
+    queryFn: () => apiFetch<RecentActivityItem[]>('/dashboard/activity'),
     staleTime: 30_000,
   })
 }

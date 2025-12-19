@@ -34,7 +34,7 @@ export function useReceiptList(params: ReceiptListParams = {}) {
       searchParams.set('page', String(page))
       searchParams.set('pageSize', String(pageSize))
 
-      return apiFetch<ReceiptListResponse>(`/api/receipts?${searchParams}`)
+      return apiFetch<ReceiptListResponse>(`/receipts?${searchParams}`)
     },
   })
 }
@@ -42,7 +42,7 @@ export function useReceiptList(params: ReceiptListParams = {}) {
 export function useReceiptDetail(id: string) {
   return useQuery({
     queryKey: receiptKeys.detail(id),
-    queryFn: () => apiFetch<ReceiptDetail>(`/api/receipts/${id}`),
+    queryFn: () => apiFetch<ReceiptDetail>(`/receipts/${id}`),
     enabled: !!id,
   })
 }
@@ -50,7 +50,7 @@ export function useReceiptDetail(id: string) {
 export function useReceiptStatusCounts() {
   return useQuery({
     queryKey: receiptKeys.statusCounts(),
-    queryFn: () => apiFetch<ReceiptStatusCounts>('/api/receipts/status-counts'),
+    queryFn: () => apiFetch<ReceiptStatusCounts>('/receipts/status-counts'),
     staleTime: 30_000,
   })
 }
@@ -71,7 +71,7 @@ export function useUploadReceipts() {
         formData.append('files', file)
       })
 
-      return apiUpload<UploadResponse>('/api/receipts/upload', formData, onProgress)
+      return apiUpload<UploadResponse>('/receipts/upload', formData, onProgress)
     },
     onSuccess: () => {
       // Invalidate receipt lists and status counts
@@ -86,7 +86,7 @@ export function useDeleteReceipt() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await apiFetch(`/api/receipts/${id}`, { method: 'DELETE' })
+      await apiFetch(`/receipts/${id}`, { method: 'DELETE' })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: receiptKeys.lists() })
@@ -100,7 +100,7 @@ export function useRetryReceipt() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      return apiFetch<ReceiptSummary>(`/api/receipts/${id}/retry`, { method: 'POST' })
+      return apiFetch<ReceiptSummary>(`/receipts/${id}/retry`, { method: 'POST' })
     },
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: receiptKeys.detail(id) })
