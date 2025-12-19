@@ -21,13 +21,14 @@ export function useApiToken() {
 
     try {
       const response = await instance.acquireTokenSilent(request);
-      return response.accessToken;
+      // Use idToken since we're using OIDC scopes (openid, profile, email)
+      return response.idToken;
     } catch (error) {
       if (error instanceof InteractionRequiredAuthError) {
         // Token expired or consent required - redirect to login
         try {
           const response = await instance.acquireTokenPopup(request);
-          return response.accessToken;
+          return response.idToken;
         } catch (popupError) {
           console.error('Failed to acquire token via popup:', popupError);
           return null;

@@ -39,7 +39,8 @@ export function StatementImportPage() {
         scopes: apiScopes.all,
         account: accounts[0],
       });
-      return response.accessToken;
+      // Use idToken since we're using OIDC scopes (openid, profile, email)
+      return response.idToken;
     } catch (error) {
       if (error instanceof InteractionRequiredAuthError) {
         // Token expired - redirect to login
