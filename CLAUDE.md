@@ -1,6 +1,11 @@
-# ExpenseFlow Development Guidelines
+﻿# ExpenseFlow Development Guidelines
 
 Auto-generated from feature plans. Last updated: 2025-12-17
+
+## Tool Usage
+###MCP Servers
+-**ref.tools**: Use this to reference best practices when developing any feature
+-**shad.cn**: Use this for all frontend components and design choices
 
 ## Active Technologies
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Microsoft.Identity.Web, Polly (002-core-backend-auth)
@@ -18,6 +23,8 @@ Auto-generated from feature plans. Last updated: 2025-12-17
 - .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, Semantic Kernel, Hangfire (008-draft-report-generation)
 - .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, ClosedXML (Excel), PdfSharpCore (PDF), SixLabors.ImageSharp (image conversion) (009-output-analytics)
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Semantic Kernel (for embedding generation), NBomber or k6 (for load testing) (010-testing-cache-warming)
+- TypeScript 5.7+ with React 18.3+ (011-unified-frontend)
+- N/A (frontend consumes existing backend APIs) (011-unified-frontend)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -106,6 +113,7 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 011-unified-frontend: Added TypeScript 5.7+ with React 18.3+
 - 010-testing-cache-warming: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Semantic Kernel, NBomber, ClosedXML
   - Entities: ImportJob (for tracking cache warming import jobs)
   - Services: CacheWarmingService (historical data import, job management)
@@ -115,7 +123,6 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
   - UAT: 7 test cases (TC-001 through TC-007) covering all Sprint 3-9 features
   - InMemory Database: DbContext conditionally ignores pgvector/jsonb properties for testing
 - 009-output-analytics: Added .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, ClosedXML (Excel), PdfSharpCore (PDF), SixLabors.ImageSharp (image conversion)
-- 008-draft-report-generation: Added .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, Semantic Kernel, Hangfire
   - Entities: TravelPeriod, DetectedSubscription, SubscriptionAlert, SplitPattern, SplitAllocation
   - Services: TravelDetectionService, SubscriptionDetectionService, ExpenseSplittingService
   - Jobs: SubscriptionAlertJob (Hangfire monthly recurring)
