@@ -592,16 +592,20 @@ public partial class MatchingService : IMatchingService
         match.ConfirmedAt = DateTime.UtcNow;
         match.ConfirmedByUserId = userId;
 
-        // Link receipt and transaction
-        var receipt = await _context.Receipts.FindAsync(match.ReceiptId)
-            ?? throw new InvalidOperationException("Receipt not found");
-        var transaction = await _context.Transactions.FindAsync(match.TransactionId)
-            ?? throw new InvalidOperationException("Transaction not found");
+        // Link receipt and transaction using navigation properties (BUG-005 fix)
+        // The match was loaded with Include(), so Receipt and Transaction are already tracked
+        var receipt = match.Receipt ?? throw new InvalidOperationException("Receipt not found");
+        var transaction = match.Transaction ?? throw new InvalidOperationException("Transaction not found");
 
         receipt.MatchedTransactionId = transaction.Id;
         receipt.MatchStatus = MatchStatus.Matched;
         transaction.MatchedReceiptId = receipt.Id;
         transaction.MatchStatus = MatchStatus.Matched;
+
+        // Explicitly mark Receipt and Transaction as modified to ensure changes are persisted
+        // This fixes BUG-005 where these entities were not being updated after match confirmation
+        _context.Entry(receipt).State = EntityState.Modified;
+        _context.Entry(transaction).State = EntityState.Modified;
 
         // Create or update vendor alias
         var pattern = ExtractVendorPattern(transaction.OriginalDescription);

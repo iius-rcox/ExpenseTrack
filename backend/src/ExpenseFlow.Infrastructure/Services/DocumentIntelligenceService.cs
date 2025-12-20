@@ -32,22 +32,34 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
 
     public async Task<ReceiptExtractionResult> AnalyzeReceiptAsync(Stream documentStream, string contentType)
     {
-        _logger.LogDebug("Starting receipt analysis with Azure Document Intelligence");
+        _logger.LogDebug("Starting receipt analysis with Azure Document Intelligence for content type {ContentType}", contentType);
 
         var result = new ReceiptExtractionResult();
 
         try
         {
             // Use the prebuilt receipt model with BinaryData
+            // Copy to MemoryStream first to ensure the entire document is loaded
             using var memoryStream = new MemoryStream();
             await documentStream.CopyToAsync(memoryStream);
-            memoryStream.Position = 0;
-            var binaryData = BinaryData.FromStream(memoryStream);
+
+            if (memoryStream.Length == 0)
+            {
+                _logger.LogWarning("Document stream is empty, cannot analyze");
+                return result;
+            }
+
+            _logger.LogDebug("Analyzing document of {Size} bytes with content type {ContentType}",
+                memoryStream.Length, contentType);
+
+            // BUG-002 fix: Use BinaryData.FromBytes for proper binary data submission
+            // The SDK accepts BinaryData directly for document analysis
+            var bytesSource = BinaryData.FromBytes(memoryStream.ToArray());
 
             var operation = await _client.AnalyzeDocumentAsync(
                 WaitUntil.Completed,
                 "prebuilt-receipt",
-                binaryData);
+                bytesSource);
 
             var analyzeResult = operation.Value;
 
@@ -82,6 +94,9 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
 
     private void ExtractReceiptFields(AnalyzedDocument receipt, ReceiptExtractionResult result)
     {
+        // Log all available fields for debugging
+        _logger.LogDebug("Available receipt fields: {Fields}", string.Join(", ", receipt.Fields.Keys));
+
         // Extract MerchantName
         if (receipt.Fields.TryGetValue("MerchantName", out var merchantField) && merchantField.Content != null)
         {
@@ -89,6 +104,20 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
             if (merchantField.Confidence.HasValue)
             {
                 result.ConfidenceScores["VendorName"] = merchantField.Confidence.Value;
+            }
+        }
+
+        // BUG-004 fix: If MerchantName is missing, try to extract from MerchantAddress
+        // Some receipts (like parking) have vendor info only in the address line
+        if (string.IsNullOrWhiteSpace(result.VendorName))
+        {
+            var extractedVendor = TryExtractVendorFromAddress(receipt);
+            if (!string.IsNullOrWhiteSpace(extractedVendor))
+            {
+                result.VendorName = extractedVendor;
+                // Use lower confidence since this is inferred from address
+                result.ConfidenceScores["VendorName"] = 0.6;
+                _logger.LogInformation("Extracted vendor from address: {Vendor}", extractedVendor);
             }
         }
 
@@ -178,5 +207,99 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
         using var memoryStream = new MemoryStream();
         await stream.CopyToAsync(memoryStream);
         return BinaryData.FromBytes(memoryStream.ToArray());
+    }
+
+    /// <summary>
+    /// Attempts to extract a vendor name from the MerchantAddress field when MerchantName is missing.
+    /// Handles cases like airport parking where the address contains the venue name.
+    /// </summary>
+    /// <remarks>
+    /// BUG-004 fix: Azure Document Intelligence may not recognize some vendor names,
+    /// especially for parking receipts where the vendor info is in address format.
+    /// Example: "RDU Airport NC 27623" should extract "RDU Airport Parking"
+    /// </remarks>
+    private string? TryExtractVendorFromAddress(AnalyzedDocument receipt)
+    {
+        // Try MerchantAddress field first
+        if (receipt.Fields.TryGetValue("MerchantAddress", out var addressField) && addressField.Content != null)
+        {
+            var address = addressField.Content;
+            _logger.LogDebug("Attempting to extract vendor from address: {Address}", address);
+
+            // Check for airport patterns
+            var normalizedVendor = TryMatchAirportPattern(address);
+            if (!string.IsNullOrWhiteSpace(normalizedVendor))
+            {
+                return normalizedVendor;
+            }
+        }
+
+        // Also check raw content for patterns if address field didn't work
+        // Look through the receipt's content for recognizable patterns
+        foreach (var field in receipt.Fields)
+        {
+            if (field.Value.Content == null) continue;
+
+            var content = field.Value.Content;
+
+            // Check for airport patterns in any field
+            var normalizedVendor = TryMatchAirportPattern(content);
+            if (!string.IsNullOrWhiteSpace(normalizedVendor))
+            {
+                _logger.LogDebug("Found vendor pattern in field {FieldName}: {Content}", field.Key, content);
+                return normalizedVendor;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Matches airport-related patterns and returns a normalized vendor name.
+    /// </summary>
+    private static string? TryMatchAirportPattern(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+
+        var upperText = text.ToUpperInvariant();
+
+        // Common airport parking patterns
+        // RDU = Raleigh-Durham International Airport
+        if (upperText.Contains("RDU") && (upperText.Contains("AIRPORT") || upperText.Contains("PARKING")))
+        {
+            return "RDU Airport Parking";
+        }
+
+        // Generic airport patterns - [CODE] Airport
+        var airportCodes = new[] { "ATL", "ORD", "DFW", "DEN", "JFK", "LAX", "SFO", "SEA", "LAS", "MCO",
+                                    "CLT", "PHX", "IAH", "MIA", "BOS", "MSP", "DTW", "FLL", "EWR", "PHL" };
+
+        foreach (var code in airportCodes)
+        {
+            if (upperText.Contains(code) && upperText.Contains("AIRPORT"))
+            {
+                return $"{code} Airport Parking";
+            }
+        }
+
+        // Check for generic "Airport Parking" pattern
+        if (upperText.Contains("AIRPORT") && upperText.Contains("PARKING"))
+        {
+            // Try to extract the airport name
+            var match = System.Text.RegularExpressions.Regex.Match(
+                text,
+                @"(\w+)\s+Airport",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (match.Success)
+            {
+                return $"{match.Groups[1].Value} Airport Parking";
+            }
+
+            return "Airport Parking";
+        }
+
+        return null;
     }
 }

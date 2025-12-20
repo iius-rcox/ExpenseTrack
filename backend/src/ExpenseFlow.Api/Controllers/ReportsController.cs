@@ -308,6 +308,17 @@ public class ReportsController : ApiControllerBase
                 Detail = ex.Message
             });
         }
+        catch (Exception ex)
+        {
+            // BUG-008 fix: Handle all exceptions during PDF generation
+            // This catches font-related errors, image processing errors, and other PDF generation issues
+            _logger.LogError(ex, "PDF generation failed for report {ReportId}: {Error}", reportId, ex.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetailsResponse
+            {
+                Title = "PDF Generation Failed",
+                Detail = "An error occurred while generating the receipt PDF. Please try again or contact support."
+            });
+        }
     }
 }
 

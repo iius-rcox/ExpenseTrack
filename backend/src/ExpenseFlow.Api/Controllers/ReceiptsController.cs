@@ -71,38 +71,32 @@ public class ReceiptsController : ApiControllerBase
 
         var user = await _userService.GetOrCreateUserAsync(User);
         var response = new UploadResponseDto();
-        var receiptsLock = new object();
-        var failedLock = new object();
 
-        // Process files in parallel for batch performance (Task 3.1)
-        await Parallel.ForEachAsync(files, new ParallelOptions { MaxDegreeOfParallelism = 4 }, async (file, ct) =>
+        // Process files sequentially to ensure DbContext thread-safety
+        // DbContext is NOT thread-safe; parallel processing caused receipts to get stuck in 'Uploaded' status
+        // when the Hangfire job enqueue failed due to concurrent DbContext access (BUG-001 fix)
+        foreach (var file in files)
         {
             try
             {
                 if (file.Length > _maxFileSizeBytes)
                 {
-                    lock (failedLock)
+                    response.Failed.Add(new UploadFailureDto
                     {
-                        response.Failed.Add(new UploadFailureDto
-                        {
-                            Filename = file.FileName,
-                            Error = $"File exceeds maximum size of {_maxFileSizeBytes / 1024 / 1024}MB"
-                        });
-                    }
-                    return;
+                        Filename = file.FileName,
+                        Error = $"File exceeds maximum size of {_maxFileSizeBytes / 1024 / 1024}MB"
+                    });
+                    continue;
                 }
 
                 if (file.Length == 0)
                 {
-                    lock (failedLock)
+                    response.Failed.Add(new UploadFailureDto
                     {
-                        response.Failed.Add(new UploadFailureDto
-                        {
-                            Filename = file.FileName,
-                            Error = "File is empty"
-                        });
-                    }
-                    return;
+                        Filename = file.FileName,
+                        Error = "File is empty"
+                    });
+                    continue;
                 }
 
                 using var stream = file.OpenReadStream();
@@ -112,36 +106,27 @@ public class ReceiptsController : ApiControllerBase
                     file.ContentType,
                     user.Id);
 
-                lock (receiptsLock)
-                {
-                    response.Receipts.Add(MapToSummaryDto(receipt));
-                }
+                response.Receipts.Add(MapToSummaryDto(receipt));
             }
             catch (ArgumentException ex)
             {
                 _logger.LogWarning(ex, "Validation error for file {Filename}", file.FileName);
-                lock (failedLock)
+                response.Failed.Add(new UploadFailureDto
                 {
-                    response.Failed.Add(new UploadFailureDto
-                    {
-                        Filename = file.FileName,
-                        Error = ex.Message
-                    });
-                }
+                    Filename = file.FileName,
+                    Error = ex.Message
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error uploading file {Filename}", file.FileName);
-                lock (failedLock)
+                response.Failed.Add(new UploadFailureDto
                 {
-                    response.Failed.Add(new UploadFailureDto
-                    {
-                        Filename = file.FileName,
-                        Error = "An error occurred during upload"
-                    });
-                }
+                    Filename = file.FileName,
+                    Error = "An error occurred during upload"
+                });
             }
-        });
+        }
 
         response.TotalUploaded = response.Receipts.Count;
 

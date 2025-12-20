@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Infrastructure.Configuration;
 using Microsoft.Extensions.Logging;
@@ -37,25 +38,27 @@ public class ExcelExportService : IExcelExportService
         var report = await _reportRepository.GetByIdWithLinesAsync(reportId, ct)
             ?? throw new InvalidOperationException($"Report {reportId} not found");
 
-        // Download template from blob storage
-        Stream templateStream;
+        // Try to download template from blob storage, or create a default one
+        XLWorkbook workbook;
+        IXLWorksheet worksheet;
+
         try
         {
-            templateStream = await _blobService.DownloadAsync(
+            var templateStream = await _blobService.DownloadAsync(
                 _options.TemplateBlobContainer,
                 _options.TemplateFileName,
                 ct);
+            workbook = new XLWorkbook(templateStream);
+            worksheet = workbook.Worksheet(1);
+            _logger.LogDebug("Using custom Excel template from blob storage");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to download Excel template from {Container}/{FileName}",
+            // BUG-007 fix: Fall back to generating a default template if custom template is not found
+            _logger.LogWarning(ex, "Custom Excel template not found at {Container}/{FileName}, using default template",
                 _options.TemplateBlobContainer, _options.TemplateFileName);
-            throw new InvalidOperationException(
-                $"Excel template not found: {_options.TemplateFileName}. Please upload template to blob storage.", ex);
+            (workbook, worksheet) = CreateDefaultTemplate(report);
         }
-
-        using var workbook = new XLWorkbook(templateStream);
-        var worksheet = workbook.Worksheet(1);
 
         // Fill header section
         worksheet.Cell("B2").Value = report.User?.DisplayName ?? "Unknown";
@@ -102,5 +105,59 @@ public class ExcelExportService : IExcelExportService
             reportId, orderedLines.Count);
 
         return outputStream.ToArray();
+    }
+
+    /// <summary>
+    /// Creates a default Excel template when custom template is not available.
+    /// This ensures Excel export works even without deploying a template to blob storage.
+    /// </summary>
+    private static (XLWorkbook workbook, IXLWorksheet worksheet) CreateDefaultTemplate(ExpenseReport report)
+    {
+        var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Expense Report");
+
+        // Set column widths
+        worksheet.Column(1).Width = 12; // Date
+        worksheet.Column(2).Width = 15; // GL Acct/Job
+        worksheet.Column(3).Width = 12; // Dept/Phase
+        worksheet.Column(4).Width = 40; // Description
+        worksheet.Column(5).Width = 10; // Units
+        worksheet.Column(6).Width = 12; // Rate/Amount
+        worksheet.Column(7).Width = 14; // Total
+
+        // Header section
+        worksheet.Cell("A1").Value = "EXPENSE REPORT";
+        worksheet.Cell("A1").Style.Font.Bold = true;
+        worksheet.Cell("A1").Style.Font.FontSize = 14;
+
+        worksheet.Cell("A2").Value = "Employee:";
+        worksheet.Cell("A2").Style.Font.Bold = true;
+        // B2 will be filled with employee name
+
+        worksheet.Cell("A3").Value = "Period:";
+        worksheet.Cell("A3").Style.Font.Bold = true;
+        // B3 will be filled with period
+
+        worksheet.Cell("A4").Value = "Report ID:";
+        worksheet.Cell("A4").Style.Font.Bold = true;
+        worksheet.Cell("B4").Value = report.Id.ToString();
+
+        // Column headers (row 6)
+        var headerRow = 6;
+        worksheet.Cell(headerRow, 1).Value = "Date";
+        worksheet.Cell(headerRow, 2).Value = "GL Acct/Job";
+        worksheet.Cell(headerRow, 3).Value = "Dept/Phas";
+        worksheet.Cell(headerRow, 4).Value = "Expense Description";
+        worksheet.Cell(headerRow, 5).Value = "Units";
+        worksheet.Cell(headerRow, 6).Value = "Rate/Amount";
+        worksheet.Cell(headerRow, 7).Value = "Expense Total";
+
+        // Style header row
+        var headerRange = worksheet.Range(headerRow, 1, headerRow, 7);
+        headerRange.Style.Font.Bold = true;
+        headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+        headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+
+        return (workbook, worksheet);
     }
 }

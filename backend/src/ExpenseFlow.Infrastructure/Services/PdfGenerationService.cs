@@ -26,6 +26,10 @@ public class PdfGenerationService : IPdfGenerationService
     private const double PageHeight = 792;
     private const double Margin = 36; // 0.5 inch margin
 
+    // Font family name - use a cross-platform compatible font
+    // Helvetica is a built-in PDF base font that doesn't require installation
+    private const string FontFamily = "Helvetica";
+
     public PdfGenerationService(
         IExpenseReportRepository reportRepository,
         IBlobStorageService blobService,
@@ -181,8 +185,8 @@ public class PdfGenerationService : IPdfGenerationService
 
     private void DrawReceiptHeader(XGraphics gfx, ExpenseLine line)
     {
-        var fontBold = new XFont("Arial", 12, XFontStyle.Bold);
-        var fontRegular = new XFont("Arial", 10, XFontStyle.Regular);
+        var fontBold = new XFont(FontFamily, 12, XFontStyle.Bold);
+        var fontRegular = new XFont(FontFamily, 10, XFontStyle.Regular);
 
         var y = Margin;
 
@@ -215,10 +219,10 @@ public class PdfGenerationService : IPdfGenerationService
 
         using var gfx = XGraphics.FromPdfPage(page);
 
-        var fontTitle = new XFont("Arial", 18, XFontStyle.Bold);
-        var fontHeader = new XFont("Arial", 14, XFontStyle.Bold);
-        var fontRegular = new XFont("Arial", 12, XFontStyle.Regular);
-        var fontSmall = new XFont("Arial", 10, XFontStyle.Regular);
+        var fontTitle = new XFont(FontFamily, 18, XFontStyle.Bold);
+        var fontHeader = new XFont(FontFamily, 14, XFontStyle.Bold);
+        var fontRegular = new XFont(FontFamily, 12, XFontStyle.Regular);
+        var fontSmall = new XFont(FontFamily, 10, XFontStyle.Regular);
 
         var y = Margin + 40;
         var lineHeight = 24;
@@ -337,8 +341,8 @@ public class PdfGenerationService : IPdfGenerationService
 
         using var gfx = XGraphics.FromPdfPage(page);
 
-        var fontTitle = new XFont("Arial", 14, XFontStyle.Bold);
-        var fontRegular = new XFont("Arial", 12, XFontStyle.Regular);
+        var fontTitle = new XFont(FontFamily, 14, XFontStyle.Bold);
+        var fontRegular = new XFont(FontFamily, 12, XFontStyle.Regular);
 
         var y = PageHeight / 2 - 60;
 
@@ -385,9 +389,9 @@ public class PdfGenerationService : IPdfGenerationService
 
         using var gfx = XGraphics.FromPdfPage(page);
 
-        var fontTitle = new XFont("Arial", 14, XFontStyle.Bold);
-        var fontRegular = new XFont("Arial", 12, XFontStyle.Regular);
-        var fontSmall = new XFont("Arial", 10, XFontStyle.Regular);
+        var fontTitle = new XFont(FontFamily, 14, XFontStyle.Bold);
+        var fontRegular = new XFont(FontFamily, 12, XFontStyle.Regular);
+        var fontSmall = new XFont(FontFamily, 10, XFontStyle.Regular);
 
         var y = PageHeight / 2 - 80;
 
@@ -448,8 +452,8 @@ public class PdfGenerationService : IPdfGenerationService
 
         using var gfx = XGraphics.FromPdfPage(page);
 
-        var fontTitle = new XFont("Arial", 16, XFontStyle.Bold);
-        var fontRegular = new XFont("Arial", 12, XFontStyle.Regular);
+        var fontTitle = new XFont(FontFamily, 16, XFontStyle.Bold);
+        var fontRegular = new XFont(FontFamily, 12, XFontStyle.Regular);
 
         var y = PageHeight / 2 - 40;
 
