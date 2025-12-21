@@ -33,6 +33,31 @@ public class CleanupResponse
 public class CleanupDeletedCounts
 {
     /// <summary>
+    /// Number of expense lines deleted.
+    /// </summary>
+    public int ExpenseLines { get; set; }
+
+    /// <summary>
+    /// Number of expense reports deleted.
+    /// </summary>
+    public int ExpenseReports { get; set; }
+
+    /// <summary>
+    /// Number of tier usage logs deleted.
+    /// </summary>
+    public int TierUsageLogs { get; set; }
+
+    /// <summary>
+    /// Number of expense embeddings deleted.
+    /// </summary>
+    public int ExpenseEmbeddings { get; set; }
+
+    /// <summary>
+    /// Number of travel periods deleted.
+    /// </summary>
+    public int TravelPeriods { get; set; }
+
+    /// <summary>
     /// Number of receipts deleted.
     /// </summary>
     public int Receipts { get; set; }

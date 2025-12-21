@@ -29,7 +29,11 @@ public class TestCleanupController : ControllerBase
         "receipts",
         "transactions",
         "matches",
-        "imports"
+        "imports",
+        "reports",
+        "embeddings",
+        "tierusage",
+        "travel"
     };
 
     public TestCleanupController(
@@ -101,19 +105,64 @@ public class TestCleanupController : ControllerBase
             };
 
             // Order matters for foreign key constraints:
-            // 1. Delete matches first (references receipts and transactions)
-            // 2. Delete receipts (and their blobs)
-            // 3. Delete transactions
-            // 4. Delete statement imports
+            // 1. Delete expense lines first (references reports, receipts, transactions)
+            // 2. Delete expense reports (parent of expense lines)
+            // 3. Delete tier usage logs (references transactions)
+            // 4. Delete expense embeddings (references transactions)
+            // 5. Delete travel periods (references receipts)
+            // 6. Delete matches (references receipts and transactions)
+            // 7. Delete receipts (and their blobs)
+            // 8. Delete transactions
+            // 9. Delete statement imports
 
-            // 1. Delete matches
+            // 1. Delete expense lines (always - they reference everything)
+            if (cleanAll || entityTypes.Contains("reports", StringComparer.OrdinalIgnoreCase))
+            {
+                var linesDeleted = await DeleteExpenseLinesAsync(user.Id, createdAfter);
+                response.DeletedCounts.ExpenseLines = linesDeleted;
+                _logger.LogInformation("Deleted {Count} expense lines", linesDeleted);
+            }
+
+            // 2. Delete expense reports
+            if (cleanAll || entityTypes.Contains("reports", StringComparer.OrdinalIgnoreCase))
+            {
+                var reportsDeleted = await DeleteExpenseReportsAsync(user.Id, createdAfter);
+                response.DeletedCounts.ExpenseReports = reportsDeleted;
+                _logger.LogInformation("Deleted {Count} expense reports", reportsDeleted);
+            }
+
+            // 3. Delete tier usage logs
+            if (cleanAll || entityTypes.Contains("tierusage", StringComparer.OrdinalIgnoreCase))
+            {
+                var tierLogsDeleted = await DeleteTierUsageLogsAsync(user.Id, createdAfter);
+                response.DeletedCounts.TierUsageLogs = tierLogsDeleted;
+                _logger.LogInformation("Deleted {Count} tier usage logs", tierLogsDeleted);
+            }
+
+            // 4. Delete expense embeddings
+            if (cleanAll || entityTypes.Contains("embeddings", StringComparer.OrdinalIgnoreCase))
+            {
+                var embeddingsDeleted = await DeleteExpenseEmbeddingsAsync(user.Id, createdAfter);
+                response.DeletedCounts.ExpenseEmbeddings = embeddingsDeleted;
+                _logger.LogInformation("Deleted {Count} expense embeddings", embeddingsDeleted);
+            }
+
+            // 5. Delete travel periods
+            if (cleanAll || entityTypes.Contains("travel", StringComparer.OrdinalIgnoreCase))
+            {
+                var travelDeleted = await DeleteTravelPeriodsAsync(user.Id, createdAfter);
+                response.DeletedCounts.TravelPeriods = travelDeleted;
+                _logger.LogInformation("Deleted {Count} travel periods", travelDeleted);
+            }
+
+            // 6. Delete matches
             if (cleanAll || entityTypes.Contains("matches", StringComparer.OrdinalIgnoreCase))
             {
                 response.DeletedCounts.Matches = await DeleteMatchesAsync(user.Id, createdAfter);
                 _logger.LogInformation("Deleted {Count} matches", response.DeletedCounts.Matches);
             }
 
-            // 2. Delete receipts (and their blobs)
+            // 7. Delete receipts (and their blobs)
             if (cleanAll || entityTypes.Contains("receipts", StringComparer.OrdinalIgnoreCase))
             {
                 var (receiptsDeleted, blobsDeleted, blobWarnings) = await DeleteReceiptsAsync(user.Id, createdAfter);
@@ -123,14 +172,14 @@ public class TestCleanupController : ControllerBase
                 _logger.LogInformation("Deleted {ReceiptCount} receipts and {BlobCount} blobs", receiptsDeleted, blobsDeleted);
             }
 
-            // 3. Delete transactions
+            // 8. Delete transactions
             if (cleanAll || entityTypes.Contains("transactions", StringComparer.OrdinalIgnoreCase))
             {
                 response.DeletedCounts.Transactions = await DeleteTransactionsAsync(user.Id, createdAfter);
                 _logger.LogInformation("Deleted {Count} transactions", response.DeletedCounts.Transactions);
             }
 
-            // 4. Delete statement imports
+            // 9. Delete statement imports
             if (cleanAll || entityTypes.Contains("imports", StringComparer.OrdinalIgnoreCase))
             {
                 response.DeletedCounts.Imports = await DeleteImportsAsync(user.Id, createdAfter);
@@ -258,6 +307,88 @@ public class TestCleanupController : ControllerBase
         await _dbContext.SaveChangesAsync();
 
         return imports.Count;
+    }
+
+    private async Task<int> DeleteExpenseLinesAsync(Guid userId, DateTime? createdAfter)
+    {
+        // Get all expense lines for reports owned by this user
+        var query = _dbContext.ExpenseLines
+            .Where(el => el.Report.UserId == userId);
+
+        if (createdAfter.HasValue)
+        {
+            query = query.Where(el => el.CreatedAt > createdAfter.Value);
+        }
+
+        var lines = await query.ToListAsync();
+        _dbContext.ExpenseLines.RemoveRange(lines);
+        await _dbContext.SaveChangesAsync();
+
+        return lines.Count;
+    }
+
+    private async Task<int> DeleteExpenseReportsAsync(Guid userId, DateTime? createdAfter)
+    {
+        var query = _dbContext.ExpenseReports.Where(r => r.UserId == userId);
+
+        if (createdAfter.HasValue)
+        {
+            query = query.Where(r => r.CreatedAt > createdAfter.Value);
+        }
+
+        var reports = await query.ToListAsync();
+        _dbContext.ExpenseReports.RemoveRange(reports);
+        await _dbContext.SaveChangesAsync();
+
+        return reports.Count;
+    }
+
+    private async Task<int> DeleteTierUsageLogsAsync(Guid userId, DateTime? createdAfter)
+    {
+        var query = _dbContext.TierUsageLogs.Where(t => t.UserId == userId);
+
+        if (createdAfter.HasValue)
+        {
+            query = query.Where(t => t.CreatedAt > createdAfter.Value);
+        }
+
+        var logs = await query.ToListAsync();
+        _dbContext.TierUsageLogs.RemoveRange(logs);
+        await _dbContext.SaveChangesAsync();
+
+        return logs.Count;
+    }
+
+    private async Task<int> DeleteExpenseEmbeddingsAsync(Guid userId, DateTime? createdAfter)
+    {
+        var query = _dbContext.ExpenseEmbeddings.Where(e => e.UserId == userId);
+
+        if (createdAfter.HasValue)
+        {
+            query = query.Where(e => e.CreatedAt > createdAfter.Value);
+        }
+
+        var embeddings = await query.ToListAsync();
+        _dbContext.ExpenseEmbeddings.RemoveRange(embeddings);
+        await _dbContext.SaveChangesAsync();
+
+        return embeddings.Count;
+    }
+
+    private async Task<int> DeleteTravelPeriodsAsync(Guid userId, DateTime? createdAfter)
+    {
+        var query = _dbContext.TravelPeriods.Where(t => t.UserId == userId);
+
+        if (createdAfter.HasValue)
+        {
+            query = query.Where(t => t.CreatedAt > createdAfter.Value);
+        }
+
+        var periods = await query.ToListAsync();
+        _dbContext.TravelPeriods.RemoveRange(periods);
+        await _dbContext.SaveChangesAsync();
+
+        return periods.Count;
     }
 }
 #endif
