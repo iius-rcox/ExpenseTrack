@@ -405,6 +405,8 @@ public class TestCleanupController : ControllerBase
 
     private async Task<int> DeleteExpenseEmbeddingsAsync(Guid userId, DateTime? createdAfter)
     {
+        // Use ExecuteDeleteAsync to avoid materializing vector columns
+        // (pgvector types can't be deserialized as System.Object)
         var query = _dbContext.ExpenseEmbeddings.Where(e => e.UserId == userId);
 
         if (createdAfter.HasValue)
@@ -412,11 +414,7 @@ public class TestCleanupController : ControllerBase
             query = query.Where(e => e.CreatedAt > createdAfter.Value);
         }
 
-        var embeddings = await query.ToListAsync();
-        _dbContext.ExpenseEmbeddings.RemoveRange(embeddings);
-        await _dbContext.SaveChangesAsync();
-
-        return embeddings.Count;
+        return await query.ExecuteDeleteAsync();
     }
 
     private async Task<int> DeleteTravelPeriodsAsync(Guid userId, DateTime? createdAfter)
