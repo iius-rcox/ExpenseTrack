@@ -111,9 +111,10 @@ public class TestCleanupController : ControllerBase
             // 4. Delete expense embeddings (references transactions)
             // 5. Delete travel periods (references receipts)
             // 6. Delete matches (references receipts and transactions)
-            // 7. Delete receipts (and their blobs)
-            // 8. Delete transactions
-            // 9. Delete statement imports
+            // 7. Clear Transaction.MatchedReceiptId (bidirectional FK not managed by EF)
+            // 8. Delete receipts (and their blobs)
+            // 9. Delete transactions
+            // 10. Delete statement imports
 
             // 1. Delete expense lines (always - they reference everything)
             if (cleanAll || entityTypes.Contains("reports", StringComparer.OrdinalIgnoreCase))
@@ -162,7 +163,16 @@ public class TestCleanupController : ControllerBase
                 _logger.LogInformation("Deleted {Count} matches", response.DeletedCounts.Matches);
             }
 
-            // 7. Delete receipts (and their blobs)
+            // 7. Clear Transaction.MatchedReceiptId before deleting receipts
+            // This is needed because the bidirectional Receipt<->Transaction relationship
+            // has a FK on Transaction.MatchedReceiptId that EF Core doesn't manage
+            if (cleanAll || entityTypes.Contains("receipts", StringComparer.OrdinalIgnoreCase))
+            {
+                var clearedCount = await ClearTransactionMatchedReceiptIdsAsync(user.Id, createdAfter);
+                _logger.LogInformation("Cleared {Count} transaction matched receipt references", clearedCount);
+            }
+
+            // 8. Delete receipts (and their blobs)
             if (cleanAll || entityTypes.Contains("receipts", StringComparer.OrdinalIgnoreCase))
             {
                 var (receiptsDeleted, blobsDeleted, blobWarnings) = await DeleteReceiptsAsync(user.Id, createdAfter);
@@ -172,14 +182,14 @@ public class TestCleanupController : ControllerBase
                 _logger.LogInformation("Deleted {ReceiptCount} receipts and {BlobCount} blobs", receiptsDeleted, blobsDeleted);
             }
 
-            // 8. Delete transactions
+            // 9. Delete transactions
             if (cleanAll || entityTypes.Contains("transactions", StringComparer.OrdinalIgnoreCase))
             {
                 response.DeletedCounts.Transactions = await DeleteTransactionsAsync(user.Id, createdAfter);
                 _logger.LogInformation("Deleted {Count} transactions", response.DeletedCounts.Transactions);
             }
 
-            // 9. Delete statement imports
+            // 10. Delete statement imports
             if (cleanAll || entityTypes.Contains("imports", StringComparer.OrdinalIgnoreCase))
             {
                 response.DeletedCounts.Imports = await DeleteImportsAsync(user.Id, createdAfter);
@@ -234,6 +244,40 @@ public class TestCleanupController : ControllerBase
         await _dbContext.SaveChangesAsync();
 
         return matches.Count;
+    }
+
+    private async Task<int> ClearTransactionMatchedReceiptIdsAsync(Guid userId, DateTime? createdAfter)
+    {
+        // Get all receipts that will be deleted
+        var receiptQuery = _dbContext.Receipts.Where(r => r.UserId == userId);
+        if (createdAfter.HasValue)
+        {
+            receiptQuery = receiptQuery.Where(r => r.CreatedAt > createdAfter.Value);
+        }
+        var receiptIds = await receiptQuery.Select(r => r.Id).ToListAsync();
+
+        if (!receiptIds.Any())
+        {
+            return 0;
+        }
+
+        // Find all transactions that reference these receipts via MatchedReceiptId
+        var transactions = await _dbContext.Transactions
+            .Where(t => t.MatchedReceiptId.HasValue && receiptIds.Contains(t.MatchedReceiptId.Value))
+            .ToListAsync();
+
+        // Clear the MatchedReceiptId to avoid FK constraint violation
+        foreach (var transaction in transactions)
+        {
+            transaction.MatchedReceiptId = null;
+        }
+
+        if (transactions.Any())
+        {
+            await _dbContext.SaveChangesAsync();
+        }
+
+        return transactions.Count;
     }
 
     private async Task<(int receiptsDeleted, int blobsDeleted, List<string> warnings)> DeleteReceiptsAsync(
