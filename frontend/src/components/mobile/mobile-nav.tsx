@@ -8,6 +8,7 @@
  * Hidden on tablet (768px+) and desktop viewports.
  */
 
+import * as React from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -244,8 +245,5 @@ export function useIsMobile(): boolean {
 
   return isMobile
 }
-
-// Need to import React for the hook
-import * as React from 'react'
 
 export default MobileNav
