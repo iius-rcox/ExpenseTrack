@@ -399,6 +399,7 @@ export interface DashboardSummary {
 export interface DashboardMetrics {
   pendingReceiptsCount: number
   unmatchedTransactionsCount: number
+  matchedTransactionsCount: number
   pendingMatchesCount: number
   draftReportsCount: number
   monthlySpending: {
@@ -408,6 +409,17 @@ export interface DashboardMetrics {
   }
 }
 
+/**
+ * Backend API activity item type.
+ * For UI components, prefer ExpenseStreamItem from '@/types/dashboard' which has
+ * additional fields (status, confidence, thumbnailUrl) needed for rich rendering.
+ *
+ * Type mapping:
+ * - 'receipt_uploaded' → ExpenseStreamEventType 'receipt'
+ * - 'statement_imported' → ExpenseStreamEventType 'transaction'
+ * - 'match_confirmed' → ExpenseStreamEventType 'match'
+ * - 'report_generated' → ExpenseStreamEventType 'report'
+ */
 export interface ActivityItem {
   id: string
   type: 'receipt_uploaded' | 'statement_imported' | 'match_confirmed' | 'report_generated'
@@ -415,6 +427,11 @@ export interface ActivityItem {
   timestamp: string
 }
 
+/**
+ * @deprecated Use ExpenseStreamItem from '@/types/dashboard' for UI components.
+ * This type is kept for backward compatibility with useRecentActivity hook.
+ * New code should use useExpenseStream hook which returns ExpenseStreamItem[].
+ */
 export interface RecentActivityItem {
   type: string
   title: string

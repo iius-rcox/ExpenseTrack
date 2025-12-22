@@ -1,0 +1,131 @@
+/**
+ * Confidence Glow - Signature Visual Effect
+ *
+ * These CSS classes create the subtle, pulsing glow effect that indicates
+ * AI confidence. The glow is applied to extracted fields, match suggestions,
+ * and other AI-generated data.
+ *
+ * Usage:
+ * - Apply `.confidence-glow-high` for scores >= 0.9
+ * - Apply `.confidence-glow-medium` for scores >= 0.7
+ * - Apply `.confidence-glow-low` for scores < 0.7
+ *
+ * The glow is purely decorative and enhances the confidence indicator.
+ */
+
+@keyframes confidence-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* High confidence - Emerald glow */
+.confidence-glow-high {
+  position: relative;
+}
+
+.confidence-glow-high::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.2) 0%,
+    rgba(16, 185, 129, 0.1) 50%,
+    transparent 100%
+  );
+  animation: confidence-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Medium confidence - Amber glow */
+.confidence-glow-medium {
+  position: relative;
+}
+
+.confidence-glow-medium::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.2) 0%,
+    rgba(245, 158, 11, 0.1) 50%,
+    transparent 100%
+  );
+  animation: confidence-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Low confidence - Rose glow */
+.confidence-glow-low {
+  position: relative;
+}
+
+.confidence-glow-low::before {
+  content: '';
+  position: absolute;
+    inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(244, 63, 94, 0.2) 0%,
+    rgba(244, 63, 94, 0.1) 50%,
+    transparent 100%
+  );
+  animation: confidence-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Static variants (no animation) for reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .confidence-glow-high::before,
+  .confidence-glow-medium::before,
+  .confidence-glow-low::before {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* Subtle border variants (alternative to glow) */
+.confidence-border-high {
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.confidence-border-medium {
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.confidence-border-low {
+  border-color: rgba(244, 63, 94, 0.5);
+}
+
+/* Focus ring variants that match confidence colors */
+.confidence-ring-high:focus-visible {
+  outline: none;
+  ring: 2px;
+  ring-offset: 2px;
+  ring-color: rgba(16, 185, 129, 0.5);
+}
+
+.confidence-ring-medium:focus-visible {
+  outline: none;
+  ring: 2px;
+  ring-offset: 2px;
+  ring-color: rgba(245, 158, 11, 0.5);
+}
+
+.confidence-ring-low:focus-visible {
+  outline: none;
+  ring: 2px;
+  ring-offset: 2px;
+  ring-color: rgba(244, 63, 94, 0.5);
+}

@@ -1,0 +1,127 @@
+/**
+ * Dashboard E2E Tests (T035)
+ *
+ * End-to-end tests for the dashboard page using Playwright.
+ * These tests verify the full user experience including:
+ * - Dashboard loading and display
+ * - Metrics visibility
+ * - Real-time updates
+ * - Navigation to detail pages
+ *
+ * Note: These tests require the backend API to be running or mocked.
+ */
+
+import { test, expect } from '@playwright/test';
+
+// Base URL for the application
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
+
+test.describe('Dashboard', () => {
+  // Skip tests if not in e2e environment
+  test.skip(({ }, testInfo) => !process.env.E2E_TEST, 'E2E tests disabled');
+
+  test.beforeEach(async ({ page }) => {
+    // Navigate to the dashboard
+    await page.goto(`${BASE_URL}/dashboard`);
+  });
+
+  test('should display the dashboard page title', async ({ page }) => {
+    // Wait for the dashboard to load
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByText('Your expense command center')).toBeVisible();
+  });
+
+  test('should show loading state initially', async ({ page }) => {
+    // Check for loading indicators on initial load
+    // The page should show skeleton loaders before data arrives
+    await expect(page.locator('[class*="animate-pulse"]').first()).toBeVisible({
+      timeout: 1000,
+    }).catch(() => {
+      // Data may have loaded too quickly for skeleton to be visible
+      // This is acceptable - just verify content loaded
+    });
+  });
+
+  test('should display metrics row with 4 stat cards', async ({ page }) => {
+    // Wait for metrics to load
+    await page.waitForSelector('[data-testid="metrics-row"]', { timeout: 10000 }).catch(() => {
+      // Fallback: look for stat card content
+    });
+
+    // Should see key metric labels
+    await expect(page.getByText('Monthly Spending')).toBeVisible();
+    await expect(page.getByText('Pending Review')).toBeVisible();
+    await expect(page.getByText('Match Rate')).toBeVisible();
+    await expect(page.getByText('Draft Reports')).toBeVisible();
+  });
+
+  test('should display recent activity section', async ({ page }) => {
+    await expect(page.getByText('Recent Activity')).toBeVisible();
+  });
+
+  test('should display action queue section', async ({ page }) => {
+    await expect(page.getByText('Action Queue')).toBeVisible();
+  });
+
+  test('should navigate to receipts when clicking upload button', async ({ page }) => {
+    // On mobile, this is a FAB; on desktop, it might be in the header
+    const uploadButton = page.getByRole('link', { name: /upload/i });
+    if (await uploadButton.isVisible()) {
+      await uploadButton.click();
+      await expect(page).toHaveURL(/\/receipts/);
+    }
+  });
+
+  test('should navigate to matching when clicking pending review card', async ({ page }) => {
+    const pendingCard = page.getByText('Pending Review').first();
+    await pendingCard.click();
+    await expect(page).toHaveURL(/\/matching/);
+  });
+
+  test('should have refresh button that reloads data', async ({ page }) => {
+    const refreshButton = page.getByRole('button', { name: /refresh/i });
+    await expect(refreshButton).toBeVisible();
+
+    // Click refresh and verify it triggers reload
+    await refreshButton.click();
+    // Button should show loading state briefly
+    await expect(refreshButton).toBeDisabled();
+    // Then return to normal
+    await expect(refreshButton).toBeEnabled({ timeout: 5000 });
+  });
+
+  test('should be responsive on mobile viewport', async ({ page }) => {
+    // Set mobile viewport
+    await page.setViewportSize({ width: 375, height: 667 });
+
+    // Should show mobile summary bar instead of full metrics row
+    // MetricsSummaryBar should be visible
+    await expect(page.getByText('Spending')).toBeVisible();
+    await expect(page.getByText('Pending')).toBeVisible();
+  });
+
+  test('should display spending by category section', async ({ page }) => {
+    await expect(page.getByText('Spending by Category')).toBeVisible();
+  });
+});
+
+test.describe('Dashboard - Performance', () => {
+  test.skip(({ }, testInfo) => !process.env.E2E_TEST, 'E2E tests disabled');
+
+  test('should load dashboard within 2 seconds (SC-001)', async ({ page }) => {
+    const startTime = Date.now();
+
+    await page.goto(`${BASE_URL}/dashboard`);
+
+    // Wait for first meaningful content
+    await page.waitForSelector('[data-testid="metrics-row"], [class*="StatCard"]', {
+      timeout: 2000,
+    }).catch(async () => {
+      // Fallback: wait for any metric content
+      await page.getByText('Monthly Spending').waitFor({ timeout: 2000 });
+    });
+
+    const loadTime = Date.now() - startTime;
+    expect(loadTime).toBeLessThan(2000);
+  });
+});

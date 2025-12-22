@@ -34,7 +34,7 @@ async function getAuthHeaders(): Promise<HeadersInit> {
       account: accounts[0],
     })
     return {
-      'Authorization': `Bearer ${response.idToken}`,
+      'Authorization': `Bearer ${response.accessToken}`,
       'Content-Type': 'application/json',
     }
   } catch (error) {
@@ -137,7 +137,7 @@ export async function apiUpload<T>(
     })
 
     xhr.open('POST', `${API_BASE_URL}${url}`)
-    xhr.setRequestHeader('Authorization', `Bearer ${response.idToken}`)
+    xhr.setRequestHeader('Authorization', `Bearer ${response.accessToken}`)
     xhr.send(formData)
   })
 }
@@ -158,7 +158,7 @@ export async function apiDownload(url: string, filename: string): Promise<void> 
 
   const fetchResponse = await fetch(`${API_BASE_URL}${url}`, {
     headers: {
-      'Authorization': `Bearer ${response.idToken}`,
+      'Authorization': `Bearer ${response.accessToken}`,
     },
   })
 

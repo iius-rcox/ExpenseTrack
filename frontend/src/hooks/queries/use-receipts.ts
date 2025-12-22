@@ -7,6 +7,8 @@ import type {
   ReceiptStatusCounts,
   UploadResponse
 } from '@/types/api'
+import type { ExtractedFieldKey } from '@/types/receipt'
+import { dashboardKeys } from './use-dashboard'
 
 export const receiptKeys = {
   all: ['receipts'] as const,
@@ -121,6 +123,198 @@ export function useProcessReceipt() {
       queryClient.invalidateQueries({ queryKey: receiptKeys.detail(id) })
       queryClient.invalidateQueries({ queryKey: receiptKeys.lists() })
       queryClient.invalidateQueries({ queryKey: receiptKeys.statusCounts() })
+    },
+  })
+}
+
+/**
+ * Field update response from the API.
+ */
+interface FieldUpdateResponse {
+  success: boolean
+  field: {
+    key: string
+    value: string | number | null
+    confidence: number
+    isEdited: boolean
+    originalValue?: string | number | null
+  }
+}
+
+/**
+ * Mutation params for updating a receipt field.
+ */
+interface UpdateFieldParams {
+  receiptId: string
+  field: ExtractedFieldKey
+  value: string | number | null
+}
+
+/**
+ * Hook for updating receipt fields with optimistic updates.
+ * Provides instant UI feedback while the API request is in flight.
+ * Includes rollback on error for data consistency.
+ */
+export function useUpdateReceiptField() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ receiptId, field, value }: UpdateFieldParams) => {
+      return apiFetch<FieldUpdateResponse>(`/receipts/${receiptId}/fields`, {
+        method: 'PATCH',
+        body: JSON.stringify({ field, value }),
+      })
+    },
+
+    // Optimistic update: immediately show the change in the UI
+    onMutate: async ({ receiptId, field, value }) => {
+      // Cancel any outgoing refetches to prevent overwriting optimistic update
+      await queryClient.cancelQueries({ queryKey: receiptKeys.detail(receiptId) })
+
+      // Snapshot the previous value
+      const previousDetail = queryClient.getQueryData<ReceiptDetail>(
+        receiptKeys.detail(receiptId)
+      )
+
+      // Optimistically update the cache
+      if (previousDetail) {
+        const updatedDetail = { ...previousDetail }
+
+        // Update the specific field based on the field key
+        switch (field) {
+          case 'merchant':
+            updatedDetail.vendor = value as string | null
+            break
+          case 'amount':
+            updatedDetail.amount = value as number | null
+            break
+          case 'date':
+            updatedDetail.date = value as string | null
+            break
+          case 'taxAmount':
+            updatedDetail.tax = value as number | null
+            break
+          // Add more field mappings as needed
+        }
+
+        // Update confidence scores to reflect edit
+        if (!updatedDetail.confidenceScores) {
+          updatedDetail.confidenceScores = {}
+        }
+        // Mark as edited (confidence doesn't change for edited fields)
+
+        queryClient.setQueryData(receiptKeys.detail(receiptId), updatedDetail)
+      }
+
+      // Return context with previous value for rollback
+      return { previousDetail }
+    },
+
+    // Rollback on error
+    onError: (_error, { receiptId }, context) => {
+      if (context?.previousDetail) {
+        queryClient.setQueryData(
+          receiptKeys.detail(receiptId),
+          context.previousDetail
+        )
+      }
+    },
+
+    // Always refetch after success or error to ensure data consistency
+    onSettled: (_, _error, { receiptId }) => {
+      queryClient.invalidateQueries({ queryKey: receiptKeys.detail(receiptId) })
+      // Also invalidate list in case summary fields changed
+      queryClient.invalidateQueries({ queryKey: receiptKeys.lists() })
+    },
+  })
+}
+
+/**
+ * Hook for batch updating multiple receipt fields.
+ * Useful for bulk corrections or category assignments.
+ */
+interface BatchUpdateParams {
+  receiptId: string
+  fields: Array<{ field: ExtractedFieldKey; value: string | number | null }>
+}
+
+export function useBatchUpdateReceiptFields() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ receiptId, fields }: BatchUpdateParams) => {
+      return apiFetch<{ success: boolean; updatedCount: number }>(
+        `/receipts/${receiptId}/fields/batch`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ fields }),
+        }
+      )
+    },
+
+    onSuccess: (_, { receiptId }) => {
+      queryClient.invalidateQueries({ queryKey: receiptKeys.detail(receiptId) })
+      queryClient.invalidateQueries({ queryKey: receiptKeys.lists() })
+    },
+  })
+}
+
+/**
+ * Hook for uploading receipts with enhanced tracking.
+ * Extends base upload with dashboard invalidation.
+ */
+export function useUploadReceiptsWithTracking() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      files,
+      onProgress,
+    }: {
+      files: File[]
+      onProgress?: (progress: number, fileIndex: number) => void
+    }) => {
+      const formData = new FormData()
+      files.forEach((file) => {
+        formData.append('files', file)
+      })
+
+      return apiUpload<UploadResponse>('/receipts', formData, (progress) => {
+        onProgress?.(progress, 0)
+      })
+    },
+
+    onSuccess: () => {
+      // Invalidate receipt queries
+      queryClient.invalidateQueries({ queryKey: receiptKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: receiptKeys.statusCounts() })
+      // Also invalidate dashboard to update pending counts
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all })
+    },
+  })
+}
+
+/**
+ * Hook for polling receipt processing status.
+ * Useful for tracking processing progress after upload.
+ */
+export function useReceiptProcessingStatus(
+  receiptId: string,
+  options: { enabled?: boolean; refetchInterval?: number } = {}
+) {
+  const { enabled = true, refetchInterval = 2000 } = options
+
+  return useQuery({
+    queryKey: [...receiptKeys.detail(receiptId), 'status'],
+    queryFn: () => apiFetch<{ status: string; progress?: number }>(`/receipts/${receiptId}/status`),
+    enabled: enabled && !!receiptId,
+    refetchInterval: (query) => {
+      // Stop polling when complete or error
+      const status = query.state.data?.status
+      if (status === 'Ready' || status === 'Error' || status === 'Matched') {
+        return false
+      }
+      return refetchInterval
     },
   })
 }

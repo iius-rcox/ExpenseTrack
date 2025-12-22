@@ -4,7 +4,7 @@ import { z } from 'zod'
 export const receiptSearchSchema = z.object({
   page: z.number().optional().default(1),
   pageSize: z.number().optional().default(20),
-  status: z.enum(['Pending', 'Processing', 'Processed', 'Unmatched', 'Matched', 'Error']).optional(),
+  status: z.enum(['Uploaded', 'Processing', 'Ready', 'ReviewRequired', 'Error', 'Unmatched', 'Matched']).optional(),
   fromDate: z.string().optional(),
   toDate: z.string().optional(),
 })

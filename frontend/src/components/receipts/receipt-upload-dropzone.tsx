@@ -1,13 +1,14 @@
 "use client"
 
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { toast } from 'sonner'
-import { Upload, X, FileImage, Loader2 } from 'lucide-react'
+import { Upload, X, FileImage, Loader2, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useUploadReceipts } from '@/hooks/queries/use-receipts'
+import { CameraCaptureButton } from '@/components/mobile/camera-capture'
 
 const ACCEPTED_FILE_TYPES = {
   'image/jpeg': ['.jpg', '.jpeg'],
@@ -17,7 +18,7 @@ const ACCEPTED_FILE_TYPES = {
   'application/pdf': ['.pdf'],
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB per spec
 const MAX_FILES = 20
 
 interface ReceiptUploadDropzoneProps {
@@ -27,7 +28,16 @@ interface ReceiptUploadDropzoneProps {
 export function ReceiptUploadDropzone({ onUploadComplete }: ReceiptUploadDropzoneProps) {
   const [files, setFiles] = useState<File[]>([])
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [isMobile, setIsMobile] = useState(false)
   const { mutate: uploadReceipts, isPending } = useUploadReceipts()
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: unknown[]) => {
     if (rejectedFiles.length > 0) {
@@ -47,6 +57,19 @@ export function ReceiptUploadDropzone({ onUploadComplete }: ReceiptUploadDropzon
   const removeFile = (index: number) => {
     setFiles(prev => prev.filter((_, i) => i !== index))
   }
+
+  // Handle camera capture
+  const handleCameraCapture = useCallback((file: File) => {
+    setFiles(prev => {
+      const newFiles = [...prev, file]
+      if (newFiles.length > MAX_FILES) {
+        toast.error(`Maximum ${MAX_FILES} files allowed`)
+        return prev
+      }
+      return newFiles
+    })
+    toast.success('Photo captured')
+  }, [])
 
   const handleUpload = () => {
     if (files.length === 0) return
@@ -92,25 +115,56 @@ export function ReceiptUploadDropzone({ onUploadComplete }: ReceiptUploadDropzon
 
   return (
     <div className="space-y-4">
-      <div
-        {...getRootProps()}
-        className={cn(
-          'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
-          isDragActive
-            ? 'border-primary bg-primary/5'
-            : 'border-muted-foreground/25 hover:border-primary/50',
-          isPending && 'cursor-not-allowed opacity-50'
-        )}
-      >
-        <input {...getInputProps()} />
-        <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
-        <p className="mt-4 text-lg font-medium">
-          {isDragActive ? 'Drop files here' : 'Drag & drop receipts here'}
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          or click to browse. Supports JPG, PNG, WebP, HEIC, PDF (max 10MB each)
-        </p>
-      </div>
+      {/* Mobile: Show camera and gallery buttons */}
+      {isMobile ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <CameraCaptureButton
+              onCapture={handleCameraCapture}
+              disabled={isPending}
+              className="h-24 flex-col"
+            />
+            <div
+              {...getRootProps()}
+              className={cn(
+                'flex flex-col items-center justify-center gap-2',
+                'h-24 rounded-lg border-2 border-dashed',
+                'cursor-pointer transition-colors',
+                'border-muted-foreground/25 hover:border-primary/50',
+                isPending && 'cursor-not-allowed opacity-50'
+              )}
+            >
+              <input {...getInputProps()} />
+              <FolderOpen className="h-8 w-8 text-muted-foreground" />
+              <span className="text-sm font-medium">Browse Files</span>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Supports JPG, PNG, WebP, HEIC, PDF (max 20MB each)
+          </p>
+        </div>
+      ) : (
+        /* Desktop: Show drag-and-drop zone */
+        <div
+          {...getRootProps()}
+          className={cn(
+            'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
+            isDragActive
+              ? 'border-primary bg-primary/5'
+              : 'border-muted-foreground/25 hover:border-primary/50',
+            isPending && 'cursor-not-allowed opacity-50'
+          )}
+        >
+          <input {...getInputProps()} />
+          <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+          <p className="mt-4 text-lg font-medium">
+            {isDragActive ? 'Drop files here' : 'Drag & drop receipts here'}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            or click to browse. Supports JPG, PNG, WebP, HEIC, PDF (max 20MB each)
+          </p>
+        </div>
+      )}
 
       {files.length > 0 && (
         <div className="space-y-4">
@@ -121,6 +175,7 @@ export function ReceiptUploadDropzone({ onUploadComplete }: ReceiptUploadDropzon
             <Button
               variant="ghost"
               size="sm"
+              className="min-h-[44px] md:min-h-0"
               onClick={() => setFiles([])}
               disabled={isPending}
             >
@@ -144,11 +199,11 @@ export function ReceiptUploadDropzone({ onUploadComplete }: ReceiptUploadDropzon
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-11 w-11 md:h-8 md:w-8"
                   onClick={() => removeFile(index)}
                   disabled={isPending}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>
               </div>
             ))}
