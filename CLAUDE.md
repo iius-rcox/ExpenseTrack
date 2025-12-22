@@ -194,4 +194,59 @@ docker buildx build --platform linux/amd64 -t iiusacr.azurecr.io/expenseflow-fro
 git add . && git commit -m "chore(deploy): Update staging frontend to vX.Y.Z" && git push origin main
 ```
 
+## React Component Type Detection
+
+**CRITICAL**: When checking if a prop is a React component vs a ReactNode, `typeof === 'function'` is NOT sufficient.
+
+### The Problem
+Lucide icons (and many UI library components) use `React.forwardRef()`, which creates an object with `typeof === 'object'`, not `'function'`. This caused React Error #31 when the component was passed directly as a child instead of being rendered as JSX.
+
+### Correct Pattern
+```typescript
+// ❌ WRONG - Fails for forwardRef components
+if (typeof Icon === 'function') {
+  return <Icon className="..." />;
+}
+return Icon; // BUG: Returns raw {$$typeof, render, displayName} object
+
+// ✅ CORRECT - Detects both function components AND forwardRef
+const isComponentType =
+  typeof Icon === 'function' ||
+  (typeof Icon === 'object' &&
+    Icon !== null &&
+    typeof (Icon as { render?: unknown }).render === 'function');
+
+if (isComponentType) {
+  const IconComponent = Icon as React.ElementType;
+  return <IconComponent className="..." />;
+}
+return Icon; // Already a ReactNode (JSX element)
+```
+
+### ForwardRef Internal Structure
+```typescript
+// What a forwardRef component looks like internally:
+{
+  $$typeof: Symbol(react.forward_ref),
+  render: ƒ,        // The actual render function
+  displayName: "IconName"
+}
+```
+
+**Files affected by this pattern**: `frontend/src/components/design-system/empty-state.tsx`
+
+## Private AKS Cluster Access
+
+The `dev-aks` cluster uses a **private API server endpoint**. When kubectl commands fail with DNS lookup errors:
+
+```bash
+# ❌ Default credentials use private FQDN (requires VPN)
+az aks get-credentials --resource-group rg_prod --name dev-aks
+
+# ✅ Use --public-fqdn for external access
+az aks get-credentials --resource-group rg_prod --name dev-aks --public-fqdn
+```
+
+**Error signature**: `dial tcp: lookup *.private.southcentralus.azmk8s.io: no such host`
+
 <!-- MANUAL ADDITIONS END -->
