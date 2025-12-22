@@ -32,7 +32,8 @@ public class TransactionRepository : ITransactionRepository
         DateOnly? startDate = null,
         DateOnly? endDate = null,
         bool? matched = null,
-        Guid? importId = null)
+        Guid? importId = null,
+        string? search = null)
     {
         var query = _context.Transactions.Where(t => t.UserId == userId);
 
@@ -57,6 +58,12 @@ public class TransactionRepository : ITransactionRepository
         if (importId.HasValue)
         {
             query = query.Where(t => t.ImportId == importId.Value);
+        }
+
+        // Apply text search on description (case-insensitive)
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(t => EF.Functions.ILike(t.Description, $"%{search}%"));
         }
 
         var totalCount = await query.CountAsync();

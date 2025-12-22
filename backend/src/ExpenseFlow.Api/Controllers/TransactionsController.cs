@@ -37,6 +37,7 @@ public class TransactionsController : ApiControllerBase
     /// <param name="endDate">Optional end date filter.</param>
     /// <param name="matched">Optional filter by receipt match status.</param>
     /// <param name="importId">Optional filter by specific import batch.</param>
+    /// <param name="search">Optional text search on description (case-insensitive).</param>
     /// <returns>Paginated list of transactions.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(TransactionListResponse), StatusCodes.Status200OK)]
@@ -46,7 +47,8 @@ public class TransactionsController : ApiControllerBase
         [FromQuery] DateOnly? startDate = null,
         [FromQuery] DateOnly? endDate = null,
         [FromQuery] bool? matched = null,
-        [FromQuery] Guid? importId = null)
+        [FromQuery] Guid? importId = null,
+        [FromQuery] string? search = null)
     {
         // Validate pagination parameters
         if (page < 1) page = 1;
@@ -62,7 +64,8 @@ public class TransactionsController : ApiControllerBase
             startDate,
             endDate,
             matched,
-            importId);
+            importId,
+            search);
 
         var response = new TransactionListResponse
         {

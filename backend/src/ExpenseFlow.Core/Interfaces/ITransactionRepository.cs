@@ -25,6 +25,7 @@ public interface ITransactionRepository
     /// <param name="endDate">Optional end date filter.</param>
     /// <param name="matched">Optional matched receipt filter.</param>
     /// <param name="importId">Optional import batch filter.</param>
+    /// <param name="search">Optional text search on description (case-insensitive).</param>
     /// <returns>Tuple of transactions list, total count, and unmatched count.</returns>
     Task<(List<Transaction> Transactions, int TotalCount, int UnmatchedCount)> GetPagedAsync(
         Guid userId,
@@ -33,7 +34,8 @@ public interface ITransactionRepository
         DateOnly? startDate = null,
         DateOnly? endDate = null,
         bool? matched = null,
-        Guid? importId = null);
+        Guid? importId = null,
+        string? search = null);
 
     /// <summary>
     /// Checks if a duplicate transaction exists.
