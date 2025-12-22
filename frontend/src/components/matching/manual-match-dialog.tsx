@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -36,12 +36,25 @@ import {
 
 interface ManualMatchDialogProps {
   trigger?: React.ReactNode
+  /** Control open state externally */
+  open?: boolean
+  /** Callback when open state changes */
+  onOpenChange?: (open: boolean) => void
+  /** Pre-select a specific receipt by ID */
+  receiptId?: string
 }
 
 export function ManualMatchDialog({
   trigger,
+  open: controlledOpen,
+  onOpenChange,
+  receiptId,
 }: ManualMatchDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+
+  // Support both controlled and uncontrolled modes
+  const open = controlledOpen ?? internalOpen
+  const setOpen = onOpenChange ?? setInternalOpen
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptSummary | null>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionSummary | null>(null)
   const [receiptSearch, setReceiptSearch] = useState('')
@@ -50,6 +63,16 @@ export function ManualMatchDialog({
   const { data: receipts, isLoading: loadingReceipts } = useUnmatchedReceipts()
   const { data: transactions, isLoading: loadingTransactions } = useUnmatchedTransactions()
   const { mutate: manualMatch, isPending: isMatching } = useManualMatch()
+
+  // Pre-select receipt when receiptId is provided and dialog opens
+  useEffect(() => {
+    if (open && receiptId && receipts && !selectedReceipt) {
+      const receipt = receipts.find((r) => r.id === receiptId)
+      if (receipt) {
+        setSelectedReceipt(receipt)
+      }
+    }
+  }, [open, receiptId, receipts, selectedReceipt])
 
   const filteredReceipts = useMemo(() => {
     if (!receipts) return []

@@ -40,6 +40,16 @@ const config: Config = {
         accent: {
           DEFAULT: 'hsl(var(--accent))',
           foreground: 'hsl(var(--accent-foreground))',
+          // Refined Intelligence copper accent
+          copper: '#b87333',
+          'copper-light': '#d4a574',
+          'copper-dark': '#8b5a2b',
+        },
+        // AI Confidence indicators
+        confidence: {
+          high: '#10b981',   // Emerald - AI is confident
+          medium: '#f59e0b', // Amber - Needs review
+          low: '#f43f5e',    // Rose - Uncertain
         },
         popover: {
           DEFAULT: 'hsl(var(--popover))',
@@ -67,6 +77,12 @@ const config: Config = {
           '5': 'hsl(var(--chart-5))',
         },
       },
+      // Refined Intelligence typography
+      fontFamily: {
+        serif: ["'Playfair Display'", 'Georgia', 'serif'],
+        sans: ["'Plus Jakarta Sans'", 'system-ui', 'sans-serif'],
+        mono: ["'JetBrains Mono'", 'monospace'],
+      },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
@@ -81,10 +97,28 @@ const config: Config = {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' },
         },
+        // Confidence glow animation for AI-detected fields
+        'confidence-pulse': {
+          '0%, 100%': { opacity: '0.4' },
+          '50%': { opacity: '0.7' },
+        },
+        // Subtle fade for stream items
+        'fade-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        // Slide up for list items
+        'slide-up': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'confidence-pulse': 'confidence-pulse 2s ease-in-out infinite',
+        'fade-in': 'fade-in 0.3s ease-out',
+        'slide-up': 'slide-up 0.3s ease-out',
       },
     },
   },

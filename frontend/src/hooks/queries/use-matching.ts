@@ -198,3 +198,89 @@ export function useTriggerAutoMatch() {
     },
   })
 }
+
+/**
+ * T067: Batch approve matches above a confidence threshold
+ */
+export function useBatchApprove() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ ids, minConfidence }: { ids?: string[]; minConfidence?: number }) => {
+      return apiFetch<{ approved: number; skipped: number }>('/matching/batch-approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, minConfidence }),
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: matchingKeys.all })
+    },
+  })
+}
+
+/**
+ * Batch reject multiple matches
+ */
+export function useBatchReject() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      return apiFetch<{ rejected: number }>('/matching/batch-reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: matchingKeys.all })
+    },
+  })
+}
+
+/**
+ * Combined hook for match review workspace
+ * Provides all state and actions needed for the review UI
+ */
+export function useMatchReviewWorkspace(params: ProposalListParams = {}) {
+  const proposalsQuery = useMatchProposals(params)
+  const confirmMatch = useConfirmMatch()
+  const rejectMatch = useRejectMatch()
+  const manualMatch = useManualMatch()
+  const batchApprove = useBatchApprove()
+  const batchReject = useBatchReject()
+
+  const isProcessing =
+    confirmMatch.isPending ||
+    rejectMatch.isPending ||
+    manualMatch.isPending ||
+    batchApprove.isPending ||
+    batchReject.isPending
+
+  return {
+    // Data
+    proposals: proposalsQuery.data?.items ?? [],
+    totalCount: proposalsQuery.data?.totalCount ?? 0,
+    page: proposalsQuery.data?.page ?? 1,
+    pageSize: proposalsQuery.data?.pageSize ?? 20,
+    isLoading: proposalsQuery.isLoading,
+    isError: proposalsQuery.isError,
+    error: proposalsQuery.error,
+
+    // Actions
+    confirm: (matchId: string) => confirmMatch.mutate({ matchId }),
+    reject: rejectMatch.mutate,
+    createManualMatch: manualMatch.mutate,
+    batchApprove: batchApprove.mutate,
+    batchReject: batchReject.mutate,
+
+    // Status
+    isProcessing,
+    isConfirming: confirmMatch.isPending,
+    isRejecting: rejectMatch.isPending,
+
+    // Refetch
+    refetch: proposalsQuery.refetch,
+  }
+}

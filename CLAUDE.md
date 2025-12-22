@@ -27,6 +27,7 @@ Auto-generated from feature plans. Last updated: 2025-12-17
 - N/A (frontend consumes existing backend APIs) (011-unified-frontend)
 - .NET 8 with C# 12 (cleanup endpoint), JSON (expected values file) + ExpenseFlow.Api (existing), test-data folder, staging API (012-automated-uat-testing)
 - `test-data/receipts/` (19 images), `test-data/statements/chase.csv`, `test-data/expected-values.json` (new) (012-automated-uat-testing)
+- TypeScript 5.7+ with React 18.3+ + TanStack Router, TanStack Query, Tailwind CSS 4.x, shadcn/ui, Framer Motion (new), Recharts (013-frontend-redesign)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -115,9 +116,9 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 013-frontend-redesign: Added TypeScript 5.7+ with React 18.3+ + TanStack Router, TanStack Query, Tailwind CSS 4.x, shadcn/ui, Framer Motion (new), Recharts
 - 012-automated-uat-testing: Added .NET 8 with C# 12 (cleanup endpoint), JSON (expected values file) + ExpenseFlow.Api (existing), test-data folder, staging API
 - 011-unified-frontend: Added TypeScript 5.7+ with React 18.3+
-- 010-testing-cache-warming: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Semantic Kernel, NBomber, ClosedXML
   - Entities: ImportJob (for tracking cache warming import jobs)
   - Services: CacheWarmingService (historical data import, job management)
   - Jobs: CacheWarmingJob (Hangfire background processing)

@@ -1,380 +1,523 @@
-"use client"
+'use client'
 
-import { useState } from 'react'
+/**
+ * Analytics Dashboard Route (T084)
+ *
+ * Enhanced analytics page using the "Refined Intelligence" design system.
+ * Integrates spending trends, category breakdown, merchant analytics,
+ * and subscription detection components.
+ *
+ * Features:
+ * - Flexible date range selection with presets
+ * - Spending trend visualization with multiple chart types
+ * - Category breakdown with pie/bar/list views
+ * - Top merchant analysis with trend indicators
+ * - Subscription detection and management
+ * - Cache performance monitoring
+ */
+
+import { useState, useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { motion } from 'framer-motion'
 import {
   useMonthlyComparison,
   useCacheStatistics,
+  useSpendingTrend,
   useSpendingByCategory,
-  useSpendingByVendor,
+  useMerchantAnalytics,
+  useSubscriptionDetection,
+  getDefaultDateRange,
 } from '@/hooks/queries/use-analytics'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Progress } from '@/components/ui/progress'
-import { formatCurrency, formatPercentage, getCurrentPeriod, getPreviousPeriod, formatPeriod } from '@/lib/utils'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { fadeIn, staggerContainer, staggerChild } from '@/lib/animations'
+import { cn } from '@/lib/utils'
 import {
   TrendingUp,
   TrendingDown,
   DollarSign,
-  ChevronLeft,
-  ChevronRight,
-  Building2,
-  Tag,
-  Zap,
+  BarChart3,
+  PieChart,
+  Store,
+  Repeat,
   Database,
   RefreshCcw,
+  AlertCircle,
 } from 'lucide-react'
+import type { AnalyticsDateRange, TimeGranularity } from '@/types/analytics'
+
+// Import analytics components
+import {
+  SpendingTrendChart,
+  CategoryBreakdown,
+  MerchantAnalytics,
+  SubscriptionDetector,
+  DateRangePicker,
+  QuickPresets,
+  ComparisonDateRange,
+} from '@/components/analytics'
 
 export const Route = createFileRoute('/_authenticated/analytics/')({
-  component: AnalyticsPage,
+  component: AnalyticsDashboard,
 })
 
-function AnalyticsPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod())
+// Format currency
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value)
+}
 
-  // Calculate date range for the selected period
-  const [year, month] = selectedPeriod.split('-').map(Number)
-  const startDate = `${selectedPeriod}-01`
-  const endDate = new Date(year, month, 0).toISOString().split('T')[0]
+// Format percentage
+function formatPercentage(value: number): string {
+  return `${(value * 100).toFixed(1)}%`
+}
 
-  const { data: monthlyComparison, isLoading: loadingComparison, refetch: refetchComparison } = useMonthlyComparison(selectedPeriod)
-  const { data: cacheStats, isLoading: loadingCache } = useCacheStatistics(selectedPeriod)
-  const { data: spendingByCategory, isLoading: loadingCategory } = useSpendingByCategory(startDate, endDate)
-  const { data: spendingByVendor, isLoading: loadingVendor } = useSpendingByVendor(startDate, endDate)
-
-  const handlePreviousPeriod = () => {
-    setSelectedPeriod(getPreviousPeriod(selectedPeriod))
-  }
-
-  const handleNextPeriod = () => {
-    const date = new Date(year, month, 1)
-    setSelectedPeriod(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`)
-  }
-
-  const isLoading = loadingComparison || loadingCache || loadingCategory || loadingVendor
+// Summary metric card
+function MetricCard({
+  title,
+  value,
+  icon: Icon,
+  trend,
+  trendLabel,
+  isLoading,
+}: {
+  title: string
+  value: string | number
+  icon: React.ElementType
+  trend?: number
+  trendLabel?: string
+  isLoading?: boolean
+}) {
+  const isPositive = trend !== undefined && trend > 0
+  const isNegative = trend !== undefined && trend < 0
 
   return (
-    <div className="space-y-6">
+    <motion.div variants={staggerChild}>
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Icon className="h-4 w-4" />
+            {title}
+          </div>
+          {isLoading ? (
+            <Skeleton className="h-8 w-24 mt-2" />
+          ) : (
+            <div className="mt-2 flex items-end justify-between">
+              <p className="text-2xl font-bold font-mono">
+                {typeof value === 'number' ? formatCurrency(value) : value}
+              </p>
+              {trend !== undefined && (
+                <div
+                  className={cn(
+                    'flex items-center gap-1 text-sm',
+                    isPositive ? 'text-rose-500' : isNegative ? 'text-emerald-500' : 'text-slate-500'
+                  )}
+                >
+                  {isPositive ? (
+                    <TrendingUp className="h-4 w-4" />
+                  ) : isNegative ? (
+                    <TrendingDown className="h-4 w-4" />
+                  ) : null}
+                  <span className="font-mono">
+                    {isPositive ? '+' : ''}
+                    {trend.toFixed(1)}%
+                  </span>
+                  {trendLabel && (
+                    <span className="text-muted-foreground text-xs">{trendLabel}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
+
+// Cache stats card
+function CacheStatsCard({
+  period,
+  isLoading,
+}: {
+  period: string
+  isLoading?: boolean
+}) {
+  const { data: cacheStats, isLoading: loadingCache } = useCacheStatistics(period)
+
+  if (loadingCache || isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            AI Cache Performance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!cacheStats) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Database className="h-5 w-5" />
+          AI Cache Performance
+        </CardTitle>
+        <CardDescription>
+          Cache efficiency and cost savings
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Total Operations</p>
+            <p className="text-xl font-bold font-mono">{cacheStats.totalOperations}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Hit Rate</p>
+            <p className="text-xl font-bold font-mono">{formatPercentage(cacheStats.hitRate)}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Est. Cost Saved</p>
+            <p className="text-xl font-bold font-mono text-emerald-500">
+              {formatCurrency(cacheStats.estimatedCostSaved)}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Tier Breakdown</p>
+            <div className="flex gap-1 flex-wrap">
+              {cacheStats.tierBreakdown.map((tier) => (
+                <Badge key={tier.tier} variant="outline" className="text-xs font-mono">
+                  T{tier.tier}: {tier.count}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function AnalyticsDashboard() {
+  // Date range state
+  const [dateRange, setDateRange] = useState<AnalyticsDateRange>(getDefaultDateRange())
+  const [comparisonRange, setComparisonRange] = useState<AnalyticsDateRange | undefined>()
+  const [granularity] = useState<TimeGranularity>('day')
+  const [activeTab, setActiveTab] = useState('overview')
+
+  // Calculate period for legacy hooks
+  const period = useMemo(() => {
+    const date = new Date(dateRange.startDate)
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  }, [dateRange.startDate])
+
+  // Map granularity for useSpendingTrend (only supports 'day' | 'week' | 'month')
+  const trendGranularity: 'day' | 'week' | 'month' =
+    granularity === 'quarter' || granularity === 'year' ? 'month' : granularity
+
+  // Data queries
+  const { data: monthlyComparison, isLoading: loadingComparison, refetch } = useMonthlyComparison(period)
+  const { data: trendData, isLoading: loadingTrend } = useSpendingTrend(
+    dateRange.startDate,
+    dateRange.endDate,
+    trendGranularity
+  )
+  const { data: categoryData, isLoading: loadingCategory } = useSpendingByCategory(
+    dateRange.startDate,
+    dateRange.endDate
+  )
+  const { data: merchantData, isLoading: loadingMerchant } = useMerchantAnalytics({
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    topCount: 10,
+    includeComparison: !!comparisonRange,
+  })
+  const { data: subscriptionData, isLoading: loadingSubscriptions } = useSubscriptionDetection({
+    minConfidence: 'medium',
+  })
+
+  // Transform trend data for chart
+  const chartTrendData = useMemo(() => {
+    if (!trendData) return []
+    return trendData.map((item) => ({
+      period: item.date,
+      amount: item.amount,
+      transactionCount: item.transactionCount,
+    }))
+  }, [trendData])
+
+  // Transform category data for breakdown
+  const chartCategoryData = useMemo(() => {
+    if (!categoryData) return []
+    return categoryData.map((item) => ({
+      category: item.category || 'Uncategorized',
+      amount: item.amount,
+      percentage: item.percentageOfTotal,
+      transactionCount: item.transactionCount,
+    }))
+  }, [categoryData])
+
+  const isLoading = loadingComparison || loadingTrend || loadingCategory || loadingMerchant
+
+  return (
+    <motion.div
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6"
+    >
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground">
             Spending insights and trends
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          {/* Period Selector */}
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={handlePreviousPeriod}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="min-w-[140px] text-center">
-              <p className="font-medium">{formatPeriod(selectedPeriod)}</p>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleNextPeriod}
-              disabled={selectedPeriod >= getCurrentPeriod()}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <Button variant="outline" size="icon" onClick={() => refetchComparison()}>
-            <RefreshCcw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <DateRangePicker
+            value={dateRange}
+            onChange={setDateRange}
+          />
+          <ComparisonDateRange
+            primaryRange={dateRange}
+            comparisonRange={comparisonRange}
+            onComparisonChange={setComparisonRange}
+          />
+          <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <RefreshCcw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
           </Button>
         </div>
       </div>
 
-      {/* Monthly Comparison Summary */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <DollarSign className="h-4 w-4" />
-              Current Period
-            </div>
-            {loadingComparison ? (
-              <Skeleton className="h-8 w-24 mt-2" />
-            ) : (
-              <p className="text-2xl font-bold mt-2">
-                {formatCurrency(monthlyComparison?.currentTotal ?? 0)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <DollarSign className="h-4 w-4" />
-              Previous Period
-            </div>
-            {loadingComparison ? (
-              <Skeleton className="h-8 w-24 mt-2" />
-            ) : (
-              <p className="text-2xl font-bold mt-2">
-                {formatCurrency(monthlyComparison?.previousTotal ?? 0)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              {monthlyComparison && monthlyComparison.percentageChange >= 0 ? (
-                <TrendingUp className="h-4 w-4" />
-              ) : (
-                <TrendingDown className="h-4 w-4" />
+      {/* Quick presets */}
+      <QuickPresets value={dateRange} onChange={setDateRange} />
+
+      {/* Summary Metrics */}
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="grid gap-4 md:grid-cols-4"
+      >
+        <MetricCard
+          title="Current Period"
+          value={monthlyComparison?.currentTotal ?? 0}
+          icon={DollarSign}
+          isLoading={loadingComparison}
+        />
+        <MetricCard
+          title="Previous Period"
+          value={monthlyComparison?.previousTotal ?? 0}
+          icon={DollarSign}
+          isLoading={loadingComparison}
+        />
+        <MetricCard
+          title="Change"
+          value={`${(monthlyComparison?.percentageChange ?? 0) >= 0 ? '+' : ''}${(monthlyComparison?.percentageChange ?? 0).toFixed(1)}%`}
+          icon={monthlyComparison?.percentageChange ?? 0 >= 0 ? TrendingUp : TrendingDown}
+          trend={monthlyComparison?.percentageChange}
+          trendLabel="vs prev"
+          isLoading={loadingComparison}
+        />
+        <MetricCard
+          title="Subscriptions"
+          value={`${subscriptionData?.subscriptions?.length ?? 0} detected`}
+          icon={Repeat}
+          isLoading={loadingSubscriptions}
+        />
+      </motion.div>
+
+      {/* Main Content Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="categories" className="gap-2">
+            <PieChart className="h-4 w-4" />
+            Categories
+          </TabsTrigger>
+          <TabsTrigger value="merchants" className="gap-2">
+            <Store className="h-4 w-4" />
+            Merchants
+          </TabsTrigger>
+          <TabsTrigger value="subscriptions" className="gap-2">
+            <Repeat className="h-4 w-4" />
+            Subscriptions
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-6">
+          {/* Spending Trend */}
+          <SpendingTrendChart
+            data={chartTrendData}
+            isLoading={loadingTrend}
+            chartType="area"
+            granularity={trendGranularity}
+            showComparison={!!comparisonRange}
+            title="Spending Over Time"
+          />
+
+          {/* Category and Merchant Grid */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <CategoryBreakdown
+              data={chartCategoryData}
+              isLoading={loadingCategory}
+              chartType="donut"
+              maxCategories={6}
+              title="Category Distribution"
+            />
+            <MerchantAnalytics
+              data={merchantData}
+              isLoading={loadingMerchant}
+              topCount={5}
+              showTrends
+              showNewMerchants={false}
+              title="Top Merchants"
+            />
+          </div>
+
+          {/* Cache Stats */}
+          <CacheStatsCard period={period} isLoading={loadingComparison} />
+
+          {/* Monthly Changes */}
+          {monthlyComparison && (
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* New Vendors */}
+              {monthlyComparison.newVendors?.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-blue-500" />
+                      New Vendors
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {monthlyComparison.newVendors.slice(0, 5).map((vendor) => (
+                        <div key={vendor.vendorName} className="flex justify-between text-sm">
+                          <span className="truncate">{vendor.vendorName}</span>
+                          <span className="font-mono">{formatCurrency(vendor.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
-              Change
+
+              {/* Missing Recurring */}
+              {monthlyComparison.missingRecurring?.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base text-amber-600">Missing Recurring</CardTitle>
+                    <CardDescription>Expected vendors not seen</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {monthlyComparison.missingRecurring.slice(0, 5).map((vendor) => (
+                        <div key={vendor.vendorName} className="flex justify-between text-sm">
+                          <span className="truncate">{vendor.vendorName}</span>
+                          <span className="text-muted-foreground font-mono">
+                            Usually {formatCurrency(vendor.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Significant Changes */}
+              {monthlyComparison.significantChanges?.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Significant Changes</CardTitle>
+                    <CardDescription>Notable spending changes</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {monthlyComparison.significantChanges.slice(0, 5).map((change) => (
+                        <div key={change.vendorName} className="flex justify-between text-sm">
+                          <span className="truncate">{change.vendorName}</span>
+                          <span
+                            className={cn(
+                              'font-mono',
+                              change.percentageChange >= 0 ? 'text-rose-500' : 'text-emerald-500'
+                            )}
+                          >
+                            {change.percentageChange >= 0 ? '+' : ''}
+                            {change.percentageChange.toFixed(1)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
-            {loadingComparison ? (
-              <Skeleton className="h-8 w-24 mt-2" />
-            ) : (
-              <p className={`text-2xl font-bold mt-2 ${
-                (monthlyComparison?.percentageChange ?? 0) >= 0 ? 'text-red-500' : 'text-green-500'
-              }`}>
-                {(monthlyComparison?.percentageChange ?? 0) >= 0 ? '+' : ''}
-                {formatPercentage((monthlyComparison?.percentageChange ?? 0) / 100, 1)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <Zap className="h-4 w-4" />
-              Cache Hit Rate
-            </div>
-            {loadingCache ? (
-              <Skeleton className="h-8 w-24 mt-2" />
-            ) : (
-              <p className="text-2xl font-bold mt-2">
-                {formatPercentage(cacheStats?.hitRate ?? 0)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Spending by Category */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Tag className="h-5 w-5" />
-              Spending by Category
-            </CardTitle>
-            <CardDescription>Breakdown of expenses by category</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loadingCategory ? (
-              <div className="space-y-4">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex justify-between">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-4 w-16" />
-                    </div>
-                    <Skeleton className="h-2 w-full" />
-                  </div>
-                ))}
-              </div>
-            ) : spendingByCategory && spendingByCategory.length > 0 ? (
-              <div className="space-y-4">
-                {spendingByCategory.slice(0, 8).map((item) => (
-                  <div key={item.category} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{item.category || 'Uncategorized'}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {item.transactionCount} txns
-                        </Badge>
-                      </div>
-                      <span className="font-medium">{formatCurrency(item.amount)}</span>
-                    </div>
-                    <Progress value={item.percentageOfTotal} className="h-2" />
-                    <p className="text-xs text-muted-foreground text-right">
-                      {formatPercentage(item.percentageOfTotal / 100, 1)} of total
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No category data available for this period
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Top Vendors */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Top Vendors
-            </CardTitle>
-            <CardDescription>Highest spending by vendor</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loadingVendor ? (
-              <div className="space-y-4">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex justify-between">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-16" />
-                    </div>
-                    <Skeleton className="h-2 w-full" />
-                  </div>
-                ))}
-              </div>
-            ) : spendingByVendor && spendingByVendor.length > 0 ? (
-              <div className="space-y-4">
-                {spendingByVendor.slice(0, 8).map((item) => (
-                  <div key={item.vendorName} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium truncate max-w-[180px]">
-                          {item.vendorName || 'Unknown'}
-                        </span>
-                        <Badge variant="outline" className="text-xs">
-                          {item.transactionCount} txns
-                        </Badge>
-                      </div>
-                      <span className="font-medium">{formatCurrency(item.amount)}</span>
-                    </div>
-                    <Progress value={item.percentageOfTotal} className="h-2" />
-                    <p className="text-xs text-muted-foreground text-right">
-                      {formatPercentage(item.percentageOfTotal / 100, 1)} of total
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No vendor data available for this period
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Monthly Changes */}
-      {monthlyComparison && (
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* New Vendors */}
-          {monthlyComparison.newVendors.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">New Vendors This Month</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {monthlyComparison.newVendors.map((vendor) => (
-                    <div key={vendor.vendorName} className="flex justify-between text-sm">
-                      <span className="truncate">{vendor.vendorName}</span>
-                      <span className="font-medium">{formatCurrency(vendor.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           )}
+        </TabsContent>
 
-          {/* Missing Recurring */}
-          {monthlyComparison.missingRecurring.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base text-yellow-600">Missing Recurring</CardTitle>
-                <CardDescription>Expected vendors not seen this month</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {monthlyComparison.missingRecurring.map((vendor) => (
-                    <div key={vendor.vendorName} className="flex justify-between text-sm">
-                      <span className="truncate">{vendor.vendorName}</span>
-                      <span className="text-muted-foreground">
-                        Usually {formatCurrency(vendor.amount)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        {/* Categories Tab */}
+        <TabsContent value="categories">
+          <CategoryBreakdown
+            data={chartCategoryData}
+            isLoading={loadingCategory}
+            chartType="donut"
+            showComparison={!!comparisonRange}
+            maxCategories={12}
+            height={400}
+            title="Spending by Category"
+          />
+        </TabsContent>
 
-          {/* Significant Changes */}
-          {monthlyComparison.significantChanges.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Significant Changes</CardTitle>
-                <CardDescription>Vendors with notable spending changes</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {monthlyComparison.significantChanges.slice(0, 5).map((change) => (
-                    <div key={change.vendorName} className="flex justify-between text-sm">
-                      <span className="truncate">{change.vendorName}</span>
-                      <span className={change.percentageChange >= 0 ? 'text-red-500' : 'text-green-500'}>
-                        {change.percentageChange >= 0 ? '+' : ''}
-                        {formatPercentage(change.percentageChange / 100)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+        {/* Merchants Tab */}
+        <TabsContent value="merchants">
+          <MerchantAnalytics
+            data={merchantData}
+            isLoading={loadingMerchant}
+            topCount={20}
+            showTrends
+            showNewMerchants
+            title="Merchant Analysis"
+          />
+        </TabsContent>
 
-      {/* Cache Statistics */}
-      {cacheStats && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5" />
-              AI Cache Performance
-            </CardTitle>
-            <CardDescription>
-              Cache efficiency and cost savings for {formatPeriod(selectedPeriod)}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Total Operations</p>
-                <p className="text-xl font-bold">{cacheStats.totalOperations}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Hit Rate</p>
-                <p className="text-xl font-bold">{formatPercentage(cacheStats.hitRate)}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Est. Cost Saved</p>
-                <p className="text-xl font-bold text-green-500">
-                  {formatCurrency(cacheStats.estimatedCostSaved)}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Tier Breakdown</p>
-                <div className="flex gap-1">
-                  {cacheStats.tierBreakdown.map((tier) => (
-                    <Badge key={tier.tier} variant="outline" className="text-xs">
-                      T{tier.tier}: {tier.count}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        {/* Subscriptions Tab */}
+        <TabsContent value="subscriptions">
+          <SubscriptionDetector
+            data={subscriptionData}
+            isLoading={loadingSubscriptions}
+            showSummary
+            groupByCategory
+            title="Detected Subscriptions"
+          />
+        </TabsContent>
+      </Tabs>
+    </motion.div>
   )
 }
+
+export default AnalyticsDashboard

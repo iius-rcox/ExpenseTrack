@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiFetch } from '@/services/api'
+import { apiFetch, apiDownload } from '@/services/api'
 import type {
   ExpenseReport,
   ReportListResponse,
@@ -138,29 +138,10 @@ export function useExportReport() {
       reportId: string
       format: 'pdf' | 'excel'
     }) => {
-      const response = await fetch(`/reports/${reportId}/export?format=${format}`, {
-        method: 'GET',
-        headers: {
-          Accept: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`Export failed: ${response.statusText}`)
-      }
-
-      const blob = await response.blob()
       const filename = `expense-report-${reportId}.${format === 'pdf' ? 'pdf' : 'xlsx'}`
 
-      // Trigger download
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      // apiDownload handles auth, blob download, and file save
+      await apiDownload(`/reports/${reportId}/export?format=${format}`, filename)
 
       return { filename }
     },

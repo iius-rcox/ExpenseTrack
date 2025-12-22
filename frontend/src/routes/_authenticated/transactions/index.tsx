@@ -1,22 +1,32 @@
 "use client"
 
-import { useState } from 'react'
+/**
+ * Transactions Page (T058)
+ *
+ * Main transaction explorer with:
+ * - Advanced filtering and search
+ * - Virtualized grid for large datasets
+ * - Inline editing with optimistic updates
+ * - Bulk operations (categorize, tag, export, delete)
+ * - Statement import dialog
+ */
+
+import { useState, useCallback, useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { useTransactionList, useImportStatement } from '@/hooks/queries/use-transactions'
+import {
+  useTransactionListWithFilters,
+  useTransactionCategories,
+  useTransactionTags,
+  useUpdateTransaction,
+  useBulkUpdateTransactions,
+  useBulkDeleteTransactions,
+  useExportTransactions,
+  useImportStatement,
+} from '@/hooks/queries/use-transactions'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -25,27 +35,35 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { formatCurrency, formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
-  CreditCard,
   Upload,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  Check,
-  X,
   FileSpreadsheet,
   Loader2,
 } from 'lucide-react'
+import { TransactionFilterPanel } from '@/components/transactions/transaction-filter-panel'
+import { TransactionGrid } from '@/components/transactions/transaction-grid'
+import { BulkActionsBar } from '@/components/transactions/bulk-actions-bar'
+import {
+  DEFAULT_TRANSACTION_FILTERS,
+  DEFAULT_TRANSACTION_SELECTION,
+} from '@/types/transaction'
+import type {
+  TransactionView,
+  TransactionFilters,
+  TransactionSortConfig,
+  TransactionSelectionState,
+} from '@/types/transaction'
 
+// Search params schema for URL state
 const transactionSearchSchema = z.object({
-  matched: z.coerce.boolean().optional(),
   page: z.coerce.number().optional().default(1),
-  pageSize: z.coerce.number().optional().default(20),
+  pageSize: z.coerce.number().optional().default(50),
   search: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  sortBy: z.enum(['date', 'amount', 'merchant', 'category']).optional().default('date'),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 })
 
 export const Route = createFileRoute('/_authenticated/transactions/')({
@@ -56,59 +74,233 @@ export const Route = createFileRoute('/_authenticated/transactions/')({
 function TransactionsPage() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const [importDialogOpen, setImportDialogOpen] = useState(false)
-  const [searchInput, setSearchInput] = useState(search.search || '')
 
-  const { data: transactions, isLoading, error } = useTransactionList({
-    page: search.page,
-    pageSize: search.pageSize,
-    matched: search.matched,
-    search: search.search,
-    startDate: search.startDate,
-    endDate: search.endDate,
+  // Import dialog state
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+
+  // Filter state (local, not persisted in URL for simplicity)
+  const [filters, setFilters] = useState<TransactionFilters>({
+    ...DEFAULT_TRANSACTION_FILTERS,
+    search: search.search || '',
+    dateRange: {
+      start: search.startDate ? new Date(search.startDate) : null,
+      end: search.endDate ? new Date(search.endDate) : null,
+    },
   })
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
+  // Sort state
+  const [sort, setSort] = useState<TransactionSortConfig>({
+    field: search.sortBy || 'date',
+    direction: search.sortOrder || 'desc',
+  })
+
+  // Selection state
+  const [selection, setSelection] = useState<TransactionSelectionState>(
+    DEFAULT_TRANSACTION_SELECTION
+  )
+
+  // Track which transactions are currently being saved
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
+
+  // Data fetching
+  const {
+    data: transactionData,
+    isLoading,
+    error,
+  } = useTransactionListWithFilters({
+    filters,
+    sort,
+    page: search.page,
+    pageSize: search.pageSize,
+  })
+
+  // Reference data
+  const { data: categories = [] } = useTransactionCategories()
+  const { data: tags = [] } = useTransactionTags()
+
+  // Mutations
+  const updateTransaction = useUpdateTransaction()
+  const bulkUpdate = useBulkUpdateTransactions()
+  const bulkDelete = useBulkDeleteTransactions()
+  const exportTransactions = useExportTransactions()
+
+  // Handle filter changes
+  const handleFilterChange = useCallback(
+    (newFilters: TransactionFilters) => {
+      setFilters(newFilters)
+      // Sync search to URL
+      navigate({
+        search: {
+          ...search,
+          search: newFilters.search || undefined,
+          startDate: newFilters.dateRange.start?.toISOString().split('T')[0] || undefined,
+          endDate: newFilters.dateRange.end?.toISOString().split('T')[0] || undefined,
+          page: 1, // Reset to first page on filter change
+        },
+      })
+    },
+    [search, navigate]
+  )
+
+  // Handle filter reset
+  const handleFilterReset = useCallback(() => {
+    setFilters(DEFAULT_TRANSACTION_FILTERS)
     navigate({
       search: {
-        ...search,
-        search: searchInput || undefined,
         page: 1,
+        pageSize: search.pageSize,
+        sortBy: search.sortBy,
+        sortOrder: search.sortOrder,
       },
     })
-  }
+  }, [search.pageSize, search.sortBy, search.sortOrder, navigate])
 
-  const handleFilterChange = (matched: boolean | undefined) => {
-    navigate({
-      search: {
-        ...search,
-        matched,
-        page: 1,
+  // Handle sort changes
+  const handleSortChange = useCallback(
+    (newSort: TransactionSortConfig) => {
+      setSort(newSort)
+      navigate({
+        search: {
+          ...search,
+          sortBy: newSort.field,
+          sortOrder: newSort.direction,
+        },
+      })
+    },
+    [search, navigate]
+  )
+
+  // Handle inline edit
+  const handleTransactionEdit = useCallback(
+    (id: string, updates: Partial<TransactionView>) => {
+      setSavingIds((prev) => new Set(prev).add(id))
+
+      updateTransaction.mutate(
+        {
+          id,
+          updates: {
+            category: updates.categoryId,
+            notes: updates.notes,
+            tags: updates.tags,
+          },
+        },
+        {
+          onSettled: () => {
+            setSavingIds((prev) => {
+              const next = new Set(prev)
+              next.delete(id)
+              return next
+            })
+          },
+          onError: (error) => {
+            toast.error(`Failed to update: ${error.message}`)
+          },
+        }
+      )
+    },
+    [updateTransaction]
+  )
+
+  // Handle transaction click (navigate to detail)
+  const handleTransactionClick = useCallback(
+    (transaction: TransactionView) => {
+      navigate({
+        to: '/transactions/$transactionId',
+        params: { transactionId: transaction.id },
+      })
+    },
+    [navigate]
+  )
+
+  // Bulk actions
+  const handleBulkCategorize = useCallback(
+    (categoryId: string) => {
+      const ids = Array.from(selection.selectedIds)
+      bulkUpdate.mutate(
+        { ids, updates: { category: categoryId } },
+        {
+          onSuccess: () => {
+            toast.success(`Updated ${ids.length} transactions`)
+            setSelection(DEFAULT_TRANSACTION_SELECTION)
+          },
+          onError: (error) => {
+            toast.error(`Failed to update: ${error.message}`)
+          },
+        }
+      )
+    },
+    [selection.selectedIds, bulkUpdate]
+  )
+
+  const handleBulkTag = useCallback(
+    (newTags: string[]) => {
+      const ids = Array.from(selection.selectedIds)
+      bulkUpdate.mutate(
+        { ids, updates: { tags: newTags } },
+        {
+          onSuccess: () => {
+            toast.success(`Added tags to ${ids.length} transactions`)
+            setSelection(DEFAULT_TRANSACTION_SELECTION)
+          },
+          onError: (error) => {
+            toast.error(`Failed to add tags: ${error.message}`)
+          },
+        }
+      )
+    },
+    [selection.selectedIds, bulkUpdate]
+  )
+
+  const handleBulkExport = useCallback(() => {
+    const ids = Array.from(selection.selectedIds)
+    exportTransactions.mutate(
+      { format: 'csv', ids },
+      {
+        onSuccess: () => {
+          toast.success('Export started')
+        },
+        onError: (error) => {
+          toast.error(`Export failed: ${error.message}`)
+        },
+      }
+    )
+  }, [selection.selectedIds, exportTransactions])
+
+  const handleBulkDelete = useCallback(() => {
+    const ids = Array.from(selection.selectedIds)
+    bulkDelete.mutate(ids, {
+      onSuccess: () => {
+        toast.success(`Deleted ${ids.length} transactions`)
+        setSelection(DEFAULT_TRANSACTION_SELECTION)
+      },
+      onError: (error) => {
+        toast.error(`Delete failed: ${error.message}`)
       },
     })
-  }
+  }, [selection.selectedIds, bulkDelete])
 
-  const handlePageChange = (newPage: number) => {
-    navigate({
-      search: {
-        ...search,
-        page: newPage,
-      },
-    })
-  }
+  const handleClearSelection = useCallback(() => {
+    setSelection(DEFAULT_TRANSACTION_SELECTION)
+  }, [])
 
-  const totalPages = transactions
-    ? Math.ceil(transactions.totalCount / search.pageSize)
-    : 0
+  // Processing state for bulk actions
+  const isProcessing =
+    bulkUpdate.isPending || bulkDelete.isPending || exportTransactions.isPending
+
+  // Transform transaction list for grid
+  const transactions = useMemo(
+    () => transactionData?.transactions || [],
+    [transactionData]
+  )
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
           <p className="text-muted-foreground">
-            View and search your imported transactions
+            View, filter, and manage your imported transactions
           </p>
         </div>
         <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
@@ -130,175 +322,97 @@ function TransactionsPage() {
         </Dialog>
       </div>
 
-      {/* Search and Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <form onSubmit={handleSearch} className="flex-1 flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search transactions..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Button type="submit" variant="secondary">
-            Search
-          </Button>
-        </form>
-        <div className="flex gap-2">
-          <Button
-            variant={search.matched === undefined ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => handleFilterChange(undefined)}
-          >
-            All
-            {transactions && (
-              <Badge variant="secondary" className="ml-2">
-                {transactions.totalCount}
-              </Badge>
-            )}
-          </Button>
-          <Button
-            variant={search.matched === false ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => handleFilterChange(false)}
-          >
-            Unmatched
-            {transactions && (
-              <Badge variant="secondary" className="ml-2">
-                {transactions.unmatchedCount}
-              </Badge>
-            )}
-          </Button>
-          <Button
-            variant={search.matched === true ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => handleFilterChange(true)}
-          >
-            Matched
-          </Button>
-        </div>
-      </div>
+      {/* Filter Panel */}
+      <TransactionFilterPanel
+        filters={filters}
+        categories={categories}
+        tags={tags}
+        onChange={handleFilterChange}
+        onReset={handleFilterReset}
+      />
 
       {/* Error State */}
       {error && (
         <Card className="border-destructive">
           <CardContent className="pt-6">
-            <p className="text-destructive">Failed to load transactions. Please try again.</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Transaction Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="w-[100px] text-center">Receipt</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 10 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-64" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                    <TableCell className="text-center"><Skeleton className="h-5 w-5 mx-auto" /></TableCell>
-                  </TableRow>
-                ))
-              ) : transactions?.transactions.map((txn) => (
-                <TableRow
-                  key={txn.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate({
-                    to: '/transactions/$transactionId',
-                    params: { transactionId: txn.id }
-                  })}
-                >
-                  <TableCell className="font-medium">
-                    {formatDate(txn.transactionDate)}
-                  </TableCell>
-                  <TableCell>{txn.description}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(txn.amount)}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {txn.hasMatchedReceipt ? (
-                      <Check className="h-5 w-5 text-green-500 mx-auto" />
-                    ) : (
-                      <X className="h-5 w-5 text-muted-foreground/50 mx-auto" />
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Empty State */}
-      {!isLoading && transactions?.transactions.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <CreditCard className="h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-semibold">No transactions found</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {search.search
-                ? `No transactions matching "${search.search}"`
-                : 'Import a bank statement to get started'}
+            <p className="text-destructive">
+              Failed to load transactions. Please try again.
             </p>
-            <Button
-              className="mt-4"
-              onClick={() => setImportDialogOpen(true)}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Import Statement
-            </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Pagination */}
-      {transactions && transactions.totalCount > search.pageSize && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
+      {/* Transaction Grid */}
+      <TransactionGrid
+        transactions={transactions}
+        isLoading={isLoading}
+        sort={sort}
+        selection={selection}
+        categories={categories}
+        onSortChange={handleSortChange}
+        onSelectionChange={setSelection}
+        onTransactionEdit={handleTransactionEdit}
+        onTransactionClick={handleTransactionClick}
+        savingIds={savingIds}
+        containerHeight={Math.min(600, Math.max(400, transactions.length * 56))}
+      />
+
+      {/* Pagination Info */}
+      {transactionData && transactionData.totalCount > 0 && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <p>
             Showing {((search.page - 1) * search.pageSize) + 1} to{' '}
-            {Math.min(search.page * search.pageSize, transactions.totalCount)} of{' '}
-            {transactions.totalCount} transactions
+            {Math.min(search.page * search.pageSize, transactionData.totalCount)} of{' '}
+            {transactionData.totalCount} transactions
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex gap-2">
             <Button
               variant="outline"
-              size="icon"
-              onClick={() => handlePageChange(search.page - 1)}
+              size="sm"
               disabled={search.page <= 1}
+              onClick={() =>
+                navigate({
+                  search: { ...search, page: search.page - 1 },
+                })
+              }
             >
-              <ChevronLeft className="h-4 w-4" />
+              Previous
             </Button>
-            <span className="text-sm">
-              Page {search.page} of {totalPages}
-            </span>
             <Button
               variant="outline"
-              size="icon"
-              onClick={() => handlePageChange(search.page + 1)}
-              disabled={search.page >= totalPages}
+              size="sm"
+              disabled={
+                search.page >= Math.ceil(transactionData.totalCount / search.pageSize)
+              }
+              onClick={() =>
+                navigate({
+                  search: { ...search, page: search.page + 1 },
+                })
+              }
             >
-              <ChevronRight className="h-4 w-4" />
+              Next
             </Button>
           </div>
         </div>
       )}
+
+      {/* Bulk Actions Bar */}
+      <BulkActionsBar
+        selectedCount={selection.selectedIds.size}
+        categories={categories}
+        availableTags={tags}
+        onCategorize={handleBulkCategorize}
+        onTag={handleBulkTag}
+        onExport={handleBulkExport}
+        onDelete={handleBulkDelete}
+        onClearSelection={handleClearSelection}
+        isProcessing={isProcessing}
+      />
     </div>
   )
 }
 
+// Statement Import Form component
 interface StatementImportFormProps {
   onSuccess: () => void
 }

@@ -1,3 +1,15 @@
+/**
+ * StatementUpload Component
+ *
+ * TODO (Phase 5): Refactor to match codebase patterns:
+ * - Convert inline styles to Tailwind CSS with design tokens
+ * - Use react-dropzone instead of manual drag/drop
+ * - Use lucide-react icons instead of custom SVG
+ * - Use TanStack Query mutation (useUploadStatement)
+ * - Use centralized apiUpload from '@/services/api'
+ * - Add skeleton loading state
+ * @see ReceiptUploadDropzone for reference implementation
+ */
 import React, { useCallback, useState } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
@@ -38,8 +50,8 @@ export function StatementUpload({ onAnalysisComplete, onError }: StatementUpload
         scopes: apiScopes.all,
         account: accounts[0],
       });
-      // Use idToken since no API scope is exposed - backend validates ID tokens
-      return response.idToken;
+      // Use accessToken for API authorization
+      return response.accessToken;
     } catch (error) {
       if (error instanceof InteractionRequiredAuthError) {
         // Token expired - redirect to login
