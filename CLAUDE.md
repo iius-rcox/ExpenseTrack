@@ -165,4 +165,33 @@ sed -i '/- name: init-db/a\          resources:\n            requests:\n        
 | Container Registry | `iiusacr` | Container images |
 
 <!-- MANUAL ADDITIONS START -->
+
+## Docker Build Requirements
+
+**CRITICAL**: When building Docker images for AKS deployment, ALWAYS use `--platform linux/amd64`:
+
+```bash
+# ✅ CORRECT - Always use this for AKS deployments
+docker buildx build --platform linux/amd64 -t iiusacr.azurecr.io/IMAGE_NAME:TAG --push .
+
+# ❌ WRONG - Will fail on AKS (builds for local architecture, e.g., ARM64 on Apple Silicon)
+docker build -t iiusacr.azurecr.io/IMAGE_NAME:TAG .
+```
+
+**Why**: The development machine (Apple Silicon Mac) uses ARM64 architecture, but AKS nodes run on AMD64 (x86_64). Without `--platform linux/amd64`, the image manifest won't match and Kubernetes will fail to pull with "no match for platform in manifest".
+
+### Frontend Deployment Workflow
+
+```bash
+# 1. Build AMD64 image and push to ACR
+cd frontend
+docker buildx build --platform linux/amd64 -t iiusacr.azurecr.io/expenseflow-frontend:vX.Y.Z-COMMIT --push .
+
+# 2. Update staging manifest
+# Edit infrastructure/kubernetes/staging/frontend-deployment.yaml with new image tag
+
+# 3. Commit and push (ArgoCD auto-syncs from main branch)
+git add . && git commit -m "chore(deploy): Update staging frontend to vX.Y.Z" && git push origin main
+```
+
 <!-- MANUAL ADDITIONS END -->
