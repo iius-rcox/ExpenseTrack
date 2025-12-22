@@ -1,0 +1,122 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Dashboard Actions API
+  description: Endpoint for retrieving pending user actions
+  version: 1.0.0
+
+paths:
+  /api/dashboard/actions:
+    get:
+      summary: Get pending actions
+      description: Returns a list of pending actions requiring user review (match confirmations, categorization suggestions)
+      operationId: getDashboardActions
+      tags:
+        - Dashboard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of actions to return (default 10, max 50)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: List of pending actions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PendingActionDto'
+              example:
+                - id: "match_abc123"
+                  type: "match_review"
+                  title: "Review match"
+                  description: "Starbucks receipt matches transaction for $5.45"
+                  createdAt: "2025-12-22T10:30:00Z"
+                  metadata:
+                    confidenceScore: 0.85
+                    vendorName: "Starbucks"
+                - id: "cat_def456"
+                  type: "categorization"
+                  title: "Confirm category"
+                  description: "Suggest 'Food & Dining' for Amazon Fresh"
+                  createdAt: "2025-12-22T09:15:00Z"
+                  metadata:
+                    suggestedCategory: "Food & Dining"
+        '401':
+          description: Unauthorized - invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Azure AD access token
+
+  schemas:
+    PendingActionDto:
+      type: object
+      required:
+        - id
+        - type
+        - title
+        - description
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the action
+          example: "match_abc123"
+        type:
+          type: string
+          enum:
+            - match_review
+            - categorization
+          description: Type of action
+          example: "match_review"
+        title:
+          type: string
+          maxLength: 200
+          description: Human-readable action title
+          example: "Review match"
+        description:
+          type: string
+          maxLength: 500
+          description: Detailed description
+          example: "Starbucks receipt matches transaction for $5.45"
+        createdAt:
+          type: string
+          format: date-time
+          description: When the action was created
+          example: "2025-12-22T10:30:00Z"
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Optional action-specific metadata
+          example:
+            confidenceScore: 0.85
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string

@@ -36,13 +36,16 @@ export const msalConfig: Configuration = {
   },
 };
 
-// For API calls, we'll use the ID token since no API scope is exposed
-// The backend must be configured to accept ID tokens
+// API client ID for requesting access tokens
+const API_CLIENT_ID = import.meta.env.VITE_API_CLIENT_ID || '00435dee-8aff-429b-bab6-762973c091c4';
+
+// For API calls, we request an access token with the API scope
+// The backend validates the token audience matches api://{client-id}
 export const apiScopes = {
-  all: ['openid', 'profile', 'email'],
+  all: [`api://${API_CLIENT_ID}/access_as_user`],
 };
 
-// Login request configuration - use openid for initial sign-in
+// Login request configuration - includes API scope for access token
 export const loginRequest = {
-  scopes: ['openid', 'profile', 'email'],
+  scopes: ['openid', 'profile', 'email', `api://${API_CLIENT_ID}/access_as_user`],
 };

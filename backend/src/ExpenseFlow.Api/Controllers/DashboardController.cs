@@ -202,4 +202,48 @@ public class DashboardController : ApiControllerBase
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Get pending actions requiring user review (match reviews, categorization approvals).
+    /// </summary>
+    /// <param name="limit">Maximum number of actions to return (default 10, max 50)</param>
+    /// <returns>List of pending actions</returns>
+    [HttpGet("actions")]
+    [ProducesResponseType(typeof(List<PendingActionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<List<PendingActionDto>>> GetActions([FromQuery] int limit = 10)
+    {
+        if (limit < 1) limit = 10;
+        if (limit > 50) limit = 50;
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation("Pending actions requested by user {UserId}, limit {Limit}", user.Id, limit);
+
+        // Get pending match reviews (Status = Proposed)
+        var pendingMatches = await _dbContext.ReceiptTransactionMatches
+            .Where(m => m.UserId == user.Id && m.Status == MatchProposalStatus.Proposed)
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(limit)
+            .Include(m => m.Receipt)
+            .Include(m => m.Transaction)
+            .Select(m => new PendingActionDto
+            {
+                Id = m.Id.ToString(),
+                Type = "match_review",
+                Title = $"Review match: {m.Receipt.VendorExtracted ?? "Receipt"} ↔ {m.Transaction.Description}",
+                Description = $"Confidence: {m.ConfidenceScore:N1}% - Amount: ${m.Transaction.Amount:N2}",
+                CreatedAt = m.CreatedAt,
+                Metadata = new Dictionary<string, object>
+                {
+                    { "confidenceScore", m.ConfidenceScore },
+                    { "receiptId", m.ReceiptId },
+                    { "transactionId", m.TransactionId },
+                    { "amount", m.Transaction.Amount }
+                }
+            })
+            .ToListAsync();
+
+        return Ok(pendingMatches);
+    }
 }
