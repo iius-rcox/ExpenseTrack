@@ -126,14 +126,14 @@
 
 ### Build and Deploy
 
-- [ ] T024 Run backend unit tests with dotnet test
-- [ ] T025 Build frontend with npm run build
-- [ ] T026 [P] Build backend Docker image with --platform linux/amd64 flag
-- [ ] T027 [P] Build frontend Docker image with --platform linux/amd64 flag
-- [ ] T028 Push images to Azure Container Registry (iiusacr.azurecr.io)
-- [ ] T029 Update image tags in infrastructure/kubernetes/staging/api-deployment.yaml
-- [ ] T030 Update image tags in infrastructure/kubernetes/staging/frontend-deployment.yaml
-- [ ] T031 Commit and push to trigger deployment
+- [x] T024 Run backend unit tests with dotnet test
+- [x] T025 Build frontend with npm run build
+- [x] T026 [P] Build backend Docker image with --platform linux/amd64 flag
+- [x] T027 [P] Build frontend Docker image with --platform linux/amd64 flag
+- [x] T028 Push images to Azure Container Registry (iiusacr.azurecr.io)
+- [x] T029 Update image tags in infrastructure/kubernetes/staging/deployment.yaml
+- [x] T030 Update image tags in infrastructure/kubernetes/staging/frontend-deployment.yaml
+- [x] T031 Commit and push to trigger deployment (PR #20 merged to main)
 
 ### End-to-End Validation
 
