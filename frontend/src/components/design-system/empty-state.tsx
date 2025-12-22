@@ -54,19 +54,28 @@ export function EmptyState({
   secondaryAction,
   className,
 }: EmptyStateProps) {
-  // If Icon is a LucideIcon, render it; otherwise use it directly as ReactNode
+  // If Icon is a LucideIcon (function or forwardRef), render it; otherwise use it directly as ReactNode
   const renderIcon = () => {
     if (!Icon) return null;
 
-    if (typeof Icon === 'function') {
-      const LucideIcon = Icon as LucideIcon;
+    // Check if Icon is a component type (function or forwardRef)
+    // forwardRef components have typeof === 'object' with a render function
+    const isComponentType =
+      typeof Icon === 'function' ||
+      (typeof Icon === 'object' &&
+        Icon !== null &&
+        typeof (Icon as { render?: unknown }).render === 'function');
+
+    if (isComponentType) {
+      const IconComponent = Icon as LucideIcon;
       return (
         <div className="rounded-full bg-muted p-4">
-          <LucideIcon className="h-8 w-8 text-muted-foreground" />
+          <IconComponent className="h-8 w-8 text-muted-foreground" />
         </div>
       );
     }
 
+    // Already a ReactNode (JSX element), return directly
     return Icon;
   };
 
