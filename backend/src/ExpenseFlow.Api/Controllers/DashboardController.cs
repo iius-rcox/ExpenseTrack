@@ -46,63 +46,53 @@ public class DashboardController : ApiControllerBase
         var currentMonthStart = new DateOnly(now.Year, now.Month, 1);
         var previousMonthStart = currentMonthStart.AddMonths(-1);
 
-        // Get counts in parallel
+        // NOTE: DbContext is NOT thread-safe, so we must run queries sequentially.
+        // Do not use Task.WhenAll with multiple queries on the same DbContext instance.
+
         // Pending receipts = Uploaded or Processing status
-        var pendingReceiptsTask = _dbContext.Receipts
+        var pendingReceiptsCount = await _dbContext.Receipts
             .Where(r => r.UserId == user.Id &&
                        (r.Status == ReceiptStatus.Uploaded || r.Status == ReceiptStatus.Processing))
             .CountAsync();
 
         // Unmatched transactions = no matched receipt
-        var unmatchedTransactionsTask = _dbContext.Transactions
+        var unmatchedTransactionsCount = await _dbContext.Transactions
             .Where(t => t.UserId == user.Id && t.MatchedReceiptId == null)
             .CountAsync();
 
         // Pending matches = Proposed status
-        var pendingMatchesTask = _dbContext.ReceiptTransactionMatches
+        var pendingMatchesCount = await _dbContext.ReceiptTransactionMatches
             .Where(m => m.UserId == user.Id && m.Status == MatchProposalStatus.Proposed)
             .CountAsync();
 
         // Draft reports
-        var draftReportsTask = _dbContext.ExpenseReports
+        var draftReportsCount = await _dbContext.ExpenseReports
             .Where(r => r.UserId == user.Id && r.Status == ReportStatus.Draft && !r.IsDeleted)
             .CountAsync();
 
         // Monthly spending (positive amounts are expenses in this schema)
-        var currentMonthSpendingTask = _dbContext.Transactions
+        var currentMonth = await _dbContext.Transactions
             .Where(t => t.UserId == user.Id &&
                        t.TransactionDate >= currentMonthStart &&
                        t.Amount > 0)
-            .SumAsync(t => (decimal?)t.Amount) ?? Task.FromResult<decimal?>(0);
+            .SumAsync(t => (decimal?)t.Amount) ?? 0;
 
-        var previousMonthSpendingTask = _dbContext.Transactions
+        var previousMonth = await _dbContext.Transactions
             .Where(t => t.UserId == user.Id &&
                         t.TransactionDate >= previousMonthStart &&
                         t.TransactionDate < currentMonthStart &&
                         t.Amount > 0)
-            .SumAsync(t => (decimal?)t.Amount) ?? Task.FromResult<decimal?>(0);
-
-        await Task.WhenAll(
-            pendingReceiptsTask,
-            unmatchedTransactionsTask,
-            pendingMatchesTask,
-            draftReportsTask,
-            currentMonthSpendingTask,
-            previousMonthSpendingTask
-        );
-
-        var currentMonth = await currentMonthSpendingTask ?? 0;
-        var previousMonth = await previousMonthSpendingTask ?? 0;
+            .SumAsync(t => (decimal?)t.Amount) ?? 0;
         var percentChange = previousMonth > 0
             ? Math.Round((currentMonth - previousMonth) / previousMonth * 100, 1)
             : 0;
 
         var metrics = new DashboardMetricsDto
         {
-            PendingReceiptsCount = await pendingReceiptsTask,
-            UnmatchedTransactionsCount = await unmatchedTransactionsTask,
-            PendingMatchesCount = await pendingMatchesTask,
-            DraftReportsCount = await draftReportsTask,
+            PendingReceiptsCount = pendingReceiptsCount,
+            UnmatchedTransactionsCount = unmatchedTransactionsCount,
+            PendingMatchesCount = pendingMatchesCount,
+            DraftReportsCount = draftReportsCount,
             MonthlySpending = new MonthlySpendingDto
             {
                 CurrentMonth = currentMonth,
