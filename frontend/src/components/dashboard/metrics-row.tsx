@@ -212,7 +212,7 @@ export function MetricsSummaryBar({
     <div className="flex gap-3 overflow-x-auto pb-2">
       {/* Spending */}
       <div className="flex min-w-[140px] items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
-        <DollarSign className="h-4 w-4 text-accent-copper" />
+        <DollarSign className="h-4 w-4 text-primary" />
         <div>
           <div className="text-xs text-muted-foreground">Spending</div>
           <div className="flex items-center gap-1 font-semibold">

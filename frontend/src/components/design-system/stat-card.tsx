@@ -90,8 +90,8 @@ export function StatCard({
     },
     neutral: {
       icon: Minus,
-      color: 'text-slate-500',
-      bg: 'bg-slate-500/10',
+      color: 'text-muted-foreground',
+      bg: 'bg-muted',
     },
   };
 
@@ -101,8 +101,8 @@ export function StatCard({
   return (
     <Card
       className={cn(
-        'transition-all duration-200',
-        highlight && 'ring-2 ring-accent-copper ring-offset-2',
+        'transition-all duration-200 glass stat-card-shine',
+        highlight && 'ring-2 ring-primary ring-offset-2',
         className
       )}
     >
@@ -110,7 +110,7 @@ export function StatCard({
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <p className="text-sm font-medium text-muted-foreground">{label}</p>
-            <p className="mt-2 text-3xl font-semibold font-mono tracking-tight">
+            <p className="mt-2 text-3xl font-semibold font-mono tracking-tight gradient-text">
               {displayValue}
             </p>
             {trend !== undefined && (

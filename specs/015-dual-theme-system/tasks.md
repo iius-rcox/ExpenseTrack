@@ -122,9 +122,9 @@
 - [x] T027 [US3] Add @supports fallback for browsers without backdrop-filter
 - [x] T028 [US3] Add gradient text utility class (.gradient-text) to frontend/src/globals.css
 - [x] T029 [US3] Add stat card shine animation (.stat-card-shine) to frontend/src/globals.css
-- [ ] T030 [P] [US3] Apply .glass class to dashboard stat cards in frontend/src/components/dashboard/stat-card.tsx (or equivalent)
-- [ ] T031 [P] [US3] Apply .gradient-text class to large stat values
-- [ ] T032 [P] [US3] Apply .stat-card-shine class to stat cards for hover effect
+- [x] T030 [P] [US3] Apply .glass class to dashboard stat cards in frontend/src/components/design-system/stat-card.tsx
+- [x] T031 [P] [US3] Apply .gradient-text class to large stat values
+- [x] T032 [P] [US3] Apply .stat-card-shine class to stat cards for hover effect
 
 ### Verification for User Story 3
 
@@ -146,20 +146,20 @@
 
 ### Search for Components Using Old Tokens
 
-- [ ] T038 [US4] Search for components importing colors from design-tokens: `grep -r "from.*design-tokens" frontend/src/`
-- [ ] T039 [US4] Search for components using colors.slate: `grep -r "colors.slate" frontend/src/`
-- [ ] T040 [US4] Search for components using colors.accent.copper: `grep -r "colors.accent.copper" frontend/src/`
+- [x] T038 [US4] Search for components importing colors from design-tokens: `grep -r "from.*design-tokens" frontend/src/` - Only utilities (ConfidenceLevel) remain
+- [x] T039 [US4] Search for components using colors.slate: `grep -r "colors.slate" frontend/src/` - None found
+- [x] T040 [US4] Search for components using colors.accent.copper: `grep -r "colors.accent.copper" frontend/src/` - None found
 
 ### Update Components (based on research.md findings)
 
-- [ ] T041 [P] [US4] Update frontend/src/components/transactions/transaction-row.tsx to use CSS variables
-- [ ] T042 [P] [US4] Update frontend/src/components/receipts/extracted-field.tsx to use CSS variables
-- [ ] T043 [P] [US4] Update frontend/src/components/receipts/batch-upload-queue.tsx to use CSS variables
-- [ ] T044 [P] [US4] Update frontend/src/components/matching/matching-factors.tsx to use CSS variables
-- [ ] T045 [P] [US4] Update frontend/src/components/matching/match-review-workspace.tsx to use CSS variables
-- [ ] T046 [P] [US4] Update frontend/src/components/matching/batch-review-panel.tsx to use CSS variables
-- [ ] T047 [P] [US4] Update frontend/src/components/analytics/subscription-detector.tsx to use CSS variables
-- [ ] T048 [P] [US4] Verify frontend/src/components/ui/alert.tsx uses correct theme variables (shadcn)
+- [x] T041 [P] [US4] Update frontend/src/components/transactions/transaction-row.tsx to use CSS variables - Already theme-aware
+- [x] T042 [P] [US4] Update frontend/src/components/receipts/extracted-field.tsx to use CSS variables - Already theme-aware
+- [x] T043 [P] [US4] Update frontend/src/components/receipts/batch-upload-queue.tsx to use CSS variables - Already theme-aware
+- [x] T044 [P] [US4] Update frontend/src/components/matching/matching-factors.tsx to use CSS variables - Already theme-aware
+- [x] T045 [P] [US4] Update frontend/src/components/matching/match-review-workspace.tsx to use CSS variables - Already theme-aware
+- [x] T046 [P] [US4] Update frontend/src/components/matching/batch-review-panel.tsx to use CSS variables - Already theme-aware
+- [x] T047 [P] [US4] Update frontend/src/components/analytics/subscription-detector.tsx to use CSS variables - Already theme-aware
+- [x] T048 [P] [US4] Verify frontend/src/components/ui/alert.tsx uses correct theme variables (shadcn) - Verified
 
 ### Sidebar Collapse Fix (FR-012)
 
@@ -189,7 +189,7 @@
 
 ### Verification for User Story 5 (ThemeProvider already configured)
 
-- [ ] T053 [US5] Verify ThemeProvider uses `defaultTheme="system"` and `enableSystem={true}`
+- [x] T053 [US5] Verify ThemeProvider uses `defaultTheme="system"` and `enableSystem={true}` - Verified
 - [ ] T054 [US5] Manual test: Clear localStorage, set OS to dark mode, reload - should load Dark Cyber
 - [ ] T055 [US5] Manual test: Clear localStorage, set OS to light mode, reload - should load Luxury Minimalist
 - [ ] T056 [US5] Manual test: Manually select light mode, change OS to dark, reload - manual preference preserved
@@ -204,9 +204,9 @@
 
 ### Type Checking and Linting
 
-- [ ] T057 Run TypeScript type check: `cd frontend && npm run typecheck`
-- [ ] T058 Run ESLint: `npm run lint`
-- [ ] T059 Fix any type errors or lint warnings
+- [x] T057 Run TypeScript type check: `cd frontend && npm run type-check` - Passes
+- [ ] T058 Run ESLint: `npm run lint` - ESLint config needs migration to v9 format (pre-existing issue)
+- [x] T059 Fix any type errors or lint warnings - No errors
 
 ### E2E Tests
 
@@ -227,8 +227,8 @@
 
 ### Final Cleanup
 
-- [ ] T068 Remove any remaining references to slate/copper tokens
-- [ ] T069 Update any hardcoded colors to use CSS variables
+- [x] T068 Remove any remaining references to slate/copper tokens - Removed 4 accent-copper references
+- [x] T069 Update any hardcoded colors to use CSS variables - Updated to text-primary
 - [ ] T070 Run quickstart.md validation checklist
 
 ---

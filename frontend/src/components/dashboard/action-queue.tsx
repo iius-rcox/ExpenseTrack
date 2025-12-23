@@ -256,7 +256,7 @@ export function ActionQueue({
           {hasMore && (
             <Link
               to="/matching"
-              className="text-sm text-accent-copper hover:underline"
+              className="text-sm text-primary hover:underline"
             >
               View all ({items?.length})
             </Link>

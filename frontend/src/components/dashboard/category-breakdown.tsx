@@ -42,10 +42,10 @@ import type { CategoryBreakdownData, CategoryBreakdownProps } from '@/types/dash
 
 /**
  * Default category colors for the design system.
- * These complement the copper accent and work in both light/dark modes.
+ * These work well in both light and dark modes.
  */
 const CATEGORY_COLORS = [
-  '#b87333', // Copper (accent)
+  '#2d5f4f', // Emerald (primary in light mode)
   '#10b981', // Emerald (confidence-high)
   '#8b5cf6', // Violet
   '#f59e0b', // Amber
@@ -352,7 +352,7 @@ export function CategoryBreakdown({
         </div>
         <Link
           to="/analytics"
-          className="text-sm text-accent-copper hover:underline"
+          className="text-sm text-primary hover:underline"
         >
           View details
         </Link>
