@@ -41,7 +41,7 @@ No violations. Proceeding to Phase 0.
 |-------|--------|--------|
 | Phase 0: Research | ✅ Complete | [research.md](./research.md) |
 | Phase 1: Design | ✅ Complete | [data-model.md](./data-model.md), [contracts/](./contracts/), [quickstart.md](./quickstart.md) |
-| Phase 2: Tasks | ⏳ Pending | Run `/speckit.tasks` to generate |
+| Phase 2: Tasks | ✅ Complete | [tasks.md](./tasks.md) - 70 tasks across 8 phases |
 
 ## Project Structure
 
