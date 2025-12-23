@@ -36,13 +36,16 @@ export const msalConfig: Configuration = {
   },
 };
 
-// For API calls, we use the ID token since no custom API scope is exposed
-// The backend is configured to accept ID tokens with the client ID as audience
+// API client ID for requesting access tokens
+const API_CLIENT_ID = '00435dee-8aff-429b-bab6-762973c091c4';
+
+// For API calls, request a token with our API as the audience
+// Using .default scope which represents all statically configured permissions
 export const apiScopes = {
-  all: ['openid', 'profile', 'email'],
+  all: [`api://${API_CLIENT_ID}/.default`],
 };
 
-// Login request configuration - use openid for initial sign-in
+// Login request configuration - request API token during login
 export const loginRequest = {
-  scopes: ['openid', 'profile', 'email'],
+  scopes: [`api://${API_CLIENT_ID}/.default`],
 };
