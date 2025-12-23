@@ -161,6 +161,15 @@
 - [ ] T047 [P] [US4] Update frontend/src/components/analytics/subscription-detector.tsx to use CSS variables
 - [ ] T048 [P] [US4] Verify frontend/src/components/ui/alert.tsx uses correct theme variables (shadcn)
 
+### Sidebar Collapse Fix (FR-012)
+
+- [ ] T048a [US4] Update frontend/src/components/layout/app-sidebar.tsx: Change `<Sidebar>` to `<Sidebar collapsible="icon">`
+- [ ] T048b [US4] Add `tooltip` prop to each SidebarMenuButton for icon-only mode hover labels
+- [ ] T048c [US4] Verify sidebar header (logo/title) hides properly in collapsed state using `group-data-[collapsible=icon]:hidden`
+- [ ] T048d [US4] Verify user dropdown in footer works correctly in collapsed state
+- [ ] T048e [US4] Manual test: Click sidebar trigger, verify sidebar collapses to icons (3rem width)
+- [ ] T048f [US4] Manual test: Hover collapsed menu items, verify tooltips appear
+
 ### Verification for User Story 4
 
 - [ ] T049 [US4] Verify buttons show appropriate hover states in both themes

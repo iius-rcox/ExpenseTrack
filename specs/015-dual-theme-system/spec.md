@@ -85,6 +85,7 @@ As a user, I want all UI components (buttons, inputs, tables, badges) to maintai
 2. **Given** I click a primary button in dark mode, **When** I hover, **Then** the button shows a cyan glow effect
 3. **Given** I am filling a form in either theme, **When** I focus an input field, **Then** the field shows a themed focus ring (emerald in light, cyan in dark)
 4. **Given** I view a data table in either theme, **When** I hover a row, **Then** the row highlights with a theme-appropriate background color
+5. **Given** I click the sidebar collapse trigger, **When** the sidebar collapses, **Then** it shrinks to icon-only mode (3rem) showing navigation icons with tooltips on hover, not sliding off-screen
 
 ---
 
@@ -143,6 +144,7 @@ As a user who has set a system-wide dark mode preference, I want ExpenseFlow to 
 - **FR-009**: System MUST detect and respect the user's operating system theme preference on first visit (when no stored preference exists)
 - **FR-010**: All interactive elements (buttons, inputs, links) MUST have visible focus states in both themes for accessibility
 - **FR-011**: Implementation MUST remove all existing "Refined Intelligence" design tokens (slate/copper palette) and replace with the new dual-theme token system - no backward compatibility layer required
+- **FR-012**: Sidebar MUST collapse to icon-only mode (3rem width) instead of sliding completely off-screen, showing only navigation icons with tooltips on hover when collapsed
 
 ### Key Entities
 

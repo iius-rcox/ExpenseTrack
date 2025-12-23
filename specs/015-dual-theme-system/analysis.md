@@ -29,6 +29,7 @@ The dual theme system specification is **well-structured** with comprehensive co
 | FR-009 | Respect OS theme preference | P3 | T053-T056 ✅ |
 | FR-010 | Visible focus states for accessibility | P1 | T016, T065-T067 ✅ |
 | FR-011 | Remove "Refined Intelligence" tokens | P1 | T011, T068-T069 ✅ |
+| FR-012 | Sidebar collapse to icon mode | P2 | T048a-T048f ✅ |
 
 ### Success Criteria (SC-001 to SC-006)
 
@@ -94,7 +95,7 @@ All requirements use specific, measurable language:
 
 ### 2.5 Coverage Gap Detection ✅ **Full Coverage**
 
-**Requirements → Tasks**: 11/11 FRs covered (100%)
+**Requirements → Tasks**: 12/12 FRs covered (100%)
 **Success Criteria → Tasks**: 6/6 SCs covered (100%)
 **User Stories → Tasks**: 5/5 stories covered (100%)
 
@@ -193,7 +194,7 @@ Phase 8 (Polish)
 
 The dual theme system specification is **ready for implementation** with minor adjustments:
 
-1. ✅ All 11 functional requirements have corresponding tasks
+1. ✅ All 12 functional requirements have corresponding tasks
 2. ✅ All 6 success criteria have verification tasks
 3. ✅ All 5 user stories are fully mapped
 4. ⚠️ 2 minor underspecification issues (charts, icons) - easy to add

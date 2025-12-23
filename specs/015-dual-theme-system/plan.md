@@ -41,7 +41,7 @@ No violations. Proceeding to Phase 0.
 |-------|--------|--------|
 | Phase 0: Research | ✅ Complete | [research.md](./research.md) |
 | Phase 1: Design | ✅ Complete | [data-model.md](./data-model.md), [contracts/](./contracts/), [quickstart.md](./quickstart.md) |
-| Phase 2: Tasks | ✅ Complete | [tasks.md](./tasks.md) - 70 tasks across 8 phases |
+| Phase 2: Tasks | ✅ Complete | [tasks.md](./tasks.md) - 76 tasks across 8 phases |
 | Phase 3: Analysis | ✅ Complete | [analysis.md](./analysis.md) - 8.5/10 quality score, 2 minor issues |
 
 ## Project Structure
