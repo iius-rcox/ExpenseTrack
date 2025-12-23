@@ -29,7 +29,8 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
-  /* Sidebar */
+  /* Sidebar - Note: bg-sidebar maps to --color-sidebar in Tailwind v4 */
+  --color-sidebar: hsl(var(--sidebar-background));
   --color-sidebar-background: hsl(var(--sidebar-background));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
   --color-sidebar-primary: hsl(var(--sidebar-primary));
@@ -43,6 +44,10 @@
   --radius-lg: 0.5rem;
   --radius-md: calc(var(--radius-lg) - 2px);
   --radius-sm: calc(var(--radius-lg) - 4px);
+
+  /* Sidebar dimensions - required for w-[--sidebar-width] to work in Tailwind v4 */
+  --sidebar-width: 11rem;
+  --sidebar-width-icon: 3rem;
 }
 
 /* Light Mode: Luxury Minimalist */

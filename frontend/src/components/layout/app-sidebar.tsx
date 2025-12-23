@@ -101,12 +101,9 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-4 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Receipt className="h-4 w-4" />
-          </div>
-          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+      <SidebarHeader className="group-data-[collapsible=icon]:hidden">
+        <div className="flex items-center px-4 py-2">
+          <div className="flex flex-col">
             <span className="font-semibold">ExpenseFlow</span>
             <span className="text-xs text-muted-foreground">Expense Manager</span>
           </div>

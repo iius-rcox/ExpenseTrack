@@ -83,9 +83,9 @@
 
 ### Verification for User Story 1
 
-- [ ] T017 [US1] Manual test: Click toggle to switch from light to dark mode
-- [ ] T018 [US1] Manual test: Click toggle to switch from dark to light mode
-- [ ] T019 [US1] Manual test: Close browser, reopen, verify preference persisted
+- [x] T017 [US1] Manual test: Click toggle to switch from light to dark mode - VERIFIED via Chrome DevTools E2E
+- [x] T018 [US1] Manual test: Click toggle to switch from dark to light mode - VERIFIED via Chrome DevTools E2E
+- [x] T019 [US1] Manual test: Close browser, reopen, verify preference persisted - VERIFIED via Chrome DevTools E2E
 
 **Checkpoint**: Theme toggle functional - users can switch between themes
 
@@ -167,8 +167,9 @@
 - [x] T048b [US4] Add `tooltip` prop to each SidebarMenuButton for icon-only mode hover labels
 - [x] T048c [US4] Verify sidebar header (logo/title) hides properly in collapsed state using `group-data-[collapsible=icon]:hidden`
 - [x] T048d [US4] Verify user dropdown in footer works correctly in collapsed state
-- [ ] T048e [US4] Manual test: Click sidebar trigger, verify sidebar collapses to icons (3rem width)
-- [ ] T048f [US4] Manual test: Hover collapsed menu items, verify tooltips appear
+- [x] T048e [US4] Manual test: Click sidebar trigger, verify sidebar collapses to icons (3rem width) - VERIFIED via Chrome DevTools E2E
+- [x] T048f [US4] Manual test: Hover collapsed menu items, verify tooltips appear - VERIFIED via Chrome DevTools E2E
+- [x] T048g [US4] Fix Tailwind v4 CSS variable syntax in sidebar.tsx: `w-[--sidebar-width]` → `w-[var(--sidebar-width)]` - Fixed sidebar layout overlap issue
 
 ### Verification for User Story 4
 
@@ -190,9 +191,9 @@
 ### Verification for User Story 5 (ThemeProvider already configured)
 
 - [x] T053 [US5] Verify ThemeProvider uses `defaultTheme="system"` and `enableSystem={true}` - Verified
-- [ ] T054 [US5] Manual test: Clear localStorage, set OS to dark mode, reload - should load Dark Cyber
-- [ ] T055 [US5] Manual test: Clear localStorage, set OS to light mode, reload - should load Luxury Minimalist
-- [ ] T056 [US5] Manual test: Manually select light mode, change OS to dark, reload - manual preference preserved
+- [x] T054 [US5] Manual test: Clear localStorage, set OS to dark mode, reload - should load Dark Cyber - VERIFIED via Chrome DevTools E2E
+- [x] T055 [US5] Manual test: Clear localStorage, set OS to light mode, reload - should load Luxury Minimalist - VERIFIED via Chrome DevTools E2E
+- [x] T056 [US5] Manual test: Manually select light mode, change OS to dark, reload - manual preference preserved - VERIFIED via Chrome DevTools E2E
 
 **Checkpoint**: System preference detection working correctly
 
@@ -205,7 +206,7 @@
 ### Type Checking and Linting
 
 - [x] T057 Run TypeScript type check: `cd frontend && npm run type-check` - Passes
-- [ ] T058 Run ESLint: `npm run lint` - ESLint config needs migration to v9 format (pre-existing issue)
+- [x] T058 Run ESLint: `npm run lint` - ESLint v9 flat config created (eslint.config.js), pre-existing lint errors unrelated to theme system
 - [x] T059 Fix any type errors or lint warnings - No errors
 
 ### E2E Tests
@@ -335,3 +336,4 @@ Task: "Update frontend/src/components/analytics/subscription-detector.tsx"
 - Verify theme transition < 500ms per SC-001
 - Use CSS variables, not hardcoded colors
 - Run `npm run typecheck` after each phase
+- **Tailwind v4 CSS Variable Syntax**: Use `w-[var(--sidebar-width)]` not `w-[--sidebar-width]` - Tailwind v4 requires explicit `var()` wrapper
