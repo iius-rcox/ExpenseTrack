@@ -25,7 +25,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { colors } from '@/lib/design-tokens'
 import { fadeIn, staggerContainer, staggerChild } from '@/lib/animations'
 import { cn } from '@/lib/utils'
 import {
@@ -36,17 +35,24 @@ import {
   TrendingDown,
 } from 'lucide-react'
 
-// Chart color palette
+// Chart color palette - theme-aware colors that work in both light and dark mode
+// These map to the chart-1 through chart-5 CSS variables defined in globals.css
 const CATEGORY_COLORS = [
-  colors.accent.copper,
-  colors.accent.emerald,
-  colors.accent.amber,
-  colors.accent.rose,
-  colors.accent.copperLight,
-  colors.slate[500],
-  colors.slate[400],
-  colors.accent.copperDark,
+  '#2d5f4f', // emerald/primary (light) -> cyan (dark via CSS)
+  '#10b981', // green/secondary
+  '#f59e0b', // amber
+  '#f43f5e', // rose
+  '#4a8f75', // lighter emerald
+  '#64748b', // slate-500
+  '#94a3b8', // slate-400
+  '#1e4d40', // darker emerald
 ]
+
+// Theme-aware muted color for "Other" category
+const MUTED_COLOR = '#94a3b8'
+
+// Theme-aware stroke color for selected items
+const STROKE_COLOR = '#0f172a'
 
 // Format currency
 function formatCurrency(value: number): string {
@@ -252,7 +258,7 @@ export function CategoryBreakdown({
         amount: otherAmount,
         percentage: (otherAmount / total) * 100,
         transactionCount: otherCount,
-        color: colors.slate[400],
+        color: MUTED_COLOR,
       },
     ]
 
@@ -322,7 +328,7 @@ export function CategoryBreakdown({
                     key={entry.category}
                     fill={entry.color}
                     stroke={
-                      selectedCategory === entry.category ? colors.slate[900] : 'transparent'
+                      selectedCategory === entry.category ? STROKE_COLOR : 'transparent'
                     }
                     strokeWidth={selectedCategory === entry.category ? 2 : 0}
                     opacity={
@@ -352,16 +358,18 @@ export function CategoryBreakdown({
               layout="vertical"
               margin={{ top: 0, right: 20, left: 80, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" horizontal stroke={colors.slate[200]} />
+              <CartesianGrid strokeDasharray="3 3" horizontal className="stroke-border" />
               <XAxis
                 type="number"
                 tickFormatter={(v) => formatCurrency(v)}
-                tick={{ fontSize: 12, fill: colors.slate[600] }}
+                tick={{ fontSize: 12 }}
+                className="fill-muted-foreground"
               />
               <YAxis
                 dataKey="category"
                 type="category"
-                tick={{ fontSize: 12, fill: colors.slate[600] }}
+                tick={{ fontSize: 12 }}
+                className="fill-muted-foreground"
                 width={75}
               />
               <Tooltip

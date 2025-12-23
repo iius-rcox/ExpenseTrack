@@ -100,13 +100,13 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-4 py-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Receipt className="h-4 w-4" />
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="font-semibold">ExpenseFlow</span>
             <span className="text-xs text-muted-foreground">Expense Manager</span>
           </div>
@@ -120,7 +120,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {mainNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={currentPath === item.url}>
+                  <SidebarMenuButton asChild isActive={currentPath === item.url} tooltip={item.title}>
                     <Link to={item.url}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
@@ -138,7 +138,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {settingsNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={currentPath === item.url}>
+                  <SidebarMenuButton asChild isActive={currentPath === item.url} tooltip={item.title}>
                     <Link to={item.url}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
@@ -156,13 +156,13 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton>
+                <SidebarMenuButton tooltip={userName}>
                   <User2 className="h-4 w-4" />
-                  <div className="flex flex-col items-start text-left">
+                  <div className="flex flex-col items-start text-left group-data-[collapsible=icon]:hidden">
                     <span className="text-sm font-medium truncate max-w-[140px]">{userName}</span>
                     <span className="text-xs text-muted-foreground truncate max-w-[140px]">{userEmail}</span>
                   </div>
-                  <ChevronUp className="ml-auto h-4 w-4" />
+                  <ChevronUp className="ml-auto h-4 w-4 group-data-[collapsible=icon]:hidden" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent

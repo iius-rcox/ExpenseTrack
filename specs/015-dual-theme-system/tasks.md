@@ -31,9 +31,9 @@
 
 **Purpose**: Verify environment and create feature branch
 
-- [ ] T001 Verify feature branch exists: `git checkout 015-dual-theme-system`
-- [ ] T002 [P] Verify frontend dev server runs: `cd frontend && npm run dev`
-- [ ] T003 [P] Verify next-themes is installed in frontend/package.json (v0.4.6)
+- [x] T001 Verify feature branch exists: `git checkout 015-dual-theme-system`
+- [x] T002 [P] Verify frontend dev server runs: `cd frontend && npm run dev`
+- [x] T003 [P] Verify next-themes is installed in frontend/package.json (v0.4.6)
 
 ---
 
@@ -45,20 +45,20 @@
 
 ### ThemeProvider Setup
 
-- [ ] T004 Create ThemeProvider component in frontend/src/providers/theme-provider.tsx
-- [ ] T005 Update frontend/src/routes/__root.tsx to wrap content with ThemeProvider
-- [ ] T006 Add flash prevention script to frontend/index.html before `</head>`
+- [x] T004 Create ThemeProvider component in frontend/src/providers/theme-provider.tsx
+- [x] T005 Update frontend/src/routes/__root.tsx to wrap content with ThemeProvider
+- [x] T006 Add flash prevention script to frontend/index.html before `</head>`
 
 ### CSS Variables Update
 
-- [ ] T007 Replace frontend/src/globals.css with new dual-theme CSS variables (from quickstart.md Step 2)
-- [ ] T008 [P] Verify @theme block includes all Tailwind color aliases
-- [ ] T009 [P] Verify :root contains Luxury Minimalist light theme values
-- [ ] T010 [P] Verify .dark contains Dark Cyber theme values
+- [x] T007 Replace frontend/src/globals.css with new dual-theme CSS variables (from quickstart.md Step 2)
+- [x] T008 [P] Verify @theme block includes all Tailwind color aliases
+- [x] T009 [P] Verify :root contains Luxury Minimalist light theme values
+- [x] T010 [P] Verify .dark contains Dark Cyber theme values
 
 ### Design Tokens Update
 
-- [ ] T011 Replace frontend/src/lib/design-tokens.ts with simplified version (remove slate/copper, keep utilities)
+- [x] T011 Replace frontend/src/lib/design-tokens.ts with simplified version (remove slate/copper, keep utilities)
 
 **Checkpoint**: Theme infrastructure ready - user story implementation can begin
 
@@ -76,10 +76,10 @@
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Create ThemeToggle component in frontend/src/components/theme-toggle.tsx
-- [ ] T014 [US1] Locate navigation/header component and identify where to add ThemeToggle
-- [ ] T015 [US1] Add ThemeToggle to navigation bar in frontend/src/components/layout/app-header.tsx (or equivalent)
-- [ ] T016 [US1] Verify toggle is accessible (aria-label, keyboard navigation)
+- [x] T013 [US1] Create ThemeToggle component in frontend/src/components/theme-toggle.tsx
+- [x] T014 [US1] Locate navigation/header component and identify where to add ThemeToggle
+- [x] T015 [US1] Add ThemeToggle to navigation bar in frontend/src/components/layout/app-shell.tsx
+- [x] T016 [US1] Verify toggle is accessible (aria-label, keyboard navigation)
 
 ### Verification for User Story 1
 
@@ -118,10 +118,10 @@
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] Add glassmorphism utility class (.glass) to frontend/src/globals.css (if not already present)
-- [ ] T027 [US3] Add @supports fallback for browsers without backdrop-filter
-- [ ] T028 [US3] Add gradient text utility class (.gradient-text) to frontend/src/globals.css
-- [ ] T029 [US3] Add stat card shine animation (.stat-card-shine) to frontend/src/globals.css
+- [x] T026 [US3] Add glassmorphism utility class (.glass) to frontend/src/globals.css (if not already present)
+- [x] T027 [US3] Add @supports fallback for browsers without backdrop-filter
+- [x] T028 [US3] Add gradient text utility class (.gradient-text) to frontend/src/globals.css
+- [x] T029 [US3] Add stat card shine animation (.stat-card-shine) to frontend/src/globals.css
 - [ ] T030 [P] [US3] Apply .glass class to dashboard stat cards in frontend/src/components/dashboard/stat-card.tsx (or equivalent)
 - [ ] T031 [P] [US3] Apply .gradient-text class to large stat values
 - [ ] T032 [P] [US3] Apply .stat-card-shine class to stat cards for hover effect
@@ -163,10 +163,10 @@
 
 ### Sidebar Collapse Fix (FR-012)
 
-- [ ] T048a [US4] Update frontend/src/components/layout/app-sidebar.tsx: Change `<Sidebar>` to `<Sidebar collapsible="icon">`
-- [ ] T048b [US4] Add `tooltip` prop to each SidebarMenuButton for icon-only mode hover labels
-- [ ] T048c [US4] Verify sidebar header (logo/title) hides properly in collapsed state using `group-data-[collapsible=icon]:hidden`
-- [ ] T048d [US4] Verify user dropdown in footer works correctly in collapsed state
+- [x] T048a [US4] Update frontend/src/components/layout/app-sidebar.tsx: Change `<Sidebar>` to `<Sidebar collapsible="icon">`
+- [x] T048b [US4] Add `tooltip` prop to each SidebarMenuButton for icon-only mode hover labels
+- [x] T048c [US4] Verify sidebar header (logo/title) hides properly in collapsed state using `group-data-[collapsible=icon]:hidden`
+- [x] T048d [US4] Verify user dropdown in footer works correctly in collapsed state
 - [ ] T048e [US4] Manual test: Click sidebar trigger, verify sidebar collapses to icons (3rem width)
 - [ ] T048f [US4] Manual test: Hover collapsed menu items, verify tooltips appear
 

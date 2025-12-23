@@ -12,6 +12,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 interface AppShellProps {
   breadcrumbs?: Array<{
@@ -43,6 +44,9 @@ export function AppShell({ breadcrumbs = [], children }: AppShellProps) {
               ))}
             </BreadcrumbList>
           </Breadcrumb>
+          {/* Spacer to push ThemeToggle to the right */}
+          <div className="flex-1" />
+          <ThemeToggle />
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4">
           {children || <Outlet />}

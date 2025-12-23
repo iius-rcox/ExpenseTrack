@@ -6,6 +6,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { Toaster } from '@/components/ui/sonner'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { NotFound } from '@/components/not-found'
+import { ThemeProvider } from '@/providers/theme-provider'
 import type { RouterContext } from '@/router'
 
 export const Route = createRootRouteWithContext<RouterContext>()({
@@ -16,16 +17,18 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootComponent() {
   return (
-    <ErrorBoundary>
-      <Outlet />
-      <Toaster position="top-right" richColors closeButton />
-      {import.meta.env.DEV && (
-        <>
-          <TanStackRouterDevtools position="bottom-right" />
-          <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
-        </>
-      )}
-    </ErrorBoundary>
+    <ThemeProvider>
+      <ErrorBoundary>
+        <Outlet />
+        <Toaster position="top-right" richColors closeButton />
+        {import.meta.env.DEV && (
+          <>
+            <TanStackRouterDevtools position="bottom-right" />
+            <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+          </>
+        )}
+      </ErrorBoundary>
+    </ThemeProvider>
   )
 }
 

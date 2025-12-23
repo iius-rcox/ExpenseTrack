@@ -26,26 +26,26 @@ import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { colors } from '@/lib/design-tokens'
 import { fadeIn } from '@/lib/animations'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// Chart color palette based on design tokens
+// Chart color palette - theme-aware colors that work in both light and dark mode
+// Primary colors adapt via CSS variables in globals.css
 const CHART_COLORS = {
-  primary: colors.accent.copper,
-  secondary: colors.accent.copperLight,
-  comparison: colors.slate[400],
-  grid: colors.slate[200],
-  text: colors.slate[600],
-  background: colors.slate[50],
+  primary: '#2d5f4f',    // emerald (primary in light theme)
+  secondary: '#4a8f75',  // lighter emerald
+  comparison: '#94a3b8', // slate-400 (muted)
+  grid: '#e2e8f0',       // slate-200 (border)
+  text: '#64748b',       // slate-500 (muted foreground)
+  background: '#f8fafc', // slate-50
   categories: [
-    colors.accent.copper,
-    colors.accent.emerald,
-    colors.accent.amber,
-    colors.accent.rose,
-    colors.accent.copperLight,
-    colors.slate[500],
+    '#2d5f4f', // emerald/primary
+    '#10b981', // green
+    '#f59e0b', // amber
+    '#f43f5e', // rose
+    '#4a8f75', // lighter emerald
+    '#64748b', // slate-500
   ],
 }
 
