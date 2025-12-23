@@ -36,16 +36,14 @@ export const msalConfig: Configuration = {
   },
 };
 
-// API client ID for requesting access tokens
-const API_CLIENT_ID = '00435dee-8aff-429b-bab6-762973c091c4';
-
-// For API calls, request a token with our API as the audience
-// Using .default scope which represents all statically configured permissions
+// Scopes for authentication - request ID token only
+// The backend uses AllowWebApiToBeAuthorizedByACL=true to accept ID tokens
+// This avoids needing a properly exposed API scope in Azure AD
 export const apiScopes = {
-  all: [`api://${API_CLIENT_ID}/.default`],
+  all: ['openid', 'profile', 'email'],
 };
 
-// Login request configuration - request API token during login
+// Login request configuration - use OIDC scopes to get ID token
 export const loginRequest = {
-  scopes: [`api://${API_CLIENT_ID}/.default`],
+  scopes: ['openid', 'profile', 'email'],
 };

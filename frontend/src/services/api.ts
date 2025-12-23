@@ -33,8 +33,10 @@ async function getAuthHeaders(): Promise<HeadersInit> {
       scopes: apiScopes.all,
       account: accounts[0],
     })
+    // Use idToken since backend has AllowWebApiToBeAuthorizedByACL=true
+    // ID token has aud=clientId which matches backend Audience config
     return {
-      'Authorization': `Bearer ${response.accessToken}`,
+      'Authorization': `Bearer ${response.idToken}`,
       'Content-Type': 'application/json',
     }
   } catch (error) {
@@ -137,7 +139,8 @@ export async function apiUpload<T>(
     })
 
     xhr.open('POST', `${API_BASE_URL}${url}`)
-    xhr.setRequestHeader('Authorization', `Bearer ${response.accessToken}`)
+    // Use idToken for consistency with getAuthHeaders()
+    xhr.setRequestHeader('Authorization', `Bearer ${response.idToken}`)
     xhr.send(formData)
   })
 }
@@ -158,7 +161,8 @@ export async function apiDownload(url: string, filename: string): Promise<void> 
 
   const fetchResponse = await fetch(`${API_BASE_URL}${url}`, {
     headers: {
-      'Authorization': `Bearer ${response.accessToken}`,
+      // Use idToken for consistency with getAuthHeaders()
+      'Authorization': `Bearer ${response.idToken}`,
     },
   })
 
