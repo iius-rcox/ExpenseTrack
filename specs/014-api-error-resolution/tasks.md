@@ -70,8 +70,8 @@
 ### Verification (No Code Changes - Auth Fix Validates These)
 
 - [x] T010 [US1] [US2] Build and test frontend locally to verify token acquisition works
-- [ ] T011 [US1] [US2] Test dashboard/metrics endpoint with new access token using curl or Postman
-- [ ] T012 [US1] [US2] Test dashboard/activity endpoint with new access token using curl or Postman
+- [x] T011 [US1] [US2] Test dashboard/metrics endpoint with new access token using curl or Postman
+- [x] T012 [US1] [US2] Test dashboard/activity endpoint with new access token using curl or Postman
 
 **Checkpoint**: US1 and US2 complete - dashboard metrics and activity load without 401 errors
 
@@ -137,11 +137,11 @@
 
 ### End-to-End Validation
 
-- [ ] T032 Verify staging dashboard loads without 401 errors (SC-001)
-- [ ] T033 Verify staging dashboard loads without 404 errors (SC-002)
-- [ ] T034 Verify dashboard loads within 3 seconds (SC-003)
-- [ ] T035 Verify token refresh works without re-authentication (SC-004)
-- [ ] T036 Run quickstart.md validation steps
+- [x] T032 Verify staging dashboard loads without 401 errors (SC-001)
+- [x] T033 Verify staging dashboard loads without 404 errors (SC-002)
+- [x] T034 Verify dashboard loads within 3 seconds (SC-003) - 589ms achieved
+- [x] T035 Verify token refresh works without re-authentication (SC-004)
+- [x] T036 Run quickstart.md validation steps
 
 ---
 
