@@ -218,7 +218,7 @@ app.UseHangfireDashboard(
 RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.ReferenceDataSyncJob>(
     "sync-reference-data",
     job => job.ExecuteAsync(CancellationToken.None),
-    "0 2 * * 0", // Every Sunday at 2 AM
+    "0 2 * * *", // Daily at 2 AM
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
 // Sprint 5: Alias confidence decay job
@@ -241,6 +241,10 @@ RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.SubscriptionAlertJob>(
     job => job.ExecuteAsync(CancellationToken.None),
     "0 4 1 * *", // First day of each month at 4 AM
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+
+// Trigger reference data sync on startup to ensure data is populated
+RecurringJob.TriggerJob("sync-reference-data");
+Log.Information("Triggered initial reference data sync job");
 
 app.MapControllers();
 
