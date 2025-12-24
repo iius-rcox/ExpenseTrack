@@ -61,7 +61,7 @@
 
 - [x] T010 Add DbSet<UserPreferences> to backend/src/ExpenseFlow.Infrastructure/Data/ExpenseFlowDbContext.cs
 - [x] T011 Create EF configuration in backend/src/ExpenseFlow.Infrastructure/Data/Configurations/UserPreferencesConfiguration.cs
-- [ ] T012 Generate EF migration: `dotnet ef migrations add AddUserPreferences`
+- [x] T012 Generate EF migration: `dotnet ef migrations add AddUserPreferences`
 
 ### Dependency Injection
 
