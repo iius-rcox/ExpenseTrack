@@ -86,11 +86,11 @@ public class SqlServerDataSource : IExternalDataSource
             var departments = new List<Department>();
             await using var connection = await CreateConnectionAsync();
 
-            // Viewpoint bPRDP table: PRCo, Department, Description
+            // Viewpoint bPRDP table: PRCo, PRDept, Description
             await using var command = new SqlCommand(
-                @"SELECT
-                    CAST(Department AS VARCHAR(50)) AS Code,
-                    ISNULL(Description, CAST(Department AS VARCHAR(50))) AS Name,
+                @"SELECT DISTINCT
+                    CAST(PRDept AS VARCHAR(50)) AS Code,
+                    ISNULL(Description, CAST(PRDept AS VARCHAR(50))) AS Name,
                     Description,
                     1 AS IsActive
                 FROM bPRDP",
