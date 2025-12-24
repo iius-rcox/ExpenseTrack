@@ -25,6 +25,7 @@ public static class ServiceCollectionExtensions
     {
         // User services (US1)
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IUserPreferencesService, UserPreferencesService>();
 
         // Cache services (US2)
         services.AddScoped<IDescriptionCacheService, DescriptionCacheService>();

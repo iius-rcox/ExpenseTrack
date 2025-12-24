@@ -1,50 +1,68 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# ExpenseFlow Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Clean Architecture
+All code follows the 4-layer Clean Architecture pattern:
+- **Core**: Domain entities, interfaces (no external dependencies)
+- **Shared**: DTOs for cross-layer data transfer
+- **Infrastructure**: EF Core, external services, repositories
+- **Api**: Controllers, middleware, DI configuration
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+Dependencies flow inward: Api → Infrastructure → Core ← Shared
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Test-First Development
+- Unit tests for service logic
+- Integration tests for API endpoints
+- All tests must pass before merge to main
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### III. ERP Integration (Viewpoint Vista)
+Reference data (departments, projects, GL accounts) is sourced from Viewpoint Vista ERP:
+- **Access Method**: Direct SQL to Vista database
+- **Authentication**: SQL Authentication (credentials in Azure Key Vault)
+- **Sync Frequency**: Daily overnight sync via Hangfire job
+- **Failure Handling**: Alert ops team immediately, continue with stale cache
+- See: [Vista Integration Reference](./vista-integration.md)
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### IV. API Design
+- RESTful endpoints under `/api/` prefix
+- ProblemDetails (RFC 7807) for error responses
+- FluentValidation for request validation
+- OpenAPI/Swagger documentation auto-generated
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### V. Observability
+- Serilog structured logging
+- Log levels: Debug for dev, Information for production
+- Named parameters in log templates (no string interpolation)
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### VI. Security
+- Azure AD / Entra ID for authentication
+- JWT bearer tokens
+- [Authorize] attribute on all controllers except health checks
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Technology Stack
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+| Layer | Technology |
+|-------|------------|
+| Runtime | .NET 8 with C# 12 |
+| API Framework | ASP.NET Core Web API |
+| ORM | Entity Framework Core 8 |
+| Database | PostgreSQL 15+ (Supabase) |
+| ERP Source | Viewpoint Vista (SQL Server) |
+| Background Jobs | Hangfire |
+| Container | Docker (linux/amd64 for AKS) |
+| Orchestration | Azure Kubernetes Service |
+
+## Deployment
+
+- **Registry**: Azure Container Registry (iiusacr.azurecr.io)
+- **GitOps**: ArgoCD syncs from main branch
+- **Build Requirement**: `docker buildx build --platform linux/amd64` (Apple Silicon dev machines)
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+- Constitution supersedes feature-specific decisions
+- Amendments require documentation update + PR review
+- All PRs must verify compliance with these principles
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2025-12-23 | **Last Amended**: 2025-12-23

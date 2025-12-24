@@ -3,9 +3,31 @@
 Auto-generated from feature plans. Last updated: 2025-12-17
 
 ## Tool Usage
-###MCP Servers
--**ref.tools**: Use this to reference best practices when developing any feature
--**shad.cn**: Use this for all frontend components and design choices
+### MCP Servers
+- **ref.tools**: Use this to reference best practices when developing any feature
+- **shad.cn**: Use this for all frontend components and design choices
+
+## Project References
+- **Constitution**: `.specify/memory/constitution.md` - Core principles and governance
+- **Vista Integration**: `.specify/memory/vista-integration.md` - Viewpoint Vista ERP integration patterns
+
+## Viewpoint Vista ERP Integration
+
+Reference data (departments, projects, GL accounts) is synced from Viewpoint Vista:
+
+| Setting | Value |
+|---------|-------|
+| Source Tables | PRDP (departments), JCCM (jobs/contracts) |
+| Company Filter | JCCo = 1 / PRCo = 1 |
+| Authentication | SQL Authentication (Key Vault) |
+| Sync Frequency | Daily overnight |
+| Status Filter | Active records only |
+| Display Format | First 25 chars of name + (Code) |
+
+**Key Rules**:
+- Validate department/project IDs against local PostgreSQL cache (not Vista directly)
+- Clear user preferences automatically when referenced records become inactive
+- On sync failure: Alert ops immediately, continue with stale cache
 
 ## Active Technologies
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Microsoft.Identity.Web, Polly (002-core-backend-auth)
@@ -30,6 +52,7 @@ Auto-generated from feature plans. Last updated: 2025-12-17
 - TypeScript 5.7+ with React 18.3+ + TanStack Router, TanStack Query, Tailwind CSS 4.x, shadcn/ui, Framer Motion (new), Recharts (013-frontend-redesign)
 - TypeScript 5.7+ with React 18.3+ + Tailwind CSS 4.x, shadcn/ui (Radix primitives), next-themes, Framer Motion, class-variance-authority (015-dual-theme-system)
 - localStorage (theme preference via next-themes) (015-dual-theme-system)
+- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Microsoft.Identity.Web, FluentValidation (016-user-preferences-api)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -118,9 +141,9 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 016-user-preferences-api: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Microsoft.Identity.Web, FluentValidation
 - 015-dual-theme-system: Added TypeScript 5.7+ with React 18.3+ + Tailwind CSS 4.x, shadcn/ui (Radix primitives), next-themes, Framer Motion, class-variance-authority
 - 014-api-error-resolution: Added PostgreSQL 15+ (Supabase self-hosted with pgvector)
-- 013-frontend-redesign: Added TypeScript 5.7+ with React 18.3+ + TanStack Router, TanStack Query, Tailwind CSS 4.x, shadcn/ui, Framer Motion (new), Recharts
   - Entities: ImportJob (for tracking cache warming import jobs)
   - Services: CacheWarmingService (historical data import, job management)
   - Jobs: CacheWarmingJob (Hangfire background processing)

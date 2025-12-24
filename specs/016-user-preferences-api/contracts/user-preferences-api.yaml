@@ -1,0 +1,280 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow User Preferences API
+  description: |
+    API endpoints for managing user profile and preferences in ExpenseFlow.
+    Part of feature 016-user-preferences-api.
+  version: 1.0.0
+  contact:
+    name: ExpenseFlow Team
+
+servers:
+  - url: /api
+    description: API base path
+
+tags:
+  - name: User
+    description: User profile and preferences management
+
+paths:
+  /user/me:
+    get:
+      tags:
+        - User
+      summary: Get current user profile
+      description: |
+        Returns the authenticated user's profile information including their preferences.
+        Auto-creates a user profile on first authentication.
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                email: "john.doe@company.com"
+                displayName: "John Doe"
+                department: "Engineering"
+                createdAt: "2025-01-15T10:30:00Z"
+                lastLoginAt: "2025-12-23T14:22:00Z"
+                preferences:
+                  theme: "dark"
+                  defaultDepartmentId: "123e4567-e89b-12d3-a456-426614174000"
+                  defaultProjectId: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /user/preferences:
+    get:
+      tags:
+        - User
+      summary: Get current user preferences
+      description: |
+        Returns the authenticated user's application preferences.
+        Returns system defaults if no preferences have been explicitly set.
+      operationId: getUserPreferences
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Preferences retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferencesResponse'
+              examples:
+                withPreferences:
+                  summary: User with custom preferences
+                  value:
+                    theme: "dark"
+                    defaultDepartmentId: "123e4567-e89b-12d3-a456-426614174000"
+                    defaultProjectId: "987fcdeb-51a2-3c4d-e5f6-789012345678"
+                defaultPreferences:
+                  summary: User with default preferences
+                  value:
+                    theme: "system"
+                    defaultDepartmentId: null
+                    defaultProjectId: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags:
+        - User
+      summary: Update user preferences
+      description: |
+        Partially updates the authenticated user's preferences.
+        Only provided fields are updated; omitted fields remain unchanged.
+        Creates a preferences record if one doesn't exist (upsert).
+      operationId: updateUserPreferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePreferencesRequest'
+            examples:
+              updateTheme:
+                summary: Update only theme
+                value:
+                  theme: "dark"
+              updateDefaults:
+                summary: Update default department and project
+                value:
+                  defaultDepartmentId: "123e4567-e89b-12d3-a456-426614174000"
+                  defaultProjectId: "987fcdeb-51a2-3c4d-e5f6-789012345678"
+              clearDefaults:
+                summary: Clear default department (set to null)
+                value:
+                  defaultDepartmentId: null
+      responses:
+        '200':
+          description: Preferences updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferencesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Azure AD / Entra ID JWT token
+
+  schemas:
+    UserResponse:
+      type: object
+      required:
+        - id
+        - email
+        - displayName
+        - createdAt
+        - lastLoginAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+        email:
+          type: string
+          format: email
+          description: User's email address (from identity provider)
+        displayName:
+          type: string
+          description: User's display name (from identity provider)
+        department:
+          type: string
+          nullable: true
+          description: User's department (from identity provider or manual)
+        createdAt:
+          type: string
+          format: date-time
+          description: When the user profile was created
+        lastLoginAt:
+          type: string
+          format: date-time
+          description: Most recent login timestamp
+        preferences:
+          $ref: '#/components/schemas/UserPreferencesResponse'
+
+    UserPreferencesResponse:
+      type: object
+      required:
+        - theme
+      properties:
+        theme:
+          type: string
+          enum: [light, dark, system]
+          description: User's preferred color theme
+          default: system
+        defaultDepartmentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Default department for new expense reports
+        defaultProjectId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Default project for new expense reports
+
+    UpdatePreferencesRequest:
+      type: object
+      description: |
+        Partial update request. All fields are optional.
+        Only provided fields will be updated.
+      properties:
+        theme:
+          type: string
+          enum: [light, dark, system]
+          description: Theme preference (case-insensitive)
+        defaultDepartmentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set default department, or null to clear
+        defaultProjectId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set default project, or null to clear
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807 Problem Details
+      properties:
+        type:
+          type: string
+          description: URI identifying the problem type
+        title:
+          type: string
+          description: Short human-readable summary
+        status:
+          type: integer
+          description: HTTP status code
+        detail:
+          type: string
+          description: Detailed explanation
+        instance:
+          type: string
+          description: URI reference to specific occurrence
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Validation errors by field
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://tools.ietf.org/html/rfc7235#section-3.1"
+            title: "Unauthorized"
+            status: 401
+            detail: "Authentication token is missing or invalid"
+
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            invalidTheme:
+              summary: Invalid theme value
+              value:
+                type: "https://tools.ietf.org/html/rfc7231#section-6.5.1"
+                title: "One or more validation errors occurred"
+                status: 400
+                errors:
+                  theme:
+                    - "Theme must be one of: light, dark, system"
+            invalidDepartment:
+              summary: Department not found
+              value:
+                type: "https://tools.ietf.org/html/rfc7231#section-6.5.1"
+                title: "Validation Failed"
+                status: 400
+                detail: "The specified department does not exist"
+                errors:
+                  defaultDepartmentId:
+                    - "Department with ID '123e4567-...' not found"
