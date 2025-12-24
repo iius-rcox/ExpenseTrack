@@ -87,13 +87,15 @@ public class SqlServerDataSource : IExternalDataSource
             await using var connection = await CreateConnectionAsync();
 
             // Viewpoint bPRDP table: PRCo, PRDept, Description
+            // Same PRDept can exist in multiple companies - use GROUP BY to deduplicate
             await using var command = new SqlCommand(
-                @"SELECT DISTINCT
+                @"SELECT
                     CAST(PRDept AS VARCHAR(50)) AS Code,
-                    ISNULL(Description, CAST(PRDept AS VARCHAR(50))) AS Name,
-                    Description,
+                    MIN(ISNULL(Description, CAST(PRDept AS VARCHAR(50)))) AS Name,
+                    MIN(Description) AS Description,
                     1 AS IsActive
-                FROM bPRDP",
+                FROM bPRDP
+                GROUP BY PRDept",
                 connection);
 
             await using var reader = await command.ExecuteReaderAsync();
