@@ -28,6 +28,10 @@ RUN dotnet publish src/ExpenseFlow.Api/ExpenseFlow.Api.csproj -c ${BUILD_CONFIGU
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
 WORKDIR /app
 
+# Install ICU libraries for SQL Server client globalization support
+RUN apk add --no-cache icu-libs
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+
 # Create non-root user for security
 RUN adduser -D -u 1000 appuser
 
