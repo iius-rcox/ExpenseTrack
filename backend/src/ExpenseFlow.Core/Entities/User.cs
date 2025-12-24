@@ -32,4 +32,9 @@ public class User : BaseEntity
 
     // Navigation properties
     public ICollection<StatementFingerprint> StatementFingerprints { get; set; } = new List<StatementFingerprint>();
+
+    /// <summary>
+    /// User's application preferences (1:1 relationship, may be null if not yet created).
+    /// </summary>
+    public UserPreferences? Preferences { get; set; }
 }

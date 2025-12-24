@@ -11,4 +11,9 @@ public class UserResponse
     public string? Department { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime LastLoginAt { get; set; }
+
+    /// <summary>
+    /// User's application preferences.
+    /// </summary>
+    public UserPreferencesResponse? Preferences { get; set; }
 }

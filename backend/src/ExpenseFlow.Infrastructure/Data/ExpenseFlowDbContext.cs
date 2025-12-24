@@ -16,6 +16,7 @@ public class ExpenseFlowDbContext : DbContext
 
     // User Story 1: Authentication
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserPreferences> UserPreferences => Set<UserPreferences>();
 
     // User Story 2: Cache Tables
     public DbSet<DescriptionCache> DescriptionCaches => Set<DescriptionCache>();
