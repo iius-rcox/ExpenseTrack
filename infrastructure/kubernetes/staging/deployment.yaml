@@ -38,6 +38,11 @@ spec:
                 secretKeyRef:
                   key: postgresql-connection-string
                   name: expenseflow-secrets
+            - name: ConnectionStrings__SqlServer
+              valueFrom:
+                secretKeyRef:
+                  key: sqlserver-connection-string
+                  name: expenseflow-secrets
             - name: AzureAd__TenantId
               valueFrom:
                 configMapKeyRef:
