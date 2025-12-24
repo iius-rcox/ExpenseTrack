@@ -47,8 +47,17 @@ public class SqlServerDataSource : IExternalDataSource
             var accounts = new List<GLAccount>();
             await using var connection = await CreateConnectionAsync();
 
+            // Viewpoint bGLAC table: GLCo, GLAcct, Description, Active (Y/N)
+            // GL codes like "40100.07" include dept suffix - extract left 5 chars for base GL code
             await using var command = new SqlCommand(
-                "SELECT Code, Name, Description, IsActive FROM GLAccounts WHERE IsActive = 1",
+                @"SELECT DISTINCT
+                    LEFT(CAST(GLAcct AS VARCHAR(50)), 5) AS Code,
+                    MIN(ISNULL(Description, CAST(GLAcct AS VARCHAR(50)))) AS Name,
+                    MIN(Description) AS Description,
+                    MAX(CASE WHEN Active = 'Y' THEN 1 ELSE 0 END) AS IsActive
+                FROM bGLAC
+                WHERE Active = 'Y'
+                GROUP BY LEFT(CAST(GLAcct AS VARCHAR(50)), 5)",
                 connection);
 
             await using var reader = await command.ExecuteReaderAsync();
@@ -59,7 +68,7 @@ public class SqlServerDataSource : IExternalDataSource
                     Code = reader.GetString(0),
                     Name = reader.GetString(1),
                     Description = reader.IsDBNull(2) ? null : reader.GetString(2),
-                    IsActive = reader.GetBoolean(3),
+                    IsActive = reader.GetInt32(3) == 1,
                     SyncedAt = DateTime.UtcNow
                 });
             }
@@ -77,8 +86,14 @@ public class SqlServerDataSource : IExternalDataSource
             var departments = new List<Department>();
             await using var connection = await CreateConnectionAsync();
 
+            // Viewpoint bPRDP table: PRCo, Department, Description
             await using var command = new SqlCommand(
-                "SELECT Code, Name, Description, IsActive FROM Departments WHERE IsActive = 1",
+                @"SELECT
+                    CAST(Department AS VARCHAR(50)) AS Code,
+                    ISNULL(Description, CAST(Department AS VARCHAR(50))) AS Name,
+                    Description,
+                    1 AS IsActive
+                FROM bPRDP",
                 connection);
 
             await using var reader = await command.ExecuteReaderAsync();
@@ -89,7 +104,7 @@ public class SqlServerDataSource : IExternalDataSource
                     Code = reader.GetString(0),
                     Name = reader.GetString(1),
                     Description = reader.IsDBNull(2) ? null : reader.GetString(2),
-                    IsActive = reader.GetBoolean(3),
+                    IsActive = reader.GetInt32(3) == 1,
                     SyncedAt = DateTime.UtcNow
                 });
             }
@@ -107,8 +122,15 @@ public class SqlServerDataSource : IExternalDataSource
             var projects = new List<Project>();
             await using var connection = await CreateConnectionAsync();
 
+            // Viewpoint bJCCM table: JCCo, Contract, Description, ContractStatus (0=Open, 1=Soft Close, 2=Hard Close, 3=Closed)
             await using var command = new SqlCommand(
-                "SELECT Code, Name, Description, IsActive FROM Projects WHERE IsActive = 1",
+                @"SELECT
+                    Contract AS Code,
+                    ISNULL(Description, Contract) AS Name,
+                    Description,
+                    CASE WHEN ContractStatus = 0 THEN 1 ELSE 0 END AS IsActive
+                FROM bJCCM
+                WHERE ContractStatus = 0",
                 connection);
 
             await using var reader = await command.ExecuteReaderAsync();
@@ -119,7 +141,7 @@ public class SqlServerDataSource : IExternalDataSource
                     Code = reader.GetString(0),
                     Name = reader.GetString(1),
                     Description = reader.IsDBNull(2) ? null : reader.GetString(2),
-                    IsActive = reader.GetBoolean(3),
+                    IsActive = reader.GetInt32(3) == 1,
                     SyncedAt = DateTime.UtcNow
                 });
             }
