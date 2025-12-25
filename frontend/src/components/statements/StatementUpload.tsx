@@ -50,8 +50,8 @@ export function StatementUpload({ onAnalysisComplete, onError }: StatementUpload
         scopes: apiScopes.all,
         account: accounts[0],
       });
-      // Use accessToken for API authorization
-      return response.accessToken;
+      // Use idToken since no API scope is exposed - backend validates ID tokens
+      return response.idToken;
     } catch (error) {
       if (error instanceof InteractionRequiredAuthError) {
         // Token expired - redirect to login
