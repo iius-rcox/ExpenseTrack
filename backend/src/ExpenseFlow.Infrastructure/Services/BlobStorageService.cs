@@ -168,6 +168,10 @@ public class BlobStorageService : IBlobStorageService
             .Where(c => !invalidChars.Contains(c))
             .ToArray());
 
+        // Replace spaces with underscores to prevent URL encoding issues in blob storage
+        // BUG-005 fix: Spaces in filenames cause blob URL mismatches when stored/retrieved
+        sanitized = sanitized.Replace(' ', '_');
+
         // Limit to 100 characters
         if (sanitized.Length > 100)
         {
