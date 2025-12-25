@@ -74,3 +74,23 @@ spec:
     - ports:
         - protocol: TCP
           port: 443
+---
+# Allow SQL Server egress to Vista ERP database for reference data sync
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-vista-sql
+  namespace: expenseflow-staging
+spec:
+  podSelector:
+    matchLabels:
+      app: expenseflow-api
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.5/32
+      ports:
+        - protocol: TCP
+          port: 1433
