@@ -7,9 +7,24 @@ import type {
   AutoMatchResponse,
   ConfirmMatchRequest,
   ManualMatchRequest,
-  TransactionSummary,
-  ReceiptSummary,
+  MatchReceiptSummary,
+  MatchTransactionSummary,
 } from '@/types/api'
+
+// Paginated response types matching backend DTOs
+interface UnmatchedReceiptsResponse {
+  items: MatchReceiptSummary[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+interface UnmatchedTransactionsResponse {
+  items: MatchTransactionSummary[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
 
 export const matchingKeys = {
   all: ['matching'] as const,
@@ -62,7 +77,10 @@ export function useMatchingStats() {
 export function useUnmatchedReceipts() {
   return useQuery({
     queryKey: matchingKeys.unmatchedReceipts(),
-    queryFn: () => apiFetch<ReceiptSummary[]>('/matching/receipts/unmatched'),
+    queryFn: async () => {
+      const response = await apiFetch<UnmatchedReceiptsResponse>('/matching/receipts/unmatched')
+      return response.items
+    },
     staleTime: 60_000,
   })
 }
@@ -70,7 +88,10 @@ export function useUnmatchedReceipts() {
 export function useUnmatchedTransactions() {
   return useQuery({
     queryKey: matchingKeys.unmatchedTransactions(),
-    queryFn: () => apiFetch<TransactionSummary[]>('/matching/transactions/unmatched'),
+    queryFn: async () => {
+      const response = await apiFetch<UnmatchedTransactionsResponse>('/matching/transactions/unmatched')
+      return response.items
+    },
     staleTime: 60_000,
   })
 }

@@ -22,7 +22,7 @@ import {
 } from '@/hooks/queries/use-matching'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
-import type { ReceiptSummary, TransactionSummary } from '@/types/api'
+import type { MatchReceiptSummary, MatchTransactionSummary } from '@/types/api'
 import {
   LinkIcon,
   Search,
@@ -55,8 +55,8 @@ export function ManualMatchDialog({
   // Support both controlled and uncontrolled modes
   const open = controlledOpen ?? internalOpen
   const setOpen = onOpenChange ?? setInternalOpen
-  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptSummary | null>(null)
-  const [selectedTransaction, setSelectedTransaction] = useState<TransactionSummary | null>(null)
+  const [selectedReceipt, setSelectedReceipt] = useState<MatchReceiptSummary | null>(null)
+  const [selectedTransaction, setSelectedTransaction] = useState<MatchTransactionSummary | null>(null)
   const [receiptSearch, setReceiptSearch] = useState('')
   const [transactionSearch, setTransactionSearch] = useState('')
 
@@ -80,7 +80,7 @@ export function ManualMatchDialog({
     const search = receiptSearch.toLowerCase()
     return receipts.filter(
       (r) =>
-        r.vendor?.toLowerCase().includes(search) ||
+        r.vendorExtracted?.toLowerCase().includes(search) ||
         r.originalFilename.toLowerCase().includes(search)
     )
   }, [receipts, receiptSearch])
@@ -204,17 +204,17 @@ export function ManualMatchDialog({
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">
-                            {receipt.vendor || receipt.originalFilename}
+                            {receipt.vendorExtracted || receipt.originalFilename}
                           </p>
                           <div className="flex items-center gap-3 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
-                              {receipt.date ? formatDate(receipt.date) : 'No date'}
+                              {receipt.dateExtracted ? formatDate(receipt.dateExtracted) : 'No date'}
                             </span>
                             <span className="flex items-center gap-1">
                               <DollarSign className="h-3 w-3" />
-                              {receipt.amount != null
-                                ? formatCurrency(receipt.amount)
+                              {receipt.amountExtracted != null
+                                ? formatCurrency(receipt.amountExtracted)
                                 : 'No amount'}
                             </span>
                           </div>
@@ -295,7 +295,7 @@ export function ManualMatchDialog({
                 <p className="text-xs text-muted-foreground mb-1">Receipt</p>
                 <p className="font-medium truncate">
                   {selectedReceipt
-                    ? selectedReceipt.vendor || selectedReceipt.originalFilename
+                    ? selectedReceipt.vendorExtracted || selectedReceipt.originalFilename
                     : 'Not selected'}
                 </p>
               </div>
