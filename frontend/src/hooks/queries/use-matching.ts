@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/services/api'
 import type {
   MatchDetail,
+  MatchProposal,
   ProposalListResponse,
   MatchingStats,
   AutoMatchResponse,
@@ -10,6 +11,36 @@ import type {
   MatchReceiptSummary,
   MatchTransactionSummary,
 } from '@/types/api'
+
+/**
+ * Normalizes confidence scores from backend (0-100) to frontend (0-1) scale.
+ * The backend returns scores as percentages (e.g., 95 for 95%) while the
+ * frontend design tokens and display logic expect decimal values (e.g., 0.95).
+ */
+function normalizeProposal<T extends MatchProposal>(proposal: T): T {
+  return {
+    ...proposal,
+    // Convert 0-100 to 0-1 scale
+    confidenceScore: proposal.confidenceScore / 100,
+    amountScore: proposal.amountScore / 100,
+    dateScore: proposal.dateScore / 100,
+    vendorScore: proposal.vendorScore / 100,
+  }
+}
+
+function normalizeProposalList(response: ProposalListResponse): ProposalListResponse {
+  return {
+    ...response,
+    items: response.items.map(normalizeProposal),
+  }
+}
+
+function normalizeStats(stats: MatchingStats): MatchingStats {
+  return {
+    ...stats,
+    averageConfidence: stats.averageConfidence / 100,
+  }
+}
 
 // Paginated response types matching backend DTOs
 interface UnmatchedReceiptsResponse {
@@ -53,7 +84,8 @@ export function useMatchProposals(params: ProposalListParams = {}) {
       searchParams.set('pageSize', String(pageSize))
       if (status) searchParams.set('status', status)
 
-      return apiFetch<ProposalListResponse>(`/matching/proposals?${searchParams}`)
+      const response = await apiFetch<ProposalListResponse>(`/matching/proposals?${searchParams}`)
+      return normalizeProposalList(response)
     },
   })
 }
@@ -61,7 +93,10 @@ export function useMatchProposals(params: ProposalListParams = {}) {
 export function useMatchProposal(matchId: string) {
   return useQuery({
     queryKey: matchingKeys.proposal(matchId),
-    queryFn: () => apiFetch<MatchDetail>(`/matching/proposals/${matchId}`),
+    queryFn: async () => {
+      const response = await apiFetch<MatchDetail>(`/matching/proposals/${matchId}`)
+      return normalizeProposal(response)
+    },
     enabled: !!matchId,
   })
 }
@@ -69,7 +104,10 @@ export function useMatchProposal(matchId: string) {
 export function useMatchingStats() {
   return useQuery({
     queryKey: matchingKeys.stats(),
-    queryFn: () => apiFetch<MatchingStats>('/matching/stats'),
+    queryFn: async () => {
+      const response = await apiFetch<MatchingStats>('/matching/stats')
+      return normalizeStats(response)
+    },
     staleTime: 30_000,
   })
 }
@@ -210,9 +248,14 @@ export function useTriggerAutoMatch() {
 
   return useMutation({
     mutationFn: async () => {
-      return apiFetch<AutoMatchResponse>('/matching/auto', {
+      const response = await apiFetch<AutoMatchResponse>('/matching/auto', {
         method: 'POST',
       })
+      // Normalize the proposals in the response
+      return {
+        ...response,
+        proposals: response.proposals.map(normalizeProposal),
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: matchingKeys.all })
@@ -228,10 +271,12 @@ export function useBatchApprove() {
 
   return useMutation({
     mutationFn: async ({ ids, minConfidence }: { ids?: string[]; minConfidence?: number }) => {
+      // Convert frontend 0-1 threshold to backend 0-100 scale
+      const backendConfidence = minConfidence !== undefined ? minConfidence * 100 : undefined
       return apiFetch<{ approved: number; skipped: number }>('/matching/batch-approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids, minConfidence }),
+        body: JSON.stringify({ ids, minConfidence: backendConfidence }),
       })
     },
     onSuccess: () => {
