@@ -76,3 +76,8 @@ claude-exports/
 # test files
 test-data/
 .mcp.json
+
+# Example data - folder tracked, contents ignored
+example-data/*
+!example-data/.gitkeep
+!example-data/README.md
