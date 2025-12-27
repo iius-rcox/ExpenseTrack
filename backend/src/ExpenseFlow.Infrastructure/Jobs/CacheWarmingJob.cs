@@ -261,12 +261,16 @@ public class CacheWarmingJob : JobBase
         List<ImportError> errors,
         CancellationToken cancellationToken)
     {
+        // Track hashes processed in this batch to avoid duplicates within the same batch
+        var processedDescriptionHashes = new HashSet<string>();
+        var processedVendorAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         // 1. Process descriptions for DescriptionCache
         foreach (var record in batch)
         {
             try
             {
-                var descriptionCached = await ProcessDescriptionAsync(record, cancellationToken);
+                var descriptionCached = await ProcessDescriptionAsync(record, processedDescriptionHashes, cancellationToken);
                 if (descriptionCached)
                 {
                     job.CachedDescriptions++;
@@ -283,7 +287,7 @@ public class CacheWarmingJob : JobBase
         {
             try
             {
-                var aliasCreated = await ProcessVendorAliasAsync(record, cancellationToken);
+                var aliasCreated = await ProcessVendorAliasAsync(record, processedVendorAliases, cancellationToken);
                 if (aliasCreated)
                 {
                     job.CreatedAliases++;
@@ -309,11 +313,17 @@ public class CacheWarmingJob : JobBase
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<bool> ProcessDescriptionAsync(HistoricalRecord record, CancellationToken cancellationToken)
+    private async Task<bool> ProcessDescriptionAsync(HistoricalRecord record, HashSet<string> processedHashes, CancellationToken cancellationToken)
     {
         var hash = ComputeDescriptionHash(record.Description);
 
-        // Check if already exists
+        // Skip if already processed in this batch
+        if (!processedHashes.Add(hash))
+        {
+            return false; // Already processed in this batch
+        }
+
+        // Check if already exists in database
         var existing = await _dbContext.DescriptionCaches
             .FirstOrDefaultAsync(d => d.RawDescriptionHash == hash, cancellationToken);
 
@@ -339,7 +349,7 @@ public class CacheWarmingJob : JobBase
         return true;
     }
 
-    private async Task<bool> ProcessVendorAliasAsync(HistoricalRecord record, CancellationToken cancellationToken)
+    private async Task<bool> ProcessVendorAliasAsync(HistoricalRecord record, HashSet<string> processedAliases, CancellationToken cancellationToken)
     {
         var vendorPattern = ExtractVendorPattern(record.Vendor ?? record.Description);
         if (string.IsNullOrEmpty(vendorPattern))
@@ -349,7 +359,13 @@ public class CacheWarmingJob : JobBase
 
         var canonicalName = vendorPattern.ToUpperInvariant();
 
-        // Check if already exists
+        // Skip if already processed in this batch
+        if (!processedAliases.Add(canonicalName))
+        {
+            return false; // Already processed in this batch
+        }
+
+        // Check if already exists in database
         var existing = await _dbContext.VendorAliases
             .FirstOrDefaultAsync(v => v.CanonicalName == canonicalName, cancellationToken);
 

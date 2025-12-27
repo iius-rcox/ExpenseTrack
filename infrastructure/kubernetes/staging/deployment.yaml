@@ -15,7 +15,7 @@ spec:
   template:
     metadata:
       annotations:
-        kubectl.kubernetes.io/restartedAt: "2025-12-23T00:30:00Z"
+        kubectl.kubernetes.io/restartedAt: "2025-12-27T22:10:00Z"
       labels:
         app: expenseflow-api
         environment: staging
@@ -23,7 +23,7 @@ spec:
       serviceAccountName: expenseflow-api
       containers:
         - name: api
-          image: iiusacr.azurecr.io/expenseflow-api:v1.14.5-0a50df3
+          image: iiusacr.azurecr.io/expenseflow-api:v1.14.6-cachefix
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
