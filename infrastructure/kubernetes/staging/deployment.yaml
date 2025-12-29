@@ -15,7 +15,7 @@ spec:
   template:
     metadata:
       annotations:
-        kubectl.kubernetes.io/restartedAt: "2025-12-29T20:55:00Z"
+        kubectl.kubernetes.io/restartedAt: "2025-12-29T21:40:00Z"
       labels:
         app: expenseflow-api
         environment: staging
@@ -93,6 +93,8 @@ spec:
                   name: expenseflow-secrets
             - name: AzureOpenAI__DeploymentName
               value: "gpt-4o-mini"
+            - name: AzureOpenAI__EmbeddingDeployment
+              value: "iius-text-embedding-ada-002"
             # Azure Blob Storage configuration
             # Azure Document Intelligence (Form Recognizer) configuration
             - name: DocumentIntelligence__Endpoint
