@@ -36,6 +36,9 @@ public class CacheWarmingJob : JobBase
     private const string ColGLCode = "GL Code";
     private const string ColDepartment = "Department";
 
+    // Maximum length for error_log column (varchar(10000) - leave buffer for JSON structure)
+    private const int MaxErrorLogLength = 9500;
+
     public CacheWarmingJob(
         ExpenseFlowDbContext dbContext,
         IEmbeddingService embeddingService,
@@ -124,7 +127,7 @@ public class CacheWarmingJob : JobBase
             // Finalize job
             job.Status = ImportJobStatus.Completed;
             job.CompletedAt = DateTime.UtcNow;
-            job.ErrorLog = errors.Count > 0 ? JsonSerializer.Serialize(errors) : null;
+            job.ErrorLog = TruncateErrorLog(errors);
             job.SkippedRecords = errors.Count;
 
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -139,7 +142,7 @@ public class CacheWarmingJob : JobBase
             _logger.LogError(ex, "Import job {JobId} failed", jobId);
             job.Status = ImportJobStatus.Failed;
             job.CompletedAt = DateTime.UtcNow;
-            job.ErrorLog = JsonSerializer.Serialize(new List<ImportError>
+            job.ErrorLog = TruncateErrorLog(new List<ImportError>
             {
                 new(0, $"Job failed: {ex.Message}", null)
             });
@@ -500,6 +503,55 @@ public class CacheWarmingJob : JobBase
     {
         // Title case the vendor name
         return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(vendorPattern.ToLower());
+    }
+
+    /// <summary>
+    /// Truncates error log to fit within the database column limit.
+    /// Progressively removes errors from the end if the serialized JSON is too long.
+    /// </summary>
+    private static string? TruncateErrorLog(List<ImportError> errors)
+    {
+        if (errors.Count == 0)
+        {
+            return null;
+        }
+
+        var json = JsonSerializer.Serialize(errors);
+
+        // If it fits, return as-is
+        if (json.Length <= MaxErrorLogLength)
+        {
+            return json;
+        }
+
+        // Progressively remove errors until it fits
+        var truncatedErrors = new List<ImportError>(errors);
+        var totalErrors = errors.Count;
+
+        while (truncatedErrors.Count > 1 && json.Length > MaxErrorLogLength)
+        {
+            truncatedErrors.RemoveAt(truncatedErrors.Count - 1);
+
+            // Add a truncation notice
+            var truncationNotice = new ImportError(
+                0,
+                $"[TRUNCATED: Showing {truncatedErrors.Count} of {totalErrors} errors due to log size limit]",
+                null);
+
+            var displayList = new List<ImportError>(truncatedErrors) { truncationNotice };
+            json = JsonSerializer.Serialize(displayList);
+        }
+
+        // Final fallback: if still too long, return a minimal error
+        if (json.Length > MaxErrorLogLength)
+        {
+            json = JsonSerializer.Serialize(new List<ImportError>
+            {
+                new(0, $"[TRUNCATED: {totalErrors} errors occurred but log was too large to store]", null)
+            });
+        }
+
+        return json;
     }
 
     private record HistoricalRecord
