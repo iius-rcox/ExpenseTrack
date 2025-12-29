@@ -32,6 +32,7 @@ builder.Host.UseSerilog();
 var connectionString = builder.Configuration.GetConnectionString("PostgreSQL");
 var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
 dataSourceBuilder.EnableDynamicJson();
+dataSourceBuilder.UseVector();  // Required for pgvector type mapping
 
 var dataSource = dataSourceBuilder.Build();
 
