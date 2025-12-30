@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using Microsoft.OpenApi.Models;
+using Pgvector.Npgsql;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
