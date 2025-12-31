@@ -76,11 +76,11 @@ public class ExpenseEmbeddingConfiguration : IEntityTypeConfiguration<ExpenseEmb
             .OnDelete(DeleteBehavior.SetNull);
 
         // Indexes
-        // IVFFlat index for vector similarity search
-        // Note: This index is created via raw SQL in migration because EF Core
-        // doesn't support IVFFlat index creation directly
-        builder.HasIndex(e => e.Embedding)
-            .HasDatabaseName("ix_expense_embeddings_vector");
+        // NOTE: Vector index (ix_expense_embeddings_vector) is created via raw SQL migration
+        // because EF Core's HasIndex creates B-tree indexes which cannot handle large vectors.
+        // See migration script for HNSW index creation:
+        //   CREATE INDEX ix_expense_embeddings_vector ON expense_embeddings
+        //   USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
         builder.HasIndex(e => new { e.Verified, e.UserId })
             .HasDatabaseName("ix_expense_embeddings_verified_user");
