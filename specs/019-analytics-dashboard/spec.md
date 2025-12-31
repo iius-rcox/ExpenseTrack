@@ -96,8 +96,8 @@ As a user analyzing expense patterns, I need to see spending grouped by vendor f
 - What happens when the date range is invalid (startDate > endDate)?
 - How does the system handle extremely large date ranges? → Enforces 5-year maximum; returns 400 Bad Request if exceeded
 - What happens when the same merchant has both positive and negative transactions (refunds)? → Keep split; show positive and negative amounts as separate entries
-- How does category breakdown handle transactions with $0 amounts?
-- What happens when requesting monthly granularity for a single day?
+- How does category breakdown handle transactions with $0 amounts? → Include in transaction count but contribute zero to totals and percentages
+- What happens when requesting monthly granularity for a single day? → Returns single month entry (YYYY-MM format) containing that day's transactions
 
 ## Requirements *(mandatory)*
 
@@ -166,7 +166,7 @@ As a user analyzing expense patterns, I need to see spending grouped by vendor f
 
 ## Assumptions
 
-- The existing Transaction entity contains all necessary fields (TransactionDate, Amount, Description, Category)
+- The existing Transaction entity contains necessary fields (TransactionDate, Amount, Description); Category is derived at query time via pattern matching on Description, not stored
 - Vendor name normalization will use the existing description field (no vendor alias lookup needed for MVP)
 - The frontend's expected response shapes match the DTOs defined in this specification
 - Performance is acceptable with direct database queries; caching may be added later if needed
