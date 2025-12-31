@@ -1,3 +1,4 @@
+using ExpenseFlow.Api.Validators;
 using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Infrastructure.Data;
 using ExpenseFlow.Shared.DTOs;
@@ -8,13 +9,15 @@ using Microsoft.EntityFrameworkCore;
 namespace ExpenseFlow.Api.Controllers;
 
 /// <summary>
-/// Controller for expense analytics including MoM comparison and cache statistics.
+/// Controller for expense analytics including spending trends, category breakdowns,
+/// merchant analytics, subscription tracking, and MoM comparison.
 /// </summary>
 [Authorize]
 public class AnalyticsController : ApiControllerBase
 {
     private readonly IComparisonService _comparisonService;
     private readonly ICacheStatisticsService _cacheStatisticsService;
+    private readonly IAnalyticsService _analyticsService;
     private readonly IUserService _userService;
     private readonly ILogger<AnalyticsController> _logger;
     private readonly ExpenseFlowDbContext _dbContext;
@@ -22,12 +25,14 @@ public class AnalyticsController : ApiControllerBase
     public AnalyticsController(
         IComparisonService comparisonService,
         ICacheStatisticsService cacheStatisticsService,
+        IAnalyticsService analyticsService,
         IUserService userService,
         ILogger<AnalyticsController> logger,
         ExpenseFlowDbContext dbContext)
     {
         _comparisonService = comparisonService;
         _cacheStatisticsService = cacheStatisticsService;
+        _analyticsService = analyticsService;
         _userService = userService;
         _logger = logger;
         _dbContext = dbContext;
@@ -333,4 +338,293 @@ public class AnalyticsController : ApiControllerBase
 
         return "Other";
     }
+
+    #region Feature 019: Analytics Dashboard Endpoints
+
+    /// <summary>
+    /// Gets spending trends over time with configurable granularity.
+    /// </summary>
+    /// <param name="startDate">Start date (ISO format YYYY-MM-DD)</param>
+    /// <param name="endDate">End date (ISO format YYYY-MM-DD)</param>
+    /// <param name="granularity">Aggregation: "day" (default), "week", or "month"</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Array of spending data points</returns>
+    [HttpGet("spending-trend")]
+    [ProducesResponseType(typeof(List<SpendingTrendItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<List<SpendingTrendItemDto>>> GetSpendingTrend(
+        [FromQuery] string startDate,
+        [FromQuery] string endDate,
+        [FromQuery] string granularity = "day",
+        CancellationToken ct = default)
+    {
+        // Validate date range
+        if (!AnalyticsValidation.ValidateDateRange(startDate, endDate, out var start, out var end, out var dateError))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = dateError
+            });
+        }
+
+        // Validate granularity
+        if (!AnalyticsValidation.ValidateGranularity(granularity, out var granularityError))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = granularityError
+            });
+        }
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Getting spending trend for user {UserId} from {StartDate} to {EndDate} with {Granularity} granularity",
+            user.Id, start, end, granularity);
+
+        var result = await _analyticsService.GetSpendingTrendAsync(
+            user.Id, start, end, granularity ?? "day", ct);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Gets spending breakdown by category for a date range.
+    /// Categories are derived from transaction descriptions using pattern matching.
+    /// </summary>
+    /// <param name="startDate">Start date (ISO format YYYY-MM-DD)</param>
+    /// <param name="endDate">End date (ISO format YYYY-MM-DD)</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Array of category spending summaries</returns>
+    [HttpGet("spending-by-category")]
+    [ProducesResponseType(typeof(List<SpendingByCategoryItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<List<SpendingByCategoryItemDto>>> GetSpendingByCategory(
+        [FromQuery] string startDate,
+        [FromQuery] string endDate,
+        CancellationToken ct = default)
+    {
+        // Validate date range
+        if (!AnalyticsValidation.ValidateDateRange(startDate, endDate, out var start, out var end, out var dateError))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = dateError
+            });
+        }
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Getting spending by category for user {UserId} from {StartDate} to {EndDate}",
+            user.Id, start, end);
+
+        var result = await _analyticsService.GetSpendingByCategoryAsync(user.Id, start, end, ct);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Gets spending breakdown by vendor for a date range.
+    /// </summary>
+    /// <param name="startDate">Start date (ISO format YYYY-MM-DD)</param>
+    /// <param name="endDate">End date (ISO format YYYY-MM-DD)</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Array of vendor spending summaries</returns>
+    [HttpGet("spending-by-vendor")]
+    [ProducesResponseType(typeof(List<SpendingByVendorItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<List<SpendingByVendorItemDto>>> GetSpendingByVendor(
+        [FromQuery] string startDate,
+        [FromQuery] string endDate,
+        CancellationToken ct = default)
+    {
+        // Validate date range
+        if (!AnalyticsValidation.ValidateDateRange(startDate, endDate, out var start, out var end, out var dateError))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = dateError
+            });
+        }
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Getting spending by vendor for user {UserId} from {StartDate} to {EndDate}",
+            user.Id, start, end);
+
+        var result = await _analyticsService.GetSpendingByVendorAsync(user.Id, start, end, ct);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Gets merchant analytics with optional comparison to previous period.
+    /// </summary>
+    /// <param name="startDate">Start date (ISO format YYYY-MM-DD)</param>
+    /// <param name="endDate">End date (ISO format YYYY-MM-DD)</param>
+    /// <param name="topCount">Number of top merchants (1-100, default 10)</param>
+    /// <param name="includeComparison">Include comparison with previous period</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Merchant analytics with trends</returns>
+    [HttpGet("merchants")]
+    [ProducesResponseType(typeof(MerchantAnalyticsResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<MerchantAnalyticsResponseDto>> GetMerchantAnalytics(
+        [FromQuery] string startDate,
+        [FromQuery] string endDate,
+        [FromQuery] int topCount = 10,
+        [FromQuery] bool includeComparison = false,
+        CancellationToken ct = default)
+    {
+        // Validate date range
+        if (!AnalyticsValidation.ValidateDateRange(startDate, endDate, out var start, out var end, out var dateError))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = dateError
+            });
+        }
+
+        // Validate topCount
+        if (!AnalyticsValidation.ValidateTopCount(topCount, out var topCountError))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = topCountError
+            });
+        }
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Getting merchant analytics for user {UserId} from {StartDate} to {EndDate}, top {TopCount}, comparison: {IncludeComparison}",
+            user.Id, start, end, topCount, includeComparison);
+
+        var result = await _analyticsService.GetMerchantAnalyticsAsync(
+            user.Id, start, end, topCount, includeComparison, ct);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Gets detected subscriptions with optional filters.
+    /// Proxies to existing subscription detection service.
+    /// </summary>
+    /// <param name="minConfidence">Minimum confidence level: "high", "medium", "low"</param>
+    /// <param name="frequency">Filter by frequencies (comma-separated)</param>
+    /// <param name="includeAcknowledged">Include acknowledged subscriptions (default true)</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Subscription detection results</returns>
+    [HttpGet("subscriptions")]
+    [ProducesResponseType(typeof(AnalyticsSubscriptionResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<AnalyticsSubscriptionResponseDto>> GetSubscriptions(
+        [FromQuery] string? minConfidence = null,
+        [FromQuery] List<string>? frequency = null,
+        [FromQuery] bool includeAcknowledged = true,
+        CancellationToken ct = default)
+    {
+        // Validate minConfidence
+        if (!AnalyticsValidation.ValidateConfidenceLevel(minConfidence, out var confidenceError))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = confidenceError
+            });
+        }
+
+        // Validate frequencies
+        if (!AnalyticsValidation.ValidateFrequencies(frequency, out var frequencyError))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = frequencyError
+            });
+        }
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Getting subscriptions for user {UserId}, minConfidence: {MinConfidence}, includeAcknowledged: {IncludeAcknowledged}",
+            user.Id, minConfidence, includeAcknowledged);
+
+        var result = await _analyticsService.GetSubscriptionsAsync(
+            user.Id, minConfidence, frequency, includeAcknowledged, ct);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Triggers subscription analysis for the user.
+    /// </summary>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Analysis result with detected count</returns>
+    [HttpPost("subscriptions/analyze")]
+    [ProducesResponseType(typeof(SubscriptionAnalysisResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<SubscriptionAnalysisResultDto>> AnalyzeSubscriptions(
+        CancellationToken ct = default)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation("Triggering subscription analysis for user {UserId}", user.Id);
+
+        var result = await _analyticsService.AnalyzeSubscriptionsAsync(user.Id, ct);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Acknowledges or unacknowledges a subscription.
+    /// </summary>
+    /// <param name="subscriptionId">Subscription ID</param>
+    /// <param name="request">Acknowledgement request</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>204 if successful, 404 if not found</returns>
+    [HttpPost("subscriptions/{subscriptionId}/acknowledge")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> AcknowledgeSubscription(
+        [FromRoute] Guid subscriptionId,
+        [FromBody] AcknowledgeSubscriptionRequest request,
+        CancellationToken ct = default)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Acknowledging subscription {SubscriptionId} for user {UserId}: {Acknowledged}",
+            subscriptionId, user.Id, request.Acknowledged);
+
+        var success = await _analyticsService.AcknowledgeSubscriptionAsync(
+            user.Id, subscriptionId, request.Acknowledged, ct);
+
+        if (!success)
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = $"Subscription {subscriptionId} not found."
+            });
+        }
+
+        return NoContent();
+    }
+
+    #endregion
 }

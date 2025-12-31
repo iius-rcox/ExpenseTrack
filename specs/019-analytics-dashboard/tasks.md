@@ -24,13 +24,13 @@
 
 **Purpose**: Create DTOs and service interface that all endpoints depend on
 
-- [ ] T001 [P] Create SpendingTrendItemDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
-- [ ] T002 [P] Create SpendingByCategoryItemDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
-- [ ] T003 [P] Create SpendingByVendorItemDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
-- [ ] T004 [P] Create TopMerchantDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
-- [ ] T005 [P] Create MerchantAnalyticsResponseDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
-- [ ] T006 [P] Create AnalyticsDateRangeDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
-- [ ] T007 [P] Create AnalyticsSubscriptionResponseDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
+- [x] T001 [P] Create SpendingTrendItemDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
+- [x] T002 [P] Create SpendingByCategoryItemDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
+- [x] T003 [P] Create SpendingByVendorItemDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
+- [x] T004 [P] Create TopMerchantDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
+- [x] T005 [P] Create MerchantAnalyticsResponseDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
+- [x] T006 [P] Create AnalyticsDateRangeDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
+- [x] T007 [P] Create AnalyticsSubscriptionResponseDto record in `backend/src/ExpenseFlow.Shared/DTOs/AnalyticsDtos.cs`
 
 ---
 
@@ -40,11 +40,11 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T008 Create IAnalyticsService interface in `backend/src/ExpenseFlow.Core/Interfaces/IAnalyticsService.cs` with methods for all 5 endpoints
-- [ ] T009 Create AnalyticsService class skeleton in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` implementing IAnalyticsService
-- [ ] T010 Register IAnalyticsService in DI container in `backend/src/ExpenseFlow.Infrastructure/ServiceCollectionExtensions.cs`
-- [ ] T011 Create AnalyticsValidation static class in `backend/src/ExpenseFlow.Api/Validators/AnalyticsValidators.cs` with ValidateDateRange method (5-year max, startDate <= endDate)
-- [ ] T012 Add DeriveCategory helper method to AnalyticsService (port from existing AnalyticsController pattern-matching logic)
+- [x] T008 Create IAnalyticsService interface in `backend/src/ExpenseFlow.Core/Interfaces/IAnalyticsService.cs` with methods for all 5 endpoints
+- [x] T009 Create AnalyticsService class skeleton in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` implementing IAnalyticsService
+- [x] T010 Register IAnalyticsService in DI container in `backend/src/ExpenseFlow.Infrastructure/Extensions/ServiceCollectionExtensions.cs`
+- [x] T011 Create AnalyticsValidation static class in `backend/src/ExpenseFlow.Api/Validators/AnalyticsValidators.cs` with ValidateDateRange method (5-year max, startDate <= endDate)
+- [x] T012 Add DeriveCategory helper method to AnalyticsService (port from existing AnalyticsController pattern-matching logic)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -58,10 +58,10 @@
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Implement GetSpendingTrendAsync method in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` with database-side GroupBy aggregation
-- [ ] T014 [US1] Add ISO week calculation helper for weekly granularity in AnalyticsService (use CalendarWeekRule.FirstFourDayWeek)
-- [ ] T015 [US1] Add GetSpendingTrend endpoint in `backend/src/ExpenseFlow.Api/Controllers/AnalyticsController.cs` at `GET /api/analytics/spending-trend`
-- [ ] T016 [US1] Add date validation and error handling to spending-trend endpoint using AnalyticsValidation.ValidateDateRange
+- [x] T013 [US1] Implement GetSpendingTrendAsync method in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` with database-side GroupBy aggregation
+- [x] T014 [US1] Add ISO week calculation helper for weekly granularity in AnalyticsService (use CalendarWeekRule.FirstFourDayWeek)
+- [x] T015 [US1] Add GetSpendingTrend endpoint in `backend/src/ExpenseFlow.Api/Controllers/AnalyticsController.cs` at `GET /api/analytics/spending-trend`
+- [x] T016 [US1] Add date validation and error handling to spending-trend endpoint using AnalyticsValidation.ValidateDateRange
 
 **Checkpoint**: User Story 1 should be fully functional - users can view spending trends with day/week/month granularity
 
@@ -75,10 +75,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Implement GetSpendingByCategoryAsync method in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` using DeriveCategory for pattern-based classification
-- [ ] T018 [US2] Calculate percentageOfTotal in GetSpendingByCategoryAsync (2 decimal places, handle empty result gracefully)
-- [ ] T019 [US2] Add GetSpendingByCategory endpoint in `backend/src/ExpenseFlow.Api/Controllers/AnalyticsController.cs` at `GET /api/analytics/spending-by-category`
-- [ ] T020 [US2] Add date validation to spending-by-category endpoint using AnalyticsValidation.ValidateDateRange
+- [x] T017 [US2] Implement GetSpendingByCategoryAsync method in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` using DeriveCategory for pattern-based classification
+- [x] T018 [US2] Calculate percentageOfTotal in GetSpendingByCategoryAsync (2 decimal places, handle empty result gracefully)
+- [x] T019 [US2] Add GetSpendingByCategory endpoint in `backend/src/ExpenseFlow.Api/Controllers/AnalyticsController.cs` at `GET /api/analytics/spending-by-category`
+- [x] T020 [US2] Add date validation to spending-by-category endpoint using AnalyticsValidation.ValidateDateRange
 
 **Checkpoint**: User Story 2 should be fully functional - users can view category spending breakdown
 
@@ -92,13 +92,13 @@
 
 ### Implementation for User Story 3
 
-- [ ] T021 [US3] Implement GetMerchantAnalyticsAsync method in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` with topCount and includeComparison support
-- [ ] T022 [US3] Add comparison period calculation in GetMerchantAnalyticsAsync (same duration, immediately preceding current period)
-- [ ] T023 [US3] Calculate trend direction (increasing/decreasing/stable) based on changePercent threshold
-- [ ] T024 [US3] Identify new merchants (present in current period but not in comparison period)
-- [ ] T025 [US3] Identify significant changes (>50% change in spending)
-- [ ] T026 [US3] Add GetMerchantAnalytics endpoint in `backend/src/ExpenseFlow.Api/Controllers/AnalyticsController.cs` at `GET /api/analytics/merchants`
-- [ ] T027 [US3] Add topCount parameter validation (1-100, default 10) to merchants endpoint
+- [x] T021 [US3] Implement GetMerchantAnalyticsAsync method in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` with topCount and includeComparison support
+- [x] T022 [US3] Add comparison period calculation in GetMerchantAnalyticsAsync (same duration, immediately preceding current period)
+- [x] T023 [US3] Calculate trend direction (increasing/decreasing/stable) based on changePercent threshold
+- [x] T024 [US3] Identify new merchants (present in current period but not in comparison period)
+- [x] T025 [US3] Identify significant changes (>50% change in spending)
+- [x] T026 [US3] Add GetMerchantAnalytics endpoint in `backend/src/ExpenseFlow.Api/Controllers/AnalyticsController.cs` at `GET /api/analytics/merchants`
+- [x] T027 [US3] Add topCount parameter validation (1-100, default 10) to merchants endpoint
 
 **Checkpoint**: User Story 3 should be fully functional - users can view top merchants with trend comparisons
 
@@ -112,14 +112,14 @@
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] Inject ISubscriptionDetectionService into AnalyticsService constructor
-- [ ] T029 [US4] Implement GetSubscriptionsAsync proxy method in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` delegating to ISubscriptionDetectionService
-- [ ] T030 [US4] Implement AnalyzeSubscriptionsAsync proxy method in AnalyticsService
-- [ ] T031 [US4] Implement AcknowledgeSubscriptionAsync proxy method in AnalyticsService
-- [ ] T032 [US4] Add GetSubscriptions endpoint in `backend/src/ExpenseFlow.Api/Controllers/AnalyticsController.cs` at `GET /api/analytics/subscriptions`
-- [ ] T033 [US4] Add AnalyzeSubscriptions endpoint at `POST /api/analytics/subscriptions/analyze`
-- [ ] T034 [US4] Add AcknowledgeSubscription endpoint at `POST /api/analytics/subscriptions/{subscriptionId}/acknowledge`
-- [ ] T035 [US4] Add minConfidence and frequency filter support to GetSubscriptions endpoint
+- [x] T028 [US4] Inject ISubscriptionDetectionService into AnalyticsService constructor
+- [x] T029 [US4] Implement GetSubscriptionsAsync proxy method in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` delegating to ISubscriptionDetectionService
+- [x] T030 [US4] Implement AnalyzeSubscriptionsAsync proxy method in AnalyticsService
+- [x] T031 [US4] Implement AcknowledgeSubscriptionAsync proxy method in AnalyticsService
+- [x] T032 [US4] Add GetSubscriptions endpoint in `backend/src/ExpenseFlow.Api/Controllers/AnalyticsController.cs` at `GET /api/analytics/subscriptions`
+- [x] T033 [US4] Add AnalyzeSubscriptions endpoint at `POST /api/analytics/subscriptions/analyze`
+- [x] T034 [US4] Add AcknowledgeSubscription endpoint at `POST /api/analytics/subscriptions/{subscriptionId}/acknowledge`
+- [x] T035 [US4] Add minConfidence and frequency filter support to GetSubscriptions endpoint
 
 **Checkpoint**: User Story 4 should be fully functional - subscription data accessible via analytics API
 
@@ -133,10 +133,10 @@
 
 ### Implementation for User Story 5
 
-- [ ] T036 [US5] Implement GetSpendingByVendorAsync method in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` using description field for vendor grouping
-- [ ] T037 [US5] Calculate percentageOfTotal in GetSpendingByVendorAsync (2 decimal places)
-- [ ] T038 [US5] Add GetSpendingByVendor endpoint in `backend/src/ExpenseFlow.Api/Controllers/AnalyticsController.cs` at `GET /api/analytics/spending-by-vendor`
-- [ ] T039 [US5] Add date validation to spending-by-vendor endpoint using AnalyticsValidation.ValidateDateRange
+- [x] T036 [US5] Implement GetSpendingByVendorAsync method in `backend/src/ExpenseFlow.Infrastructure/Services/AnalyticsService.cs` using description field for vendor grouping
+- [x] T037 [US5] Calculate percentageOfTotal in GetSpendingByVendorAsync (2 decimal places)
+- [x] T038 [US5] Add GetSpendingByVendor endpoint in `backend/src/ExpenseFlow.Api/Controllers/AnalyticsController.cs` at `GET /api/analytics/spending-by-vendor`
+- [x] T039 [US5] Add date validation to spending-by-vendor endpoint using AnalyticsValidation.ValidateDateRange
 
 **Checkpoint**: User Story 5 should be fully functional - users can view vendor spending breakdown
 
@@ -146,10 +146,10 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T040 Add structured logging (Serilog) with correlation IDs to all AnalyticsService methods
-- [ ] T041 Add ProblemDetails error responses for all analytics endpoints (FR-007)
-- [ ] T042 Verify all endpoints return 200 with empty arrays when no data matches (FR-013)
-- [ ] T043 Verify all endpoints require [Authorize] attribute and filter by authenticated user (FR-006)
+- [x] T040 Add structured logging (Serilog) with correlation IDs to all AnalyticsService methods
+- [x] T041 Add ProblemDetails error responses for all analytics endpoints (FR-007)
+- [x] T042 Verify all endpoints return 200 with empty arrays when no data matches (FR-013)
+- [x] T043 Verify all endpoints require [Authorize] attribute and filter by authenticated user (FR-006)
 - [ ] T044 Run quickstart.md verification checklist against all endpoints
 - [ ] T045 Performance test: Verify 500ms response for 90-day range with 1000 transactions (SC-002)
 

@@ -138,6 +138,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICacheWarmingService, CacheWarmingService>();
         services.AddScoped<CacheWarmingJob>();
 
+        // Feature 019: Analytics Dashboard
+        services.AddScoped<IAnalyticsService, AnalyticsService>();
+
         return services;
     }
 }
