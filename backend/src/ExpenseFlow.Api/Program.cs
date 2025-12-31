@@ -45,6 +45,7 @@ builder.Services.AddDbContext<ExpenseFlowDbContext>(options =>
         dataSource,
         npgsqlOptions =>
         {
+            npgsqlOptions.UseVector();  // EF Core needs this for Vector property mapping
             npgsqlOptions.EnableRetryOnFailure(
                 maxRetryCount: 3,
                 maxRetryDelay: TimeSpan.FromSeconds(10),
