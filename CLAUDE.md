@@ -55,6 +55,8 @@ Reference data (departments, projects, GL accounts) is synced from Viewpoint Vis
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Microsoft.Identity.Web, FluentValidation (016-user-preferences-api)
 - Markdown (GitHub Flavored Markdown) + None (documentation only) (017-how-to-guide)
 - Repository files in `docs/user-guide/` directory (018-end-user-guide)
+- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, FluentValidation (019-analytics-dashboard)
+- PostgreSQL 15+ (Supabase self-hosted), existing Transaction/VendorAlias tables (019-analytics-dashboard)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -143,9 +145,9 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 019-analytics-dashboard: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, FluentValidation
 - 018-end-user-guide: Added Markdown (GitHub Flavored Markdown) + None (documentation only)
 - 017-how-to-guide: Added Markdown (GitHub Flavored Markdown) + None (documentation only)
-- 016-user-preferences-api: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Microsoft.Identity.Web, FluentValidation
   - Entities: ImportJob (for tracking cache warming import jobs)
   - Services: CacheWarmingService (historical data import, job management)
   - Jobs: CacheWarmingJob (Hangfire background processing)

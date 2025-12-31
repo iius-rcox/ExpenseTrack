@@ -1,0 +1,545 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Analytics API
+  description: API endpoints for spending analytics and insights
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: API base path
+
+security:
+  - bearerAuth: []
+
+paths:
+  /analytics/spending-trend:
+    get:
+      summary: Get spending trends over time
+      operationId: getSpendingTrend
+      tags:
+        - Analytics
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Start date (ISO format YYYY-MM-DD)
+          example: "2025-01-01"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: End date (ISO format YYYY-MM-DD)
+          example: "2025-01-31"
+        - name: granularity
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [day, week, month]
+            default: day
+          description: Time aggregation granularity
+      responses:
+        '200':
+          description: Spending trend data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SpendingTrendItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /analytics/spending-by-category:
+    get:
+      summary: Get spending breakdown by category
+      operationId: getSpendingByCategory
+      tags:
+        - Analytics
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2025-01-01"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2025-01-31"
+      responses:
+        '200':
+          description: Category spending breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SpendingByCategoryItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /analytics/spending-by-vendor:
+    get:
+      summary: Get spending breakdown by vendor
+      operationId: getSpendingByVendor
+      tags:
+        - Analytics
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2025-01-01"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2025-01-31"
+      responses:
+        '200':
+          description: Vendor spending breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SpendingByVendorItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /analytics/merchants:
+    get:
+      summary: Get merchant analytics with trends
+      operationId: getMerchantAnalytics
+      tags:
+        - Analytics
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2025-01-01"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2025-01-31"
+        - name: topCount
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          description: Number of top merchants to return
+        - name: includeComparison
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include comparison with previous period
+      responses:
+        '200':
+          description: Merchant analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchantAnalyticsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /analytics/subscriptions:
+    get:
+      summary: Get detected subscriptions
+      operationId: getSubscriptions
+      tags:
+        - Analytics
+      parameters:
+        - name: minConfidence
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [high, medium, low]
+          description: Minimum confidence level filter
+        - name: frequency
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [weekly, biweekly, monthly, quarterly, annual]
+          description: Filter by frequency types
+        - name: includeAcknowledged
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+          description: Include acknowledged subscriptions
+      responses:
+        '200':
+          description: Subscription detection results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsSubscriptionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /analytics/subscriptions/{subscriptionId}/acknowledge:
+    post:
+      summary: Acknowledge or unacknowledge a subscription
+      operationId: acknowledgeSubscription
+      tags:
+        - Analytics
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                acknowledged:
+                  type: boolean
+              required:
+                - acknowledged
+      responses:
+        '204':
+          description: Subscription acknowledgement updated
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /analytics/subscriptions/analyze:
+    post:
+      summary: Trigger subscription analysis
+      operationId: analyzeSubscriptions
+      tags:
+        - Analytics
+      responses:
+        '200':
+          description: Analysis completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detected:
+                    type: integer
+                    description: Number of subscriptions detected
+                  analyzed:
+                    type: integer
+                    description: Number of transactions analyzed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Entra ID JWT token
+
+  schemas:
+    SpendingTrendItem:
+      type: object
+      properties:
+        date:
+          type: string
+          description: Period identifier (date, week, or month)
+          example: "2025-01-15"
+        amount:
+          type: number
+          format: decimal
+          description: Total spending for this period
+          example: 1250.50
+        transactionCount:
+          type: integer
+          description: Number of transactions
+          example: 15
+      required:
+        - date
+        - amount
+        - transactionCount
+
+    SpendingByCategoryItem:
+      type: object
+      properties:
+        category:
+          type: string
+          description: Category name
+          example: "Food & Dining"
+        amount:
+          type: number
+          format: decimal
+          example: 450.25
+        transactionCount:
+          type: integer
+          example: 12
+        percentageOfTotal:
+          type: number
+          format: decimal
+          description: Percentage of total spending (0-100)
+          example: 25.50
+      required:
+        - category
+        - amount
+        - transactionCount
+        - percentageOfTotal
+
+    SpendingByVendorItem:
+      type: object
+      properties:
+        vendorName:
+          type: string
+          example: "STARBUCKS"
+        amount:
+          type: number
+          format: decimal
+          example: 125.75
+        transactionCount:
+          type: integer
+          example: 8
+        percentageOfTotal:
+          type: number
+          format: decimal
+          example: 7.25
+      required:
+        - vendorName
+        - amount
+        - transactionCount
+        - percentageOfTotal
+
+    TopMerchant:
+      type: object
+      properties:
+        merchantName:
+          type: string
+          example: "AMAZON"
+        displayName:
+          type: string
+          nullable: true
+          example: "Amazon.com"
+        totalAmount:
+          type: number
+          format: decimal
+          example: 523.99
+        transactionCount:
+          type: integer
+          example: 7
+        averageAmount:
+          type: number
+          format: decimal
+          example: 74.86
+        percentageOfTotal:
+          type: number
+          format: decimal
+          example: 15.25
+        previousAmount:
+          type: number
+          format: decimal
+          nullable: true
+          example: 412.50
+        changePercent:
+          type: number
+          format: decimal
+          nullable: true
+          example: 27.03
+        trend:
+          type: string
+          enum: [increasing, decreasing, stable]
+          nullable: true
+          example: "increasing"
+      required:
+        - merchantName
+        - totalAmount
+        - transactionCount
+        - averageAmount
+        - percentageOfTotal
+
+    MerchantAnalyticsResponse:
+      type: object
+      properties:
+        topMerchants:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopMerchant'
+        newMerchants:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopMerchant'
+        significantChanges:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopMerchant'
+        totalMerchantCount:
+          type: integer
+          example: 45
+        dateRange:
+          $ref: '#/components/schemas/DateRange'
+      required:
+        - topMerchants
+        - newMerchants
+        - significantChanges
+        - totalMerchantCount
+        - dateRange
+
+    DateRange:
+      type: object
+      properties:
+        startDate:
+          type: string
+          format: date
+          example: "2025-01-01"
+        endDate:
+          type: string
+          format: date
+          example: "2025-01-31"
+      required:
+        - startDate
+        - endDate
+
+    AnalyticsSubscriptionResponse:
+      type: object
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionDetail'
+        summary:
+          $ref: '#/components/schemas/SubscriptionSummary'
+        newSubscriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionDetail'
+        possiblyEnded:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionDetail'
+        analyzedAt:
+          type: string
+          format: date-time
+      required:
+        - subscriptions
+        - summary
+        - newSubscriptions
+        - possiblyEnded
+        - analyzedAt
+
+    SubscriptionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        merchantName:
+          type: string
+        frequency:
+          type: string
+          enum: [weekly, biweekly, monthly, quarterly, annual, unknown]
+        amount:
+          type: number
+          format: decimal
+        confidence:
+          type: string
+          enum: [high, medium, low]
+        firstSeen:
+          type: string
+          format: date
+        lastSeen:
+          type: string
+          format: date
+        isAcknowledged:
+          type: boolean
+
+    SubscriptionSummary:
+      type: object
+      properties:
+        subscriptionCount:
+          type: integer
+        estimatedMonthlyTotal:
+          type: number
+          format: decimal
+        estimatedAnnualTotal:
+          type: number
+          format: decimal
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        traceId:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://tools.ietf.org/html/rfc7807"
+            title: "Validation Error"
+            status: 400
+            detail: "Date range exceeds maximum of 5 years"
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
