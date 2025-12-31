@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using Microsoft.OpenApi.Models;
+using Npgsql;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,16 +29,22 @@ builder.Host.UseSerilog();
 // Add services to the container
 
 // Configure Entity Framework Core with PostgreSQL and pgvector
-// For Npgsql 9.x with EF Core 9.x, UseVector() on the options builder handles type mapping
+// For Npgsql 9.x with EF Core 9.x, we need NpgsqlDataSourceBuilder for EnableDynamicJson()
 var connectionString = builder.Configuration.GetConnectionString("PostgreSQL");
+
+// Build data source with dynamic JSON support (required for Dictionary<string, T> JSONB columns)
+// and pgvector extension support
+var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+dataSourceBuilder.EnableDynamicJson();  // Required for Receipt.ConfidenceScores Dictionary<string, double>
+dataSourceBuilder.UseVector();          // Required for pgvector embedding columns
+var dataSource = dataSourceBuilder.Build();
 
 builder.Services.AddDbContext<ExpenseFlowDbContext>(options =>
 {
     options.UseNpgsql(
-        connectionString,
+        dataSource,
         npgsqlOptions =>
         {
-            npgsqlOptions.UseVector();
             npgsqlOptions.EnableRetryOnFailure(
                 maxRetryCount: 3,
                 maxRetryDelay: TimeSpan.FromSeconds(10),
