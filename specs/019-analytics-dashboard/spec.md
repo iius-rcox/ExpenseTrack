@@ -94,8 +94,8 @@ As a user analyzing expense patterns, I need to see spending grouped by vendor f
 ### Edge Cases
 
 - What happens when the date range is invalid (startDate > endDate)?
-- How does the system handle extremely large date ranges (e.g., 5 years)?
-- What happens when the same merchant has both positive and negative transactions (refunds)?
+- How does the system handle extremely large date ranges? → Enforces 5-year maximum; returns 400 Bad Request if exceeded
+- What happens when the same merchant has both positive and negative transactions (refunds)? → Include in net calculation; merchant total = expenses minus refunds
 - How does category breakdown handle transactions with $0 amounts?
 - What happens when requesting monthly granularity for a single day?
 
@@ -116,6 +116,8 @@ As a user analyzing expense patterns, I need to see spending grouped by vendor f
 - **FR-011**: Merchant analytics MUST identify new merchants (present in current period but not in comparison period) when comparison is enabled
 - **FR-012**: Subscription analytics MUST support filtering by minConfidence (high/medium/low) and frequency types
 - **FR-013**: System MUST handle empty result sets gracefully with 200 status and empty arrays (not 404)
+- **FR-014**: System MUST reject date ranges exceeding 5 years (1,826 days) with 400 Bad Request and descriptive error message
+- **FR-015**: System MUST include refund transactions (negative amounts) in net calculations; merchant/category totals represent expenses minus refunds
 
 ### Key Entities *(include if feature involves data)*
 
@@ -154,6 +156,13 @@ As a user analyzing expense patterns, I need to see spending grouped by vendor f
 - AI-powered analytics or predictions (existing rule-based detection is sufficient)
 - Export functionality (handled by Reports feature)
 - Real-time streaming or WebSocket analytics
+
+## Clarifications
+
+### Session 2025-12-31
+
+- Q: Should the API enforce a maximum date range to prevent performance degradation? → A: 5 years maximum
+- Q: How should refunds affect analytics calculations? → A: Include in net calculation (expenses minus refunds)
 
 ## Assumptions
 
