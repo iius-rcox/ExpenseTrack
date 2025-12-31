@@ -150,7 +150,7 @@
 - [x] T041 Add ProblemDetails error responses for all analytics endpoints (FR-007)
 - [x] T042 Verify all endpoints return 200 with empty arrays when no data matches (FR-013)
 - [x] T043 Verify all endpoints require [Authorize] attribute and filter by authenticated user (FR-006)
-- [ ] T044 Run quickstart.md verification checklist against all endpoints
+- [x] T044 Run quickstart.md verification checklist against all endpoints
 - [ ] T045 Performance test: Verify 500ms response for 90-day range with 1000 transactions (SC-002)
 
 ---
