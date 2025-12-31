@@ -95,7 +95,7 @@ As a user analyzing expense patterns, I need to see spending grouped by vendor f
 
 - What happens when the date range is invalid (startDate > endDate)?
 - How does the system handle extremely large date ranges? → Enforces 5-year maximum; returns 400 Bad Request if exceeded
-- What happens when the same merchant has both positive and negative transactions (refunds)? → Include in net calculation; merchant total = expenses minus refunds
+- What happens when the same merchant has both positive and negative transactions (refunds)? → Keep split; show positive and negative amounts as separate entries
 - How does category breakdown handle transactions with $0 amounts?
 - What happens when requesting monthly granularity for a single day?
 
@@ -117,7 +117,7 @@ As a user analyzing expense patterns, I need to see spending grouped by vendor f
 - **FR-012**: Subscription analytics MUST support filtering by minConfidence (high/medium/low) and frequency types
 - **FR-013**: System MUST handle empty result sets gracefully with 200 status and empty arrays (not 404)
 - **FR-014**: System MUST reject date ranges exceeding 5 years (1,826 days) with 400 Bad Request and descriptive error message
-- **FR-015**: System MUST include refund transactions (negative amounts) in net calculations; merchant/category totals represent expenses minus refunds
+- **FR-015**: System MUST keep positive (expense) and negative (refund) transactions as separate line items in analytics results; no automatic netting
 
 ### Key Entities *(include if feature involves data)*
 
@@ -162,7 +162,7 @@ As a user analyzing expense patterns, I need to see spending grouped by vendor f
 ### Session 2025-12-31
 
 - Q: Should the API enforce a maximum date range to prevent performance degradation? → A: 5 years maximum
-- Q: How should refunds affect analytics calculations? → A: Include in net calculation (expenses minus refunds)
+- Q: How should refunds affect analytics calculations? → A: Keep split; positive (expenses) and negative (refunds) shown as separate line items
 
 ## Assumptions
 
