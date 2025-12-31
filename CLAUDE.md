@@ -53,6 +53,8 @@ Reference data (departments, projects, GL accounts) is synced from Viewpoint Vis
 - TypeScript 5.7+ with React 18.3+ + Tailwind CSS 4.x, shadcn/ui (Radix primitives), next-themes, Framer Motion, class-variance-authority (015-dual-theme-system)
 - localStorage (theme preference via next-themes) (015-dual-theme-system)
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Microsoft.Identity.Web, FluentValidation (016-user-preferences-api)
+- Markdown (GitHub Flavored Markdown) + None (documentation only) (017-how-to-guide)
+- Repository files in `docs/user-guide/` directory (018-end-user-guide)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -141,9 +143,9 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 018-end-user-guide: Added Markdown (GitHub Flavored Markdown) + None (documentation only)
+- 017-how-to-guide: Added Markdown (GitHub Flavored Markdown) + None (documentation only)
 - 016-user-preferences-api: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Microsoft.Identity.Web, FluentValidation
-- 015-dual-theme-system: Added TypeScript 5.7+ with React 18.3+ + Tailwind CSS 4.x, shadcn/ui (Radix primitives), next-themes, Framer Motion, class-variance-authority
-- 014-api-error-resolution: Added PostgreSQL 15+ (Supabase self-hosted with pgvector)
   - Entities: ImportJob (for tracking cache warming import jobs)
   - Services: CacheWarmingService (historical data import, job management)
   - Jobs: CacheWarmingJob (Hangfire background processing)
