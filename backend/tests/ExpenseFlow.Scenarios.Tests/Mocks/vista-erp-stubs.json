@@ -1,0 +1,133 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "GET",
+        "urlPattern": "/api/vista/departments.*"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "departments": [
+            {
+              "departmentId": "1001",
+              "name": "Engineering",
+              "code": "ENG",
+              "active": true
+            },
+            {
+              "departmentId": "1002",
+              "name": "Marketing",
+              "code": "MKT",
+              "active": true
+            },
+            {
+              "departmentId": "1003",
+              "name": "Finance",
+              "code": "FIN",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "urlPattern": "/api/vista/projects.*"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "projects": [
+            {
+              "projectId": "P001",
+              "name": "Website Redesign",
+              "code": "WEB-2024",
+              "active": true,
+              "departmentId": "1001"
+            },
+            {
+              "projectId": "P002",
+              "name": "Mobile App Development",
+              "code": "MOB-2024",
+              "active": true,
+              "departmentId": "1001"
+            },
+            {
+              "projectId": "P003",
+              "name": "Q4 Marketing Campaign",
+              "code": "MKT-Q4",
+              "active": true,
+              "departmentId": "1002"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "urlPattern": "/api/vista/gl-accounts.*"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "accounts": [
+            {
+              "accountCode": "6100",
+              "description": "Travel - Air",
+              "active": true
+            },
+            {
+              "accountCode": "6110",
+              "description": "Travel - Lodging",
+              "active": true
+            },
+            {
+              "accountCode": "6120",
+              "description": "Travel - Meals",
+              "active": true
+            },
+            {
+              "accountCode": "6200",
+              "description": "Office Supplies",
+              "active": true
+            },
+            {
+              "accountCode": "6300",
+              "description": "Professional Services",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "urlPattern": "/api/vista/expense-reports.*"
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "vistaReportId": "VR-2024-001",
+          "status": "Submitted",
+          "submittedAt": "2024-12-15T10:30:00Z"
+        }
+      }
+    }
+  ]
+}

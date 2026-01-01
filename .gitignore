@@ -42,6 +42,24 @@ packages/
 project.lock.json
 .vs/
 
+# Test Results and Coverage
+TestResults/
+test-results/
+coverage/
+*.coverage
+*.coveragexml
+coverage.json
+coverage.cobertura.xml
+lcov.info
+*.trx
+
+# Testcontainers
+.testcontainers/
+
+# WireMock mappings (generated, not source)
+__files/
+mappings/
+
 # Logs
 *.log
 logs/

@@ -1,0 +1,62 @@
+name: CI Quick (Commit)
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '!**/*.md'
+
+concurrency:
+  group: ci-quick-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  quick-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+
+      - name: Restore
+        run: dotnet restore backend/ExpenseFlow.sln
+
+      - name: Build
+        run: dotnet build backend/ExpenseFlow.sln --no-restore --configuration Release
+
+      - name: Run Unit Tests
+        run: |
+          dotnet test backend/tests/ExpenseFlow.Core.Tests \
+            --no-build \
+            --configuration Release \
+            --logger "trx;LogFileName=unit-results.trx" \
+            --results-directory ./test-results
+
+      - name: Run Contract Tests
+        run: |
+          dotnet test backend/tests/ExpenseFlow.Contracts.Tests \
+            --no-build \
+            --configuration Release \
+            --logger "trx;LogFileName=contract-results.trx" \
+            --results-directory ./test-results
+
+      - name: Publish Test Results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Quick Tests
+          path: ./test-results/*.trx
+          reporter: dotnet-trx
+          fail-on-error: true

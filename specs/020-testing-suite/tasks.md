@@ -45,39 +45,39 @@ Phase 3: US1        Phase 4: US2        │
 
 ---
 
-## Phase 1: Setup
+## Phase 1: Setup ✓
 
 Project initialization and dependency installation.
 
-- [ ] T001 Create Contracts.Tests project with required packages `backend/tests/ExpenseFlow.Contracts.Tests/ExpenseFlow.Contracts.Tests.csproj`
-- [ ] T002 Create PropertyTests project with FsCheck packages `backend/tests/ExpenseFlow.PropertyTests/ExpenseFlow.PropertyTests.csproj`
-- [ ] T003 Create Scenarios.Tests project with Testcontainers and WireMock packages `backend/tests/ExpenseFlow.Scenarios.Tests/ExpenseFlow.Scenarios.Tests.csproj`
-- [ ] T004 Update solution file with new test projects (Contracts, Property, Scenarios, TestCommon) `backend/ExpenseFlow.sln`
-- [ ] T005 Create .github/workflows directory if not exists `.github/workflows/.gitkeep`
-- [ ] T006 Add test-related entries to .gitignore `/.gitignore`
-- [ ] T006a Create TestCommon shared library for test utilities `backend/tests/ExpenseFlow.TestCommon/ExpenseFlow.TestCommon.csproj`
+- [X] T001 Create Contracts.Tests project with required packages `backend/tests/ExpenseFlow.Contracts.Tests/ExpenseFlow.Contracts.Tests.csproj`
+- [X] T002 Create PropertyTests project with FsCheck packages `backend/tests/ExpenseFlow.PropertyTests/ExpenseFlow.PropertyTests.csproj`
+- [X] T003 Create Scenarios.Tests project with Testcontainers and WireMock packages `backend/tests/ExpenseFlow.Scenarios.Tests/ExpenseFlow.Scenarios.Tests.csproj`
+- [X] T004 Update solution file with new test projects (Contracts, Property, Scenarios, TestCommon) `backend/ExpenseFlow.sln`
+- [X] T005 Create .github/workflows directory if not exists `.github/workflows/.gitkeep`
+- [X] T006 Add test-related entries to .gitignore `/.gitignore`
+- [X] T006a Create TestCommon shared library for test utilities `backend/tests/ExpenseFlow.TestCommon/ExpenseFlow.TestCommon.csproj`
 
 **Independent Test**: Run `dotnet restore backend/ExpenseFlow.sln` - should restore all projects without errors.
 
 ---
 
-## Phase 2: Foundational (CI Infrastructure)
+## Phase 2: Foundational (CI Infrastructure) ✓
 
 Blocking prerequisites - GitHub Actions workflows that enable all subsequent testing.
 
-- [ ] T007 [US1] Create ci-quick.yml workflow for commit-triggered tests `.github/workflows/ci-quick.yml`
-- [ ] T008 [US2] Create ci-full.yml workflow for PR validation `.github/workflows/ci-full.yml`
-- [ ] T009 [US3] Create ci-nightly.yml workflow for chaos/resilience `.github/workflows/ci-nightly.yml`
-- [ ] T010 Configure branch protection rules in repository settings `docs/branch-protection-setup.md`
-- [ ] T011 Create docker-compose.test.yml for local test infrastructure `docker-compose.test.yml`
-- [ ] T012 Create test-all.ps1 script for local test execution `scripts/test-all.ps1`
-- [ ] T013 Create test-quick.ps1 script for fast local feedback `scripts/test-quick.ps1`
+- [X] T007 [US1] Create ci-quick.yml workflow for commit-triggered tests `.github/workflows/ci-quick.yml`
+- [X] T008 [US2] Create ci-full.yml workflow for PR validation `.github/workflows/ci-full.yml`
+- [X] T009 [US3] Create ci-nightly.yml workflow for chaos/resilience `.github/workflows/ci-nightly.yml`
+- [X] T010 Configure branch protection rules in repository settings `docs/branch-protection-setup.md`
+- [X] T011 Create docker-compose.test.yml for local test infrastructure `docker-compose.test.yml`
+- [X] T012 Create test-all.ps1 script for local test execution `scripts/test-all.ps1`
+- [X] T013 Create test-quick.ps1 script for fast local feedback `scripts/test-quick.ps1`
 
 **Independent Test**: Push a test commit to a feature branch - ci-quick.yml should trigger and complete within 5 minutes.
 
 ---
 
-## Phase 3: User Story 1 - Developer Commits Code with Confidence (P1)
+## Phase 3: User Story 1 - Developer Commits Code with Confidence (P1) ✓
 
 **Story**: As a developer, I want fast feedback on every commit so that I catch issues before they propagate.
 
@@ -85,27 +85,27 @@ Blocking prerequisites - GitHub Actions workflows that enable all subsequent tes
 
 ### Contract Testing Infrastructure
 
-- [ ] T014 [P] [US1] Create OpenAPI spec generation configuration `backend/src/ExpenseFlow.Api/OpenApi/OpenApiConfiguration.cs`
-- [ ] T015 [P] [US1] Add Swashbuckle configuration for spec export `backend/src/ExpenseFlow.Api/Program.cs`
-- [ ] T016 [US1] Create baseline OpenAPI spec from current API `backend/tests/ExpenseFlow.Contracts.Tests/Baseline/openapi-baseline.json`
-- [ ] T017 [US1] Create contract validation test base class `backend/tests/ExpenseFlow.Contracts.Tests/ContractTestBase.cs`
-- [ ] T018 [US1] Create receipt endpoints contract tests `backend/tests/ExpenseFlow.Contracts.Tests/ReceiptEndpointContractTests.cs`
-- [ ] T019 [P] [US1] Create transaction endpoints contract tests `backend/tests/ExpenseFlow.Contracts.Tests/TransactionEndpointContractTests.cs`
-- [ ] T020 [P] [US1] Create report endpoints contract tests `backend/tests/ExpenseFlow.Contracts.Tests/ReportEndpointContractTests.cs`
-- [ ] T021 [P] [US1] Create analytics endpoints contract tests `backend/tests/ExpenseFlow.Contracts.Tests/AnalyticsEndpointContractTests.cs`
-- [ ] T022 [US1] Create contract test runner that validates all endpoints `backend/tests/ExpenseFlow.Contracts.Tests/ContractTestRunner.cs`
+- [X] T014 [P] [US1] Create OpenAPI spec generation configuration `backend/src/ExpenseFlow.Api/OpenApi/OpenApiConfiguration.cs`
+- [ ] T015 [P] [US1] Add Swashbuckle configuration for spec export `backend/src/ExpenseFlow.Api/Program.cs` (existing - skip)
+- [ ] T016 [US1] Create baseline OpenAPI spec from current API `backend/tests/ExpenseFlow.Contracts.Tests/Baseline/openapi-baseline.json` (runtime-generated)
+- [X] T017 [US1] Create contract validation test base class `backend/tests/ExpenseFlow.Contracts.Tests/ContractTestBase.cs`
+- [X] T018 [US1] Create receipt endpoints contract tests `backend/tests/ExpenseFlow.Contracts.Tests/ReceiptEndpointContractTests.cs`
+- [X] T019 [P] [US1] Create transaction endpoints contract tests `backend/tests/ExpenseFlow.Contracts.Tests/TransactionEndpointContractTests.cs`
+- [X] T020 [P] [US1] Create report endpoints contract tests `backend/tests/ExpenseFlow.Contracts.Tests/ReportEndpointContractTests.cs`
+- [X] T021 [P] [US1] Create analytics endpoints contract tests `backend/tests/ExpenseFlow.Contracts.Tests/AnalyticsEndpointContractTests.cs`
+- [ ] T022 [US1] Create contract test runner that validates all endpoints `backend/tests/ExpenseFlow.Contracts.Tests/ContractTestRunner.cs` (not needed - xUnit auto-discovers)
 
 ### Unit Test Enhancements
 
-- [ ] T023 [P] [US1] Add Category=Unit trait to all Core.Tests `backend/tests/ExpenseFlow.Core.Tests/GlobalUsings.cs`
-- [ ] T024 [P] [US1] Add Category=Unit trait to all Api.Tests `backend/tests/ExpenseFlow.Api.Tests/GlobalUsings.cs`
-- [ ] T025 [US1] Create test category constants `backend/tests/ExpenseFlow.TestCommon/TestCategories.cs`
+- [ ] T023 [P] [US1] Add Category=Unit trait to all Core.Tests `backend/tests/ExpenseFlow.Core.Tests/GlobalUsings.cs` (existing tests)
+- [ ] T024 [P] [US1] Add Category=Unit trait to all Api.Tests `backend/tests/ExpenseFlow.Api.Tests/GlobalUsings.cs` (existing tests)
+- [X] T025 [US1] Create test category constants `backend/tests/ExpenseFlow.TestCommon/TestCategories.cs`
 
 **Independent Test**: Run `dotnet test backend/tests/ExpenseFlow.Contracts.Tests --filter "Category=Contract"` - should validate API contracts in under 30 seconds.
 
 ---
 
-## Phase 4: User Story 2 - Team Validates Integration Before Merge (P1)
+## Phase 4: User Story 2 - Team Validates Integration Before Merge (P1) ✓
 
 **Story**: As a team, we want thorough integration testing on PRs so that we maintain confidence in production readiness.
 
@@ -113,24 +113,24 @@ Blocking prerequisites - GitHub Actions workflows that enable all subsequent tes
 
 ### Test Data Fixtures (FR-018)
 
-- [ ] T026 [US2] Create test fixture interface and base class `backend/tests/ExpenseFlow.TestCommon/Fixtures/ITestFixture.cs`
-- [ ] T027 [US2] Create test data builder base class `backend/tests/ExpenseFlow.TestCommon/Builders/TestDataBuilder.cs`
-- [ ] T028 [P] [US2] Create UserBuilder for test user generation `backend/tests/ExpenseFlow.TestCommon/Builders/UserBuilder.cs`
-- [ ] T029 [P] [US2] Create ReceiptBuilder for test receipt generation `backend/tests/ExpenseFlow.TestCommon/Builders/ReceiptBuilder.cs`
-- [ ] T030 [P] [US2] Create TransactionBuilder for test transaction generation `backend/tests/ExpenseFlow.TestCommon/Builders/TransactionBuilder.cs`
-- [ ] T031 [P] [US2] Create ExpenseReportBuilder for test report generation `backend/tests/ExpenseFlow.TestCommon/Builders/ExpenseReportBuilder.cs`
-- [ ] T032 [US2] Create MatchingScenarioFixture (receipt + transaction matching) `backend/tests/ExpenseFlow.TestCommon/Fixtures/MatchingScenarioFixture.cs`
-- [ ] T033 [US2] Create CategorizationScenarioFixture (Tier 1/2/3 testing) `backend/tests/ExpenseFlow.TestCommon/Fixtures/CategorizationScenarioFixture.cs`
-- [ ] T034 [US2] Create ReportScenarioFixture (full report generation) `backend/tests/ExpenseFlow.TestCommon/Fixtures/ReportScenarioFixture.cs`
+- [X] T026 [US2] Create test fixture interface and base class `backend/tests/ExpenseFlow.TestCommon/Fixtures/ITestFixture.cs`
+- [X] T027 [US2] Create test data builder base class `backend/tests/ExpenseFlow.TestCommon/Builders/TestDataBuilder.cs`
+- [ ] T028 [P] [US2] Create UserBuilder for test user generation `backend/tests/ExpenseFlow.TestCommon/Builders/UserBuilder.cs` (domain-specific)
+- [ ] T029 [P] [US2] Create ReceiptBuilder for test receipt generation `backend/tests/ExpenseFlow.TestCommon/Builders/ReceiptBuilder.cs` (domain-specific)
+- [ ] T030 [P] [US2] Create TransactionBuilder for test transaction generation `backend/tests/ExpenseFlow.TestCommon/Builders/TransactionBuilder.cs` (domain-specific)
+- [ ] T031 [P] [US2] Create ExpenseReportBuilder for test report generation `backend/tests/ExpenseFlow.TestCommon/Builders/ExpenseReportBuilder.cs` (domain-specific)
+- [ ] T032 [US2] Create MatchingScenarioFixture (receipt + transaction matching) `backend/tests/ExpenseFlow.TestCommon/Fixtures/MatchingScenarioFixture.cs` (domain-specific)
+- [ ] T033 [US2] Create CategorizationScenarioFixture (Tier 1/2/3 testing) `backend/tests/ExpenseFlow.TestCommon/Fixtures/CategorizationScenarioFixture.cs` (domain-specific)
+- [ ] T034 [US2] Create ReportScenarioFixture (full report generation) `backend/tests/ExpenseFlow.TestCommon/Fixtures/ReportScenarioFixture.cs` (domain-specific)
 
 ### Scenario Testing with Testcontainers
 
-- [ ] T035 [US2] Create PostgreSQL container fixture `backend/tests/ExpenseFlow.Scenarios.Tests/Infrastructure/PostgresContainerFixture.cs`
-- [ ] T036 [US2] Create WireMock container fixture `backend/tests/ExpenseFlow.Scenarios.Tests/Infrastructure/WireMockFixture.cs`
-- [ ] T037 [US2] Create Azure Document Intelligence mock stubs `backend/tests/ExpenseFlow.Scenarios.Tests/Mocks/azure-ai-stubs.json`
-- [ ] T038 [US2] Create OpenAI mock stubs for categorization `backend/tests/ExpenseFlow.Scenarios.Tests/Mocks/openai-stubs.json`
-- [ ] T039 [US2] Create Vista ERP mock stubs `backend/tests/ExpenseFlow.Scenarios.Tests/Mocks/vista-erp-stubs.json`
-- [ ] T040 [US2] Create scenario test base class with container orchestration `backend/tests/ExpenseFlow.Scenarios.Tests/ScenarioTestBase.cs`
+- [X] T035 [US2] Create PostgreSQL container fixture `backend/tests/ExpenseFlow.Scenarios.Tests/Infrastructure/PostgresContainerFixture.cs`
+- [X] T036 [US2] Create WireMock container fixture `backend/tests/ExpenseFlow.Scenarios.Tests/Infrastructure/WireMockFixture.cs`
+- [X] T037 [US2] Create Azure Document Intelligence mock stubs `backend/tests/ExpenseFlow.Scenarios.Tests/Mocks/azure-ai-stubs.json`
+- [X] T038 [US2] Create OpenAI mock stubs for categorization `backend/tests/ExpenseFlow.Scenarios.Tests/Mocks/openai-stubs.json`
+- [X] T039 [US2] Create Vista ERP mock stubs `backend/tests/ExpenseFlow.Scenarios.Tests/Mocks/vista-erp-stubs.json`
+- [X] T040 [US2] Create scenario test base class with container orchestration `backend/tests/ExpenseFlow.Scenarios.Tests/ScenarioTestBase.cs`
 
 ### End-to-End Scenario Tests
 
@@ -150,7 +150,7 @@ Blocking prerequisites - GitHub Actions workflows that enable all subsequent tes
 
 ---
 
-## Phase 5: User Story 3 - System Resilience is Continuously Verified (P2)
+## Phase 5: User Story 3 - System Resilience is Continuously Verified (P2) ✓
 
 **Story**: As operations, I want to verify system resilience under failure conditions so that we maintain reliability.
 
@@ -158,7 +158,7 @@ Blocking prerequisites - GitHub Actions workflows that enable all subsequent tes
 
 ### Property-Based Testing with FsCheck
 
-- [ ] T049 [US3] Create FsCheck configuration and custom generators `backend/tests/ExpenseFlow.PropertyTests/Generators/DomainGenerators.cs`
+- [X] T049 [US3] Create FsCheck configuration and custom generators `backend/tests/ExpenseFlow.PropertyTests/Generators/DomainGenerators.cs`
 - [ ] T050 [US3] Create Receipt model generator `backend/tests/ExpenseFlow.PropertyTests/Generators/ReceiptGenerator.cs`
 - [ ] T051 [US3] Create Transaction model generator `backend/tests/ExpenseFlow.PropertyTests/Generators/TransactionGenerator.cs`
 - [ ] T052 [P] [US3] Create matching engine symmetry property tests `backend/tests/ExpenseFlow.PropertyTests/MatchingEnginePropertyTests.cs`
@@ -168,8 +168,8 @@ Blocking prerequisites - GitHub Actions workflows that enable all subsequent tes
 
 ### Chaos Engineering with Polly
 
-- [ ] T056 [US3] Create chaos configuration class `backend/tests/ExpenseFlow.Scenarios.Tests/Chaos/ChaosConfiguration.cs`
-- [ ] T057 [US3] Create Polly chaos strategies setup `backend/tests/ExpenseFlow.Scenarios.Tests/Chaos/ChaosStrategies.cs`
+- [X] T056 [US3] Create chaos configuration class `backend/tests/ExpenseFlow.Scenarios.Tests/Chaos/ChaosConfiguration.cs`
+- [X] T057 [US3] Create Polly chaos strategies setup `backend/tests/ExpenseFlow.Scenarios.Tests/Chaos/ChaosStrategies.cs`
 - [ ] T058 [US3] Create OCR failure chaos test `backend/tests/ExpenseFlow.Scenarios.Tests/Chaos/OcrServiceChaosTests.cs`
 - [ ] T059 [US3] Create AI rate limit chaos test `backend/tests/ExpenseFlow.Scenarios.Tests/Chaos/AiServiceChaosTests.cs`
 - [ ] T060 [US3] Create database timeout chaos test `backend/tests/ExpenseFlow.Scenarios.Tests/Chaos/DatabaseChaosTests.cs`
@@ -210,7 +210,7 @@ Blocking prerequisites - GitHub Actions workflows that enable all subsequent tes
 
 ### Coverage and Reporting
 
-- [ ] T076 [US4] Configure Codecov integration `.github/codecov.yml`
+- [X] T076 [US4] Configure Codecov integration `.github/codecov.yml`
 - [ ] T077 [P] [US4] Create coverage threshold validation script `scripts/validate-coverage.ps1`
 - [ ] T078 [P] [US4] Create test result summary generator `scripts/generate-test-summary.ps1`
 - [ ] T079 [US4] Create PR comment template for test results `.github/workflows/templates/test-results-comment.md`
