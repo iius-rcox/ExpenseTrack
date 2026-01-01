@@ -97,7 +97,7 @@ Developers and team leads can easily understand test health, identify flaky test
 - **FR-004**: System MUST provide clear pass/fail status visible on GitHub commits and PRs
 - **FR-005**: System MUST isolate test databases using containers to prevent test interference
 - **FR-006**: System MUST mock external services (Azure AI, Vista ERP) consistently across test runs
-- **FR-007**: System MUST generate test reports with coverage metrics and failure details
+- **FR-007**: System MUST generate test reports via GitHub Actions workflow summaries (GITHUB_STEP_SUMMARY) with coverage metrics from Codecov and failure details from test result annotations
 - **FR-008**: System MUST support running tests locally with the same configuration as CI
 - **FR-009**: System MUST cancel redundant test runs when new commits are pushed to the same branch
 - **FR-010**: System MUST cache test dependencies to minimize pipeline execution time

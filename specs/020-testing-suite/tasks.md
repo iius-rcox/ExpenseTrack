@@ -52,9 +52,10 @@ Project initialization and dependency installation.
 - [ ] T001 Create Contracts.Tests project with required packages `backend/tests/ExpenseFlow.Contracts.Tests/ExpenseFlow.Contracts.Tests.csproj`
 - [ ] T002 Create PropertyTests project with FsCheck packages `backend/tests/ExpenseFlow.PropertyTests/ExpenseFlow.PropertyTests.csproj`
 - [ ] T003 Create Scenarios.Tests project with Testcontainers and WireMock packages `backend/tests/ExpenseFlow.Scenarios.Tests/ExpenseFlow.Scenarios.Tests.csproj`
-- [ ] T004 Update solution file with new test projects `backend/ExpenseFlow.sln`
+- [ ] T004 Update solution file with new test projects (Contracts, Property, Scenarios, TestCommon) `backend/ExpenseFlow.sln`
 - [ ] T005 Create .github/workflows directory if not exists `.github/workflows/.gitkeep`
 - [ ] T006 Add test-related entries to .gitignore `/.gitignore`
+- [ ] T006a Create TestCommon shared library for test utilities `backend/tests/ExpenseFlow.TestCommon/ExpenseFlow.TestCommon.csproj`
 
 **Independent Test**: Run `dotnet restore backend/ExpenseFlow.sln` - should restore all projects without errors.
 
@@ -216,8 +217,8 @@ Blocking prerequisites - GitHub Actions workflows that enable all subsequent tes
 
 ### Pipeline Monitoring (FR-019)
 
-- [ ] T080 [US4] Create pipeline metrics collection job `backend/src/ExpenseFlow.Infrastructure/Jobs/PipelineMetricsJob.cs`
-- [ ] T081 [US4] Create test health dashboard data endpoint `backend/src/ExpenseFlow.Api/Controllers/TestHealthController.cs`
+> **Note**: FR-019 specifies using GitHub Actions built-in workflow insights. No custom endpoints required.
+> Pipeline duration trends and failure rates are available at: `https://github.com/{org}/{repo}/actions`
 
 **Independent Test**: Push a PR with intentional test failure - should see formatted test results in PR comment and coverage report.
 
@@ -243,14 +244,14 @@ Final validation and documentation.
 
 | Phase | Tasks | Parallelizable | Blocking |
 |-------|-------|----------------|----------|
-| 1. Setup | 6 | 0 | Yes |
+| 1. Setup | 7 | 0 | Yes |
 | 2. Foundational | 7 | 0 | Yes |
 | 3. US1 (Fast Feedback) | 12 | 7 | No |
 | 4. US2 (Integration) | 23 | 8 | No |
 | 5. US3 (Resilience) | 16 | 5 | No |
-| 6. US4 (Visibility) | 17 | 2 | No |
+| 6. US4 (Visibility) | 15 | 2 | No |
 | 7. Polish | 7 | 0 | No |
-| **Total** | **88** | **22** | - |
+| **Total** | **87** | **22** | - |
 
 ---
 
