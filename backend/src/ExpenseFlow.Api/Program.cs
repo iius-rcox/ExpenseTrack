@@ -75,18 +75,21 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("AdminOnly", policy =>
         policy.RequireClaim("roles", "Admin", "ExpenseFlow.Admin"));
 
-// Configure Hangfire
-builder.Services.AddHangfire(config => config
-    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-    .UseSimpleAssemblyNameTypeSerializer()
-    .UseRecommendedSerializerSettings()
-    .UsePostgreSqlStorage(options =>
-        options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("PostgreSQL"))));
-
-builder.Services.AddHangfireServer(options =>
+// Configure Hangfire (skip for test environments that don't need background jobs)
+if (!builder.Environment.IsEnvironment("Testing"))
 {
-    options.WorkerCount = builder.Configuration.GetValue("Hangfire:WorkerCount", 2);
-});
+    builder.Services.AddHangfire(config => config
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UsePostgreSqlStorage(options =>
+            options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("PostgreSQL"))));
+
+    builder.Services.AddHangfireServer(options =>
+    {
+        options.WorkerCount = builder.Configuration.GetValue("Hangfire:WorkerCount", 2);
+    });
+}
 
 // Add memory cache for session storage
 builder.Services.AddMemoryCache();
@@ -209,46 +212,49 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Hangfire Dashboard (admin only)
-app.UseHangfireDashboard(
-    builder.Configuration.GetValue("Hangfire:DashboardPath", "/hangfire"),
-    new DashboardOptions
-    {
-        Authorization = new[] { new ExpenseFlow.Api.Filters.HangfireAuthorizationFilter() },
-        DashboardTitle = "ExpenseFlow Jobs"
-    });
+// Hangfire Dashboard and recurring jobs (skip for test environments)
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseHangfireDashboard(
+        builder.Configuration.GetValue("Hangfire:DashboardPath", "/hangfire"),
+        new DashboardOptions
+        {
+            Authorization = new[] { new ExpenseFlow.Api.Filters.HangfireAuthorizationFilter() },
+            DashboardTitle = "ExpenseFlow Jobs"
+        });
 
-// Configure recurring jobs
-RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.ReferenceDataSyncJob>(
-    "sync-reference-data",
-    job => job.ExecuteAsync(CancellationToken.None),
-    "0 2 * * *", // Daily at 2 AM
-    new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+    // Configure recurring jobs
+    RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.ReferenceDataSyncJob>(
+        "sync-reference-data",
+        job => job.ExecuteAsync(CancellationToken.None),
+        "0 2 * * *", // Daily at 2 AM
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
-// Sprint 5: Alias confidence decay job
-RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.AliasConfidenceDecayJob>(
-    "alias-confidence-decay",
-    job => job.ExecuteAsync(CancellationToken.None),
-    "0 2 * * 0", // Every Sunday at 2 AM
-    new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+    // Sprint 5: Alias confidence decay job
+    RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.AliasConfidenceDecayJob>(
+        "alias-confidence-decay",
+        job => job.ExecuteAsync(CancellationToken.None),
+        "0 2 * * 0", // Every Sunday at 2 AM
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
-// Sprint 6: Stale embedding cleanup job (monthly)
-RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.EmbeddingCleanupJob>(
-    "embedding-cleanup",
-    job => job.ExecuteAsync(CancellationToken.None),
-    "0 3 1 * *", // First day of each month at 3 AM
-    new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+    // Sprint 6: Stale embedding cleanup job (monthly)
+    RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.EmbeddingCleanupJob>(
+        "embedding-cleanup",
+        job => job.ExecuteAsync(CancellationToken.None),
+        "0 3 1 * *", // First day of each month at 3 AM
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
-// Sprint 7: Subscription alert check job (monthly)
-RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.SubscriptionAlertJob>(
-    "subscription-alert-check",
-    job => job.ExecuteAsync(CancellationToken.None),
-    "0 4 1 * *", // First day of each month at 4 AM
-    new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+    // Sprint 7: Subscription alert check job (monthly)
+    RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.SubscriptionAlertJob>(
+        "subscription-alert-check",
+        job => job.ExecuteAsync(CancellationToken.None),
+        "0 4 1 * *", // First day of each month at 4 AM
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
-// Trigger reference data sync on startup to ensure data is populated
-RecurringJob.TriggerJob("sync-reference-data");
-Log.Information("Triggered initial reference data sync job");
+    // Trigger reference data sync on startup to ensure data is populated
+    RecurringJob.TriggerJob("sync-reference-data");
+    Log.Information("Triggered initial reference data sync job");
+}
 
 app.MapControllers();
 

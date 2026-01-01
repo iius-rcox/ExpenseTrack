@@ -1,6 +1,5 @@
 using System.Net;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
 namespace ExpenseFlow.Contracts.Tests;
@@ -12,7 +11,7 @@ namespace ExpenseFlow.Contracts.Tests;
 [Trait("Category", "Contract")]
 public class AnalyticsEndpointContractTests : ContractTestBase
 {
-    public AnalyticsEndpointContractTests(WebApplicationFactory<Program> factory)
+    public AnalyticsEndpointContractTests(ContractTestWebApplicationFactory factory)
         : base(factory)
     {
     }

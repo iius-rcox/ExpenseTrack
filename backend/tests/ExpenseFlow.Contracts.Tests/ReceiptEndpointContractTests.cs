@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
 namespace ExpenseFlow.Contracts.Tests;
@@ -13,7 +12,7 @@ namespace ExpenseFlow.Contracts.Tests;
 [Trait("Category", "Contract")]
 public class ReceiptEndpointContractTests : ContractTestBase
 {
-    public ReceiptEndpointContractTests(WebApplicationFactory<Program> factory)
+    public ReceiptEndpointContractTests(ContractTestWebApplicationFactory factory)
         : base(factory)
     {
     }

@@ -2,12 +2,13 @@ using Polly;
 using Polly.Simmy;
 using Polly.Simmy.Fault;
 using Polly.Simmy.Latency;
+using Polly.Simmy.Outcomes;
 
 namespace ExpenseFlow.Scenarios.Tests.Chaos;
 
 /// <summary>
 /// Factory for creating Polly chaos engineering strategies.
-/// Uses Polly v8 ResiliencePipeline patterns.
+/// Uses Polly v8 ResiliencePipeline patterns with Simmy extensions.
 /// </summary>
 public static class ChaosStrategies
 {
@@ -77,25 +78,27 @@ public static class ChaosStrategies
     public static ResiliencePipeline<HttpResponseMessage> CreateApiChaosStrategy(ChaosConfiguration config)
     {
         return new ResiliencePipelineBuilder<HttpResponseMessage>()
-            .AddChaosResult(new ChaosResultStrategyOptions<HttpResponseMessage>
+            .AddChaosOutcome(new ChaosOutcomeStrategyOptions<HttpResponseMessage>
             {
                 InjectionRate = config.InjectionRate,
                 EnabledGenerator = static args => new ValueTask<bool>(
                     bool.TryParse(
                         Environment.GetEnvironmentVariable("CHAOS_ENABLED"),
                         out var enabled) && enabled),
-                ResultGenerator = static args =>
+                OutcomeGenerator = static args =>
                 {
                     // Randomly choose between 429 and 503
                     var statusCode = Random.Shared.Next(2) == 0
                         ? System.Net.HttpStatusCode.TooManyRequests
                         : System.Net.HttpStatusCode.ServiceUnavailable;
 
-                    return new ValueTask<HttpResponseMessage?>(
-                        new HttpResponseMessage(statusCode)
-                        {
-                            Content = new StringContent($"{{\"error\":\"Chaos: {statusCode}\"}}")
-                        });
+                    var response = new HttpResponseMessage(statusCode)
+                    {
+                        Content = new StringContent($"{{\"error\":\"Chaos: {statusCode}\"}}")
+                    };
+
+                    return new ValueTask<Outcome<HttpResponseMessage>?>(
+                        Outcome.FromResult(response));
                 }
             })
             .Build();

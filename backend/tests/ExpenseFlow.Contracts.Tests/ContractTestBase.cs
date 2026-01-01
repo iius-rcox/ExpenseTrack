@@ -1,7 +1,17 @@
 using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using ExpenseFlow.Infrastructure.Data;
 using FluentAssertions;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Microsoft.OpenApi.Readers;
 using Xunit;
@@ -9,16 +19,94 @@ using Xunit;
 namespace ExpenseFlow.Contracts.Tests;
 
 /// <summary>
+/// Extension method to handle IDictionary GetValueOrDefault for OpenAPI operations.
+/// </summary>
+internal static class DictionaryExtensions
+{
+    public static TValue? GetValueOrDefault<TKey, TValue>(
+        this IDictionary<TKey, TValue> dictionary,
+        TKey key) where TKey : notnull
+    {
+        return dictionary.TryGetValue(key, out var value) ? value : default;
+    }
+}
+
+/// <summary>
+/// Custom WebApplicationFactory for contract tests.
+/// Sets Testing environment to skip Hangfire and uses in-memory database.
+/// </summary>
+public class ContractTestWebApplicationFactory : WebApplicationFactory<Program>
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
+
+        builder.ConfigureTestServices(services =>
+        {
+            // Remove the real DbContext registration
+            var descriptor = services.SingleOrDefault(
+                d => d.ServiceType == typeof(DbContextOptions<ExpenseFlowDbContext>));
+            if (descriptor != null)
+                services.Remove(descriptor);
+
+            // Add in-memory database for contract testing
+            services.AddDbContext<ExpenseFlowDbContext>(options =>
+            {
+                options.UseInMemoryDatabase("ContractTestDb_" + Guid.NewGuid());
+            });
+
+            // Configure test authentication
+            services.AddAuthentication(TestAuthHandler.SchemeName)
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
+                    TestAuthHandler.SchemeName, null);
+        });
+    }
+}
+
+/// <summary>
+/// Test authentication handler for contract tests.
+/// </summary>
+public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+{
+    public const string SchemeName = "TestScheme";
+    public const string TestObjectId = "test-object-id";
+    public const string TestEmail = "test@example.com";
+    public const string TestName = "Test User";
+
+    public TestAuthHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder) : base(options, logger, encoder)
+    {
+    }
+
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, TestObjectId),
+            new Claim(ClaimTypes.Email, TestEmail),
+            new Claim(ClaimTypes.Name, TestName),
+            new Claim("oid", TestObjectId)
+        };
+        var identity = new ClaimsIdentity(claims, SchemeName);
+        var principal = new ClaimsPrincipal(identity);
+        var ticket = new AuthenticationTicket(principal, SchemeName);
+        return Task.FromResult(AuthenticateResult.Success(ticket));
+    }
+}
+
+/// <summary>
 /// Base class for contract tests that validate API responses against OpenAPI specifications.
 /// </summary>
-public abstract class ContractTestBase : IClassFixture<WebApplicationFactory<Program>>
+public abstract class ContractTestBase : IClassFixture<ContractTestWebApplicationFactory>
 {
     protected readonly HttpClient Client;
-    protected readonly WebApplicationFactory<Program> Factory;
+    protected readonly ContractTestWebApplicationFactory Factory;
     private static OpenApiDocument? _cachedSpec;
     private static readonly object _lock = new();
 
-    protected ContractTestBase(WebApplicationFactory<Program> factory)
+    protected ContractTestBase(ContractTestWebApplicationFactory factory)
     {
         Factory = factory;
         Client = factory.CreateClient(new WebApplicationFactoryClientOptions
