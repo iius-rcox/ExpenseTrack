@@ -104,8 +104,8 @@ public class ExpenseLineTests
     }
 
     [Theory]
-    [InlineData(MissingReceiptJustification.ReceiptNotProvided)]
-    [InlineData(MissingReceiptJustification.LostReceipt)]
+    [InlineData(MissingReceiptJustification.NotProvided)]
+    [InlineData(MissingReceiptJustification.Lost)]
     [InlineData(MissingReceiptJustification.DigitalSubscription)]
     [InlineData(MissingReceiptJustification.Other)]
     public void MissingReceiptJustification_CanBeSet(MissingReceiptJustification justification)
