@@ -1,10 +1,10 @@
 'use client';
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TransactionFilterPanel } from '@/components/transactions/transaction-filter-panel';
-import type { TransactionFilters, TransactionMatchStatus } from '@/types/transaction';
+import type { TransactionFilters } from '@/types/transaction';
 import { DEFAULT_TRANSACTION_FILTERS } from '@/types/transaction';
 
 // Mock framer-motion
@@ -377,9 +377,6 @@ describe('TransactionFilterPanel', () => {
 
       // Find the filter toggle button (has Filter icon)
       const buttons = screen.getAllByRole('button');
-      const filterToggle = buttons.find(btn =>
-        btn.querySelector('svg')?.classList.contains('lucide-filter')
-      );
       // Button should exist
       expect(buttons.length).toBeGreaterThan(0);
     });

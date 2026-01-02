@@ -9,7 +9,7 @@
  * - Responsive compact variant
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MetricsRow, MetricsSummaryBar } from '@/components/dashboard/metrics-row';
 import type { DashboardMetrics } from '@/types/api';

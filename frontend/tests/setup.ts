@@ -36,20 +36,21 @@ vi.mock('@tanstack/react-router', () => {
 // This prevents animation-related issues in tests
 vi.mock('framer-motion', () => {
   // Helper to create motion element factories that strip animation props
+  // Animation props are destructured to prevent them from being passed to DOM elements
   const createMotionComponent = (type: string) => {
     return function MockMotionComponent({
       children,
-      initial,
-      animate,
-      exit,
-      variants,
-      whileHover,
-      whileTap,
-      whileFocus,
-      whileInView,
-      transition,
-      layout,
-      layoutId,
+      initial: _initial,
+      animate: _animate,
+      exit: _exit,
+      variants: _variants,
+      whileHover: _whileHover,
+      whileTap: _whileTap,
+      whileFocus: _whileFocus,
+      whileInView: _whileInView,
+      transition: _transition,
+      layout: _layout,
+      layoutId: _layoutId,
       ...props
     }: React.HTMLAttributes<HTMLElement> & Record<string, unknown>) {
       return React.createElement(type, props, children);

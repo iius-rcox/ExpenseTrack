@@ -257,6 +257,17 @@ export function SpendingTrendChart({
     return categories.filter((cat) => selectedCategories.includes(cat))
   }, [categories, selectedCategories])
 
+  // Handle chart click events - must be before early returns (Rules of Hooks)
+  const handleChartClick = useMemo(() => {
+    if (!onPointClick) return undefined
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data: any) => {
+      if (data?.activePayload?.[0]?.payload) {
+        onPointClick(data.activePayload[0].payload as SpendingTrendPoint)
+      }
+    }
+  }, [onPointClick])
+
   if (isLoading) {
     return (
       <Card className={className}>
@@ -284,17 +295,6 @@ export function SpendingTrendChart({
       </Card>
     )
   }
-
-  // Handle chart click events
-  const handleChartClick = useMemo(() => {
-    if (!onPointClick) return undefined
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data: any) => {
-      if (data?.activePayload?.[0]?.payload) {
-        onPointClick(data.activePayload[0].payload as SpendingTrendPoint)
-      }
-    }
-  }, [onPointClick])
 
   // Common chart props
   const commonProps = {

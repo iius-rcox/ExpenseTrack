@@ -8,8 +8,8 @@
  * - Priority badges (high, medium, low)
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { ActionQueue, ActionQueueBadge } from '@/components/dashboard/action-queue';
 import type { ActionQueueItem } from '@/types/dashboard';
 

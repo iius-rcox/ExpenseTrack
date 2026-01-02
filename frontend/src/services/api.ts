@@ -39,7 +39,7 @@ async function getAuthHeaders(): Promise<HeadersInit> {
       'Authorization': `Bearer ${response.idToken}`,
       'Content-Type': 'application/json',
     }
-  } catch (error) {
+  } catch {
     // Token expired, redirect to login
     await instance.loginRedirect({
       scopes: apiScopes.all,

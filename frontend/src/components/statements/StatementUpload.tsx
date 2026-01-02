@@ -41,7 +41,7 @@ export function StatementUpload({ onAnalysisComplete, onError }: StatementUpload
     return null;
   };
 
-  const getToken = async (): Promise<string | null> => {
+  const getToken = useCallback(async (): Promise<string | null> => {
     if (accounts.length === 0) {
       return null;
     }
@@ -61,7 +61,7 @@ export function StatementUpload({ onAnalysisComplete, onError }: StatementUpload
       console.error('Failed to acquire token:', error);
       return null;
     }
-  };
+  }, [accounts, instance]);
 
   const handleFileSelect = useCallback(async (file: File) => {
     const validationError = validateFile(file);
@@ -96,7 +96,7 @@ export function StatementUpload({ onAnalysisComplete, onError }: StatementUpload
     } finally {
       setIsUploading(false);
     }
-  }, [onAnalysisComplete, onError, accounts, instance]);
+  }, [onAnalysisComplete, onError, getToken]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
