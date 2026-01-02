@@ -279,16 +279,20 @@ export interface GenerateDraftRequest {
 }
 
 // Analytics Types
+export interface ComparisonSummary {
+  currentTotal: number
+  previousTotal: number
+  change: number
+  changePercent: number
+}
+
 export interface MonthlyComparison {
   currentPeriod: string
   previousPeriod: string
-  currentTotal: number
-  previousTotal: number
-  percentageChange: number
+  summary: ComparisonSummary
   newVendors: VendorSummary[]
   missingRecurring: VendorSummary[]
   significantChanges: VendorChange[]
-  categoryBreakdown: CategoryBreakdown[]
 }
 
 export interface VendorSummary {
@@ -301,7 +305,8 @@ export interface VendorChange {
   vendorName: string
   currentAmount: number
   previousAmount: number
-  percentageChange: number
+  change: number
+  changePercent: number
 }
 
 export interface CategoryBreakdown {

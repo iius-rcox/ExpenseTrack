@@ -324,21 +324,21 @@ function AnalyticsDashboard() {
       >
         <MetricCard
           title="Current Period"
-          value={monthlyComparison?.currentTotal ?? 0}
+          value={monthlyComparison?.summary?.currentTotal ?? 0}
           icon={DollarSign}
           isLoading={loadingComparison}
         />
         <MetricCard
           title="Previous Period"
-          value={monthlyComparison?.previousTotal ?? 0}
+          value={monthlyComparison?.summary?.previousTotal ?? 0}
           icon={DollarSign}
           isLoading={loadingComparison}
         />
         <MetricCard
           title="Change"
-          value={`${(monthlyComparison?.percentageChange ?? 0) >= 0 ? '+' : ''}${(monthlyComparison?.percentageChange ?? 0).toFixed(1)}%`}
-          icon={monthlyComparison?.percentageChange ?? 0 >= 0 ? TrendingUp : TrendingDown}
-          trend={monthlyComparison?.percentageChange}
+          value={`${(monthlyComparison?.summary?.changePercent ?? 0) >= 0 ? '+' : ''}${(monthlyComparison?.summary?.changePercent ?? 0).toFixed(1)}%`}
+          icon={(monthlyComparison?.summary?.changePercent ?? 0) >= 0 ? TrendingUp : TrendingDown}
+          trend={monthlyComparison?.summary?.changePercent}
           trendLabel="vs prev"
           isLoading={loadingComparison}
         />
@@ -507,11 +507,11 @@ function AnalyticsDashboard() {
                           <span
                             className={cn(
                               'font-mono',
-                              change.percentageChange >= 0 ? 'text-rose-500' : 'text-emerald-500'
+                              change.changePercent >= 0 ? 'text-rose-500' : 'text-emerald-500'
                             )}
                           >
-                            {change.percentageChange >= 0 ? '+' : ''}
-                            {change.percentageChange.toFixed(1)}%
+                            {change.changePercent >= 0 ? '+' : ''}
+                            {change.changePercent.toFixed(1)}%
                           </span>
                         </div>
                       ))}

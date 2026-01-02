@@ -20,15 +20,19 @@ export const analyticsHandlers = [
   http.get('/api/analytics/comparison', async () => {
     await delay(50) // Simulate network latency
     return HttpResponse.json({
-      currentTotal: 2547.89,
-      previousTotal: 2312.45,
-      percentageChange: 10.18,
+      currentPeriod: '2025-12',
+      previousPeriod: '2025-11',
+      summary: {
+        currentTotal: 2547.89,
+        previousTotal: 2312.45,
+        change: 235.44,
+        changePercent: 10.18,
+      },
       newVendors: [
         {
           vendorName: 'Spotify',
-          currentAmount: 14.99,
-          previousAmount: 0,
-          changePercentage: 100,
+          amount: 14.99,
+          transactionCount: 1,
         },
       ],
       missingRecurring: [],
@@ -37,7 +41,8 @@ export const analyticsHandlers = [
           vendorName: 'Amazon',
           currentAmount: 456.78,
           previousAmount: 234.56,
-          changePercentage: 94.7,
+          change: 222.22,
+          changePercent: 94.7,
         },
       ],
     })
