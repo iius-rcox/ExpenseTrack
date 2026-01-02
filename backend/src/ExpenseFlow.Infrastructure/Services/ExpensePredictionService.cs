@@ -59,7 +59,7 @@ public class ExpensePredictionService : IExpensePredictionService
         _logger.LogInformation("Learning expense patterns from report {ReportId} for user {UserId}", reportId, userId);
 
         var report = await _dbContext.ExpenseReports
-            .Include(r => r.ExpenseLines)
+            .Include(r => r.Lines)
             .FirstOrDefaultAsync(r => r.Id == reportId && r.UserId == userId);
 
         if (report == null)
@@ -70,9 +70,10 @@ public class ExpensePredictionService : IExpensePredictionService
 
         var patternsUpdated = 0;
 
-        foreach (var line in report.ExpenseLines)
+        foreach (var line in report.Lines)
         {
-            var normalized = await NormalizeVendorAsync(line.VendorName);
+            var vendorName = line.VendorName ?? line.OriginalDescription;
+            var normalized = await NormalizeVendorAsync(vendorName);
             var pattern = await _patternRepository.GetByNormalizedVendorAsync(userId, normalized);
 
             if (pattern == null)
@@ -83,8 +84,8 @@ public class ExpensePredictionService : IExpensePredictionService
                     Id = Guid.NewGuid(),
                     UserId = userId,
                     NormalizedVendor = normalized,
-                    DisplayName = line.VendorName,
-                    Category = line.Category,
+                    DisplayName = line.VendorName ?? line.OriginalDescription,
+                    Category = line.GLCode, // Use GL code as category
                     AverageAmount = line.Amount,
                     MinAmount = line.Amount,
                     MaxAmount = line.Amount,
@@ -138,9 +139,9 @@ public class ExpensePredictionService : IExpensePredictionService
     {
         _logger.LogInformation("Rebuilding all patterns for user {UserId}", userId);
 
-        // Get all approved reports for the user
+        // Get all submitted reports for the user
         var approvedReportIds = await _dbContext.ExpenseReports
-            .Where(r => r.UserId == userId && r.Status == ExpenseReportStatus.Approved)
+            .Where(r => r.UserId == userId && r.Status == ReportStatus.Submitted)
             .OrderBy(r => r.CreatedAt)
             .Select(r => r.Id)
             .ToListAsync();
@@ -519,7 +520,7 @@ public class ExpensePredictionService : IExpensePredictionService
                 topTransactions.Add(new PredictionTransactionDto
                 {
                     Id = transaction.Id,
-                    TransactionDate = DateOnly.FromDateTime(transaction.TransactionDate),
+                    TransactionDate = transaction.TransactionDate,
                     Description = transaction.Description,
                     Amount = transaction.Amount,
                     HasMatchedReceipt = transaction.MatchedReceiptId.HasValue,
@@ -580,7 +581,7 @@ public class ExpensePredictionService : IExpensePredictionService
     public async Task<PredictionAvailabilityDto> CheckAvailabilityAsync(Guid userId)
     {
         var counts = await _patternRepository.GetCountsAsync(userId);
-        var patternCount = counts.Active + counts.Suppressed;
+        var patternCount = counts.ActiveCount + counts.SuppressedCount;
         var isAvailable = patternCount > 0;
 
         var message = isAvailable
@@ -706,8 +707,6 @@ public class ExpensePredictionService : IExpensePredictionService
             pattern.DefaultGLCode = line.GLCode;
         if (!string.IsNullOrEmpty(line.DepartmentCode))
             pattern.DefaultDepartment = line.DepartmentCode;
-        if (!string.IsNullOrEmpty(line.Category))
-            pattern.Category = line.Category;
     }
 
     /// <summary>
@@ -780,8 +779,8 @@ public class ExpensePredictionService : IExpensePredictionService
 
         // Check which transactions already have matched receipts
         var transactionIds = predictedTransactions.Select(p => p.TransactionId).ToList();
-        var matchedTransactionIds = await _dbContext.Matches
-            .Where(m => transactionIds.Contains(m.TransactionId) && m.Status == MatchStatus.Confirmed)
+        var matchedTransactionIds = await _dbContext.ReceiptTransactionMatches
+            .Where(m => transactionIds.Contains(m.TransactionId) && m.Status == MatchStatus.Matched)
             .Select(m => m.TransactionId)
             .ToHashSetAsync();
 

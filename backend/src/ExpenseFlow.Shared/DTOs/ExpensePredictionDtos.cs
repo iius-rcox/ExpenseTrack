@@ -79,6 +79,9 @@ public class PatternDetailDto
     /// <summary>True if user suppressed predictions for this vendor.</summary>
     public bool IsSuppressed { get; set; }
 
+    /// <summary>Accuracy rate (ConfirmCount / (ConfirmCount + RejectCount)).</summary>
+    public decimal AccuracyRate { get; set; }
+
     /// <summary>Pattern creation date.</summary>
     public DateTime CreatedAt { get; set; }
 
