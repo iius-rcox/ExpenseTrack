@@ -13,8 +13,14 @@ public class ExpenseReport : BaseEntity
     /// <summary>Reporting period in YYYY-MM format (e.g., "2025-01")</summary>
     public string Period { get; set; } = string.Empty;
 
-    /// <summary>Report status (Draft only in Sprint 8)</summary>
+    /// <summary>Report status (Draft → Generated → Submitted)</summary>
     public ReportStatus Status { get; set; } = ReportStatus.Draft;
+
+    /// <summary>Timestamp when report was finalized (status changed to Generated)</summary>
+    public DateTimeOffset? GeneratedAt { get; set; }
+
+    /// <summary>Timestamp when report was submitted (status changed to Submitted)</summary>
+    public DateTimeOffset? SubmittedAt { get; set; }
 
     /// <summary>Sum of all expense line amounts</summary>
     public decimal TotalAmount { get; set; }

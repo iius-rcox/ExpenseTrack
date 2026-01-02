@@ -983,7 +983,463 @@ public class ReportServiceTests
 
     #endregion
 
+    #region ValidateReportAsync Tests
+
+    [Fact]
+    public async Task ValidateReportAsync_ReportNotFound_ReturnsError()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ExpenseReport?)null);
+
+        // Act
+        var result = await _service.ValidateReportAsync(reportId);
+
+        // Assert
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e => e.Code == "REPORT_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task ValidateReportAsync_ReportAlreadyGenerated_ReturnsError()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        report.Status = ReportStatus.Generated;
+        report.Lines = new List<ExpenseLine> { CreateValidExpenseLine(reportId) };
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act
+        var result = await _service.ValidateReportAsync(reportId);
+
+        // Assert
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e => e.Code == "REPORT_ALREADY_GENERATED");
+    }
+
+    [Fact]
+    public async Task ValidateReportAsync_ReportHasNoLines_ReturnsError()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        report.Lines = new List<ExpenseLine>();
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act
+        var result = await _service.ValidateReportAsync(reportId);
+
+        // Assert
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e => e.Code == "REPORT_EMPTY");
+    }
+
+    [Fact]
+    public async Task ValidateReportAsync_LineMissingGLCode_ReturnsError()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        var line = CreateValidExpenseLine(reportId);
+        line.GLCode = null;
+        report.Lines = new List<ExpenseLine> { line };
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act
+        var result = await _service.ValidateReportAsync(reportId);
+
+        // Assert
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e => e.Code == "LINE_NO_CATEGORY");
+    }
+
+    [Fact]
+    public async Task ValidateReportAsync_LineHasZeroAmount_ReturnsError()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        var line = CreateValidExpenseLine(reportId);
+        line.Amount = 0;
+        report.Lines = new List<ExpenseLine> { line };
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act
+        var result = await _service.ValidateReportAsync(reportId);
+
+        // Assert
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e => e.Code == "LINE_INVALID_AMOUNT");
+    }
+
+    [Fact]
+    public async Task ValidateReportAsync_LineMissingReceipt_ReturnsError()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        var line = CreateValidExpenseLine(reportId);
+        line.HasReceipt = false;
+        line.ReceiptId = null;
+        report.Lines = new List<ExpenseLine> { line };
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act
+        var result = await _service.ValidateReportAsync(reportId);
+
+        // Assert
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e => e.Code == "LINE_NO_RECEIPT");
+    }
+
+    [Fact]
+    public async Task ValidateReportAsync_ValidReport_ReturnsSuccess()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        report.Lines = new List<ExpenseLine>
+        {
+            CreateValidExpenseLine(reportId),
+            CreateValidExpenseLine(reportId)
+        };
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act
+        var result = await _service.ValidateReportAsync(reportId);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ValidateReportAsync_MultipleErrors_ReturnsAllErrors()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+
+        var line1 = CreateValidExpenseLine(reportId);
+        line1.GLCode = null; // Missing GL code
+
+        var line2 = CreateValidExpenseLine(reportId);
+        line2.Amount = 0; // Invalid amount
+
+        report.Lines = new List<ExpenseLine> { line1, line2 };
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act
+        var result = await _service.ValidateReportAsync(reportId);
+
+        // Assert
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().HaveCount(2);
+        result.Errors.Should().Contain(e => e.Code == "LINE_NO_CATEGORY");
+        result.Errors.Should().Contain(e => e.Code == "LINE_INVALID_AMOUNT");
+    }
+
+    #endregion
+
+    #region GenerateAsync Tests
+
+    [Fact]
+    public async Task GenerateAsync_ValidDraftReport_TransitionsToGenerated()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        report.Lines = new List<ExpenseLine> { CreateValidExpenseLine(reportId) };
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        _reportRepositoryMock
+            .Setup(x => x.UpdateAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _service.GenerateAsync(_testUserId, reportId);
+
+        // Assert
+        result.Status.Should().Be("Generated");
+        result.ReportId.Should().Be(reportId);
+        result.GeneratedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
+
+        _reportRepositoryMock.Verify(
+            x => x.UpdateAsync(It.Is<ExpenseReport>(r =>
+                r.Status == ReportStatus.Generated &&
+                r.GeneratedAt != null),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_ReportNotFound_ThrowsException()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ExpenseReport?)null);
+
+        // Act & Assert
+        var action = () => _service.GenerateAsync(_testUserId, reportId);
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*not found*");
+    }
+
+    [Fact]
+    public async Task GenerateAsync_DifferentUser_ThrowsException()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var differentUserId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, differentUserId);
+        report.Lines = new List<ExpenseLine> { CreateValidExpenseLine(reportId) };
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act & Assert
+        var action = () => _service.GenerateAsync(_testUserId, reportId);
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*not found*");
+    }
+
+    [Fact]
+    public async Task GenerateAsync_ValidationFails_ThrowsException()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        var line = CreateValidExpenseLine(reportId);
+        line.GLCode = null; // Invalid - missing GL code
+        report.Lines = new List<ExpenseLine> { line };
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act & Assert
+        var action = () => _service.GenerateAsync(_testUserId, reportId);
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*validation failed*");
+    }
+
+    [Fact]
+    public async Task GenerateAsync_ReturnsCorrectTotals()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        report.TotalAmount = 250.00m;
+        report.LineCount = 3;
+        report.Lines = new List<ExpenseLine>
+        {
+            CreateValidExpenseLine(reportId),
+            CreateValidExpenseLine(reportId),
+            CreateValidExpenseLine(reportId)
+        };
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdWithLinesAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        _reportRepositoryMock
+            .Setup(x => x.UpdateAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _service.GenerateAsync(_testUserId, reportId);
+
+        // Assert
+        result.TotalAmount.Should().Be(250.00m);
+        result.LineCount.Should().Be(3);
+    }
+
+    #endregion
+
+    #region SubmitAsync Tests
+
+    [Fact]
+    public async Task SubmitAsync_GeneratedReport_TransitionsToSubmitted()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        report.Status = ReportStatus.Generated;
+        report.GeneratedAt = DateTimeOffset.UtcNow.AddHours(-1);
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        _reportRepositoryMock
+            .Setup(x => x.UpdateAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _service.SubmitAsync(_testUserId, reportId);
+
+        // Assert
+        result.Status.Should().Be("Submitted");
+        result.ReportId.Should().Be(reportId);
+        result.SubmittedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
+
+        _reportRepositoryMock.Verify(
+            x => x.UpdateAsync(It.Is<ExpenseReport>(r =>
+                r.Status == ReportStatus.Submitted &&
+                r.SubmittedAt != null),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_ReportNotFound_ThrowsException()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ExpenseReport?)null);
+
+        // Act & Assert
+        var action = () => _service.SubmitAsync(_testUserId, reportId);
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*not found*");
+    }
+
+    [Fact]
+    public async Task SubmitAsync_DifferentUser_ThrowsException()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var differentUserId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, differentUserId);
+        report.Status = ReportStatus.Generated;
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act & Assert
+        var action = () => _service.SubmitAsync(_testUserId, reportId);
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*not found*");
+    }
+
+    [Fact]
+    public async Task SubmitAsync_AlreadySubmitted_ThrowsException()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        report.Status = ReportStatus.Submitted;
+        report.SubmittedAt = DateTimeOffset.UtcNow.AddHours(-1);
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act & Assert
+        var action = () => _service.SubmitAsync(_testUserId, reportId);
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*already been submitted*");
+    }
+
+    [Fact]
+    public async Task SubmitAsync_DraftReport_ThrowsException()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var report = CreateTestReport(reportId, _testUserId);
+        report.Status = ReportStatus.Draft;
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        // Act & Assert
+        var action = () => _service.SubmitAsync(_testUserId, reportId);
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*must be in Generated status*");
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PreservesGeneratedTimestamp()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var generatedAt = DateTimeOffset.UtcNow.AddHours(-2);
+        var report = CreateTestReport(reportId, _testUserId);
+        report.Status = ReportStatus.Generated;
+        report.GeneratedAt = generatedAt;
+
+        _reportRepositoryMock
+            .Setup(x => x.GetByIdAsync(reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        _reportRepositoryMock
+            .Setup(x => x.UpdateAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _service.SubmitAsync(_testUserId, reportId);
+
+        // Assert
+        result.GeneratedAt.Should().Be(generatedAt);
+    }
+
+    #endregion
+
     #region Helper Methods
+
+    private ExpenseLine CreateValidExpenseLine(Guid reportId)
+    {
+        return new ExpenseLine
+        {
+            Id = Guid.NewGuid(),
+            ReportId = reportId,
+            LineOrder = 1,
+            ExpenseDate = new DateOnly(2024, 6, 15),
+            Amount = 100.00m,
+            OriginalDescription = "Test Transaction",
+            NormalizedDescription = "Test Transaction",
+            GLCode = "6200",
+            GLCodeSuggested = "6200",
+            HasReceipt = true,
+            ReceiptId = Guid.NewGuid(),
+            IsUserEdited = false,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
 
     private void SetupMocksForDraftGeneration(
         List<ReceiptTransactionMatch> matches,

@@ -29,29 +29,33 @@ builder.Host.UseSerilog();
 // Add services to the container
 
 // Configure Entity Framework Core with PostgreSQL and pgvector
-// For Npgsql 9.x with EF Core 9.x, we need NpgsqlDataSourceBuilder for EnableDynamicJson()
-var connectionString = builder.Configuration.GetConnectionString("PostgreSQL");
-
-// Build data source with dynamic JSON support (required for Dictionary<string, T> JSONB columns)
-// and pgvector extension support
-var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-dataSourceBuilder.EnableDynamicJson();  // Required for Receipt.ConfidenceScores Dictionary<string, double>
-dataSourceBuilder.UseVector();          // Required for pgvector embedding columns
-var dataSource = dataSourceBuilder.Build();
-
-builder.Services.AddDbContext<ExpenseFlowDbContext>(options =>
+// Skip for Testing environment - tests configure InMemory database via WebApplicationFactory
+if (!builder.Environment.IsEnvironment("Testing"))
 {
-    options.UseNpgsql(
-        dataSource,
-        npgsqlOptions =>
-        {
-            npgsqlOptions.UseVector();  // EF Core needs this for Vector property mapping
-            npgsqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 3,
-                maxRetryDelay: TimeSpan.FromSeconds(10),
-                errorCodesToAdd: null);
-        });
-});
+    // For Npgsql 9.x with EF Core 9.x, we need NpgsqlDataSourceBuilder for EnableDynamicJson()
+    var connectionString = builder.Configuration.GetConnectionString("PostgreSQL");
+
+    // Build data source with dynamic JSON support (required for Dictionary<string, T> JSONB columns)
+    // and pgvector extension support
+    var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+    dataSourceBuilder.EnableDynamicJson();  // Required for Receipt.ConfidenceScores Dictionary<string, double>
+    dataSourceBuilder.UseVector();          // Required for pgvector embedding columns
+    var dataSource = dataSourceBuilder.Build();
+
+    builder.Services.AddDbContext<ExpenseFlowDbContext>(options =>
+    {
+        options.UseNpgsql(
+            dataSource,
+            npgsqlOptions =>
+            {
+                npgsqlOptions.UseVector();  // EF Core needs this for Vector property mapping
+                npgsqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(10),
+                    errorCodesToAdd: null);
+            });
+    });
+}
 
 // Configure Authentication
 var useDevAuth = builder.Configuration.GetValue<bool>("UseDevAuth", false);
@@ -155,6 +159,9 @@ builder.Services.AddSwaggerGen(options =>
             Array.Empty<string>()
         }
     });
+
+    // Add 401 response to authenticated endpoints automatically
+    options.OperationFilter<ExpenseFlow.Api.Filters.AuthorizeResponseOperationFilter>();
 });
 
 // Configure CORS
@@ -196,8 +203,8 @@ app.UseSerilogRequestLogging(options =>
     };
 });
 
-// Swagger UI in development and staging
-if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+// Swagger UI in development, staging, and testing (contract tests need OpenAPI spec)
+if (app.Environment.IsDevelopment() || app.Environment.IsStaging() || app.Environment.IsEnvironment("Testing"))
 {
     app.UseSwagger();
     app.UseSwaggerUI(options =>

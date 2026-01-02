@@ -257,6 +257,122 @@ public class ReportsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Finalizes a draft report, changing status to Generated.
+    /// Report must pass validation: each line needs category, amount > 0, and receipt.
+    /// </summary>
+    /// <param name="reportId">Report ID to finalize</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Generate response with status and timestamp</returns>
+    [HttpPost("{reportId:guid}/generate")]
+    [ProducesResponseType(typeof(GenerateReportResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<GenerateReportResponseDto>> Generate(
+        Guid reportId,
+        CancellationToken ct)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Generating (finalizing) report {ReportId} for user {UserId}",
+            reportId, user.Id);
+
+        try
+        {
+            var result = await _reportService.GenerateAsync(user.Id, reportId, ct);
+
+            _logger.LogInformation(
+                "Report {ReportId} successfully finalized at {GeneratedAt}",
+                reportId, result.GeneratedAt);
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already been finalized"))
+        {
+            return Conflict(new ProblemDetailsResponse
+            {
+                Title = "Conflict",
+                Detail = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Submits a generated report for tracking/audit purposes.
+    /// Report must be in Generated status.
+    /// </summary>
+    /// <param name="reportId">Report ID to submit</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Submit response with status and timestamp</returns>
+    [HttpPost("{reportId:guid}/submit")]
+    [ProducesResponseType(typeof(SubmitReportResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<SubmitReportResponseDto>> Submit(
+        Guid reportId,
+        CancellationToken ct)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Submitting report {ReportId} for user {UserId}",
+            reportId, user.Id);
+
+        try
+        {
+            var result = await _reportService.SubmitAsync(user.Id, reportId, ct);
+
+            _logger.LogInformation(
+                "Report {ReportId} successfully submitted at {SubmittedAt}",
+                reportId, result.SubmittedAt);
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already been submitted"))
+        {
+            return Conflict(new ProblemDetailsResponse
+            {
+                Title = "Conflict",
+                Detail = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
     /// Exports a consolidated PDF of all receipts for a report.
     /// Includes placeholder pages for missing receipts with justification details.
     /// </summary>

@@ -80,4 +80,33 @@ public interface IReportService
     /// <param name="ct">Cancellation token</param>
     /// <returns>Existing draft report ID if found, null otherwise</returns>
     Task<Guid?> GetExistingDraftIdAsync(Guid userId, string period, CancellationToken ct = default);
+
+    /// <summary>
+    /// Validates a report before generation (finalization).
+    /// Checks: at least one line, each line has category, amount > 0, and receipt.
+    /// </summary>
+    /// <param name="reportId">Report ID to validate</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Validation result with errors and warnings</returns>
+    Task<ReportValidationResultDto> ValidateReportAsync(Guid reportId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Finalizes a draft report, changing status to Generated.
+    /// Report must pass validation first. After generation, report becomes immutable.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="reportId">Report ID to finalize</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Result with reportId, status, generatedAt timestamp, lineCount, and totalAmount</returns>
+    Task<GenerateReportResponseDto> GenerateAsync(Guid userId, Guid reportId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Submits a generated report for tracking/audit purposes.
+    /// Report must be in Generated status.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="reportId">Report ID to submit</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Result with reportId, status, and submittedAt timestamp</returns>
+    Task<SubmitReportResponseDto> SubmitAsync(Guid userId, Guid reportId, CancellationToken ct = default);
 }

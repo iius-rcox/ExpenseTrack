@@ -379,4 +379,213 @@ public class ReportsControllerTests
     }
 
     #endregion
+
+    #region Generate (Finalize) Tests
+
+    [Fact]
+    public async Task Generate_WithValidDraftReport_ReturnsOkWithGeneratedStatus()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var expectedResponse = new GenerateReportResponseDto
+        {
+            ReportId = reportId,
+            Status = "Generated",
+            GeneratedAt = DateTimeOffset.UtcNow,
+            LineCount = 5,
+            TotalAmount = 500.00m
+        };
+
+        _reportServiceMock
+            .Setup(s => s.GenerateAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await _controller.Generate(reportId, CancellationToken.None);
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value.Should().BeOfType<GenerateReportResponseDto>().Subject;
+        response.Status.Should().Be("Generated");
+        response.ReportId.Should().Be(reportId);
+        response.LineCount.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task Generate_WithNonExistingReport_ReturnsNotFound()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        _reportServiceMock
+            .Setup(s => s.GenerateAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException($"Report with ID {reportId} was not found"));
+
+        // Act
+        var result = await _controller.Generate(reportId, CancellationToken.None);
+
+        // Assert
+        result.Result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task Generate_WithValidationFailure_ReturnsBadRequest()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        _reportServiceMock
+            .Setup(s => s.GenerateAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Report validation failed: Expense line must have a category (GL code) assigned"));
+
+        // Act
+        var result = await _controller.Generate(reportId, CancellationToken.None);
+
+        // Assert
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Generate_WithAlreadyGeneratedReport_ReturnsConflict()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        _reportServiceMock
+            .Setup(s => s.GenerateAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Report has already been finalized"));
+
+        // Act
+        var result = await _controller.Generate(reportId, CancellationToken.None);
+
+        // Assert
+        result.Result.Should().BeOfType<ConflictObjectResult>();
+    }
+
+    [Fact]
+    public async Task Generate_CallsServiceWithCorrectParameters()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        _reportServiceMock
+            .Setup(s => s.GenerateAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerateReportResponseDto
+            {
+                ReportId = reportId,
+                Status = "Generated",
+                GeneratedAt = DateTimeOffset.UtcNow
+            });
+
+        // Act
+        await _controller.Generate(reportId, CancellationToken.None);
+
+        // Assert
+        _reportServiceMock.Verify(
+            s => s.GenerateAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    #endregion
+
+    #region Submit Tests
+
+    [Fact]
+    public async Task Submit_WithGeneratedReport_ReturnsOkWithSubmittedStatus()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        var generatedAt = DateTimeOffset.UtcNow.AddHours(-1);
+        var expectedResponse = new SubmitReportResponseDto
+        {
+            ReportId = reportId,
+            Status = "Submitted",
+            GeneratedAt = generatedAt,
+            SubmittedAt = DateTimeOffset.UtcNow
+        };
+
+        _reportServiceMock
+            .Setup(s => s.SubmitAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await _controller.Submit(reportId, CancellationToken.None);
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value.Should().BeOfType<SubmitReportResponseDto>().Subject;
+        response.Status.Should().Be("Submitted");
+        response.ReportId.Should().Be(reportId);
+        response.GeneratedAt.Should().Be(generatedAt);
+    }
+
+    [Fact]
+    public async Task Submit_WithNonExistingReport_ReturnsNotFound()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        _reportServiceMock
+            .Setup(s => s.SubmitAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException($"Report with ID {reportId} was not found"));
+
+        // Act
+        var result = await _controller.Submit(reportId, CancellationToken.None);
+
+        // Assert
+        result.Result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task Submit_WithDraftReport_ReturnsBadRequest()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        _reportServiceMock
+            .Setup(s => s.SubmitAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Report must be in Generated status before submitting"));
+
+        // Act
+        var result = await _controller.Submit(reportId, CancellationToken.None);
+
+        // Assert
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Submit_WithAlreadySubmittedReport_ReturnsConflict()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        _reportServiceMock
+            .Setup(s => s.SubmitAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Report has already been submitted"));
+
+        // Act
+        var result = await _controller.Submit(reportId, CancellationToken.None);
+
+        // Assert
+        result.Result.Should().BeOfType<ConflictObjectResult>();
+    }
+
+    [Fact]
+    public async Task Submit_CallsServiceWithCorrectParameters()
+    {
+        // Arrange
+        var reportId = Guid.NewGuid();
+        _reportServiceMock
+            .Setup(s => s.SubmitAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SubmitReportResponseDto
+            {
+                ReportId = reportId,
+                Status = "Submitted",
+                GeneratedAt = DateTimeOffset.UtcNow.AddHours(-1),
+                SubmittedAt = DateTimeOffset.UtcNow
+            });
+
+        // Act
+        await _controller.Submit(reportId, CancellationToken.None);
+
+        // Assert
+        _reportServiceMock.Verify(
+            s => s.SubmitAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    #endregion
 }

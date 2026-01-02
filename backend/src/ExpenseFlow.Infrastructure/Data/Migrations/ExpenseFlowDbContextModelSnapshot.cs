@@ -440,6 +440,10 @@ namespace ExpenseFlow.Infrastructure.Data.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("NOW()");
 
+                    b.Property<DateTimeOffset?>("GeneratedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("generated_at");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -475,6 +479,10 @@ namespace ExpenseFlow.Infrastructure.Data.Migrations
                         .HasColumnType("smallint")
                         .HasDefaultValue((short)0)
                         .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
 
                     b.Property<int>("Tier1HitCount")
                         .ValueGeneratedOnAdd()
@@ -519,6 +527,10 @@ namespace ExpenseFlow.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_expense_reports_user_period")
                         .HasFilter("NOT is_deleted");
+
+                    b.HasIndex("Status", "GeneratedAt")
+                        .HasDatabaseName("ix_expense_reports_status_generated")
+                        .HasFilter("generated_at IS NOT NULL");
 
                     b.ToTable("expense_reports", null, t =>
                         {

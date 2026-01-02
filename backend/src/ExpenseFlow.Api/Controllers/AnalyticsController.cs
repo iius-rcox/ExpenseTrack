@@ -10,7 +10,7 @@ namespace ExpenseFlow.Api.Controllers;
 
 /// <summary>
 /// Controller for expense analytics including spending trends, category breakdowns,
-/// merchant analytics, subscription tracking, and MoM comparison.
+/// merchant analytics, subscription tracking, MoM comparison, and data export.
 /// </summary>
 [Authorize]
 public class AnalyticsController : ApiControllerBase
@@ -18,6 +18,7 @@ public class AnalyticsController : ApiControllerBase
     private readonly IComparisonService _comparisonService;
     private readonly ICacheStatisticsService _cacheStatisticsService;
     private readonly IAnalyticsService _analyticsService;
+    private readonly IAnalyticsExportService _analyticsExportService;
     private readonly IUserService _userService;
     private readonly ILogger<AnalyticsController> _logger;
     private readonly ExpenseFlowDbContext _dbContext;
@@ -26,6 +27,7 @@ public class AnalyticsController : ApiControllerBase
         IComparisonService comparisonService,
         ICacheStatisticsService cacheStatisticsService,
         IAnalyticsService analyticsService,
+        IAnalyticsExportService analyticsExportService,
         IUserService userService,
         ILogger<AnalyticsController> logger,
         ExpenseFlowDbContext dbContext)
@@ -33,6 +35,7 @@ public class AnalyticsController : ApiControllerBase
         _comparisonService = comparisonService;
         _cacheStatisticsService = cacheStatisticsService;
         _analyticsService = analyticsService;
+        _analyticsExportService = analyticsExportService;
         _userService = userService;
         _logger = logger;
         _dbContext = dbContext;
@@ -624,6 +627,81 @@ public class AnalyticsController : ApiControllerBase
         }
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Exports analytics data to CSV or Excel format.
+    /// Supports multiple sections: trends, categories, vendors, and transactions.
+    /// </summary>
+    /// <param name="request">Export request with date range, format, and sections</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>File download with analytics data</returns>
+    [HttpGet("export")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "text/csv")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ExportAnalytics(
+        [FromQuery] AnalyticsExportRequestDto request,
+        CancellationToken ct = default)
+    {
+        // Validate required fields
+        if (string.IsNullOrWhiteSpace(request.StartDate) || string.IsNullOrWhiteSpace(request.EndDate))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = "StartDate and EndDate are required."
+            });
+        }
+
+        // Validate date range format
+        if (!AnalyticsValidation.ValidateDateRange(request.StartDate, request.EndDate, out var startDate, out var endDate, out var dateError))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = dateError
+            });
+        }
+
+        // Validate format
+        var format = request.Format?.ToLowerInvariant() ?? "csv";
+        if (format != "csv" && format != "xlsx")
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = "Format must be 'csv' or 'xlsx'."
+            });
+        }
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+        var sections = request.GetSectionsList();
+
+        _logger.LogInformation(
+            "Exporting analytics for user {UserId} from {StartDate} to {EndDate}, format: {Format}, sections: {Sections}",
+            user.Id, startDate, endDate, format, string.Join(",", sections));
+
+        try
+        {
+            var (fileBytes, contentType, fileName) = await _analyticsExportService.ExportAsync(
+                user.Id, startDate, endDate, format, sections, ct);
+
+            // Set Content-Disposition header for file download
+            Response.Headers.Append("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+
+            return File(fileBytes, contentType, fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Export validation error for user {UserId}", user.Id);
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = ex.Message
+            });
+        }
     }
 
     #endregion

@@ -35,6 +35,14 @@ public class ExpenseReportConfiguration : IEntityTypeConfiguration<ExpenseReport
             .HasDefaultValue(ReportStatus.Draft)
             .IsRequired();
 
+        builder.Property(e => e.GeneratedAt)
+            .HasColumnName("generated_at")
+            .HasColumnType("timestamptz");
+
+        builder.Property(e => e.SubmittedAt)
+            .HasColumnName("submitted_at")
+            .HasColumnType("timestamptz");
+
         builder.Property(e => e.TotalAmount)
             .HasColumnName("total_amount")
             .HasPrecision(18, 2)
