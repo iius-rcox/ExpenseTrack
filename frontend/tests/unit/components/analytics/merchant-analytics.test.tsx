@@ -54,8 +54,10 @@ const mockMerchantData: MerchantAnalyticsResponse = {
     createMockMerchant({ merchantName: 'target', displayName: 'Target', changePercent: -32.1 }),
   ],
   totalMerchantCount: 42,
-  periodStart: '2024-03-01',
-  periodEnd: '2024-03-31',
+  dateRange: {
+    startDate: '2024-03-01',
+    endDate: '2024-03-31',
+  },
 }
 
 describe('MerchantAnalytics', () => {
