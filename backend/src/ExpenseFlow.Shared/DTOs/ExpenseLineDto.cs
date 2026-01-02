@@ -39,4 +39,16 @@ public class ExpenseLineDto
     public bool IsUserEdited { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+
+    // Auto-suggestion tracking (Feature 023 - Expense Prediction)
+    /// <summary>
+    /// True if this line was auto-suggested by expense prediction.
+    /// UI should show "Auto-suggested" indicator for these lines.
+    /// </summary>
+    public bool IsAutoSuggested { get; set; }
+
+    /// <summary>
+    /// The prediction ID that suggested this line (nullable).
+    /// </summary>
+    public Guid? PredictionId { get; set; }
 }

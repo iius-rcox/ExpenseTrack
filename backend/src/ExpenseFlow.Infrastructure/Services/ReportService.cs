@@ -18,6 +18,7 @@ public class ReportService : IReportService
     private readonly IDescriptionNormalizationService _normalizationService;
     private readonly IVendorAliasService _vendorAliasService;
     private readonly IDescriptionCacheService _descriptionCacheService;
+    private readonly IExpensePredictionService? _predictionService;
     private readonly ILogger<ReportService> _logger;
 
     public ReportService(
@@ -28,7 +29,8 @@ public class ReportService : IReportService
         IDescriptionNormalizationService normalizationService,
         IVendorAliasService vendorAliasService,
         IDescriptionCacheService descriptionCacheService,
-        ILogger<ReportService> logger)
+        ILogger<ReportService> logger,
+        IExpensePredictionService? predictionService = null)
     {
         _reportRepository = reportRepository;
         _matchRepository = matchRepository;
@@ -37,6 +39,7 @@ public class ReportService : IReportService
         _normalizationService = normalizationService;
         _vendorAliasService = vendorAliasService;
         _descriptionCacheService = descriptionCacheService;
+        _predictionService = predictionService;
         _logger = logger;
     }
 
@@ -62,6 +65,25 @@ public class ReportService : IReportService
         // Get unmatched transactions for the period
         var unmatchedTransactions = await _transactionRepository.GetUnmatchedByPeriodAsync(userId, startDate, endDate);
         _logger.LogInformation("Found {UnmatchedCount} unmatched transactions for period {Period}", unmatchedTransactions.Count, period);
+
+        // Feature 023: Get predicted transactions for auto-suggestion
+        var predictedTransactionLookup = new Dictionary<Guid, PredictedTransactionDto>();
+        if (_predictionService != null)
+        {
+            try
+            {
+                var predictions = await _predictionService.GetPredictedTransactionsForPeriodAsync(userId, startDate, endDate);
+                predictedTransactionLookup = predictions.ToDictionary(p => p.TransactionId);
+                _logger.LogInformation(
+                    "Found {PredictionCount} predicted transactions for period {Period}",
+                    predictions.Count, period);
+            }
+            catch (Exception ex)
+            {
+                // Non-blocking: predictions are enhancement, not critical
+                _logger.LogWarning(ex, "Failed to get predictions for draft report, continuing without auto-suggestions");
+            }
+        }
 
         // Create the report
         var report = new ExpenseReport
@@ -91,6 +113,9 @@ public class ReportService : IReportService
             // Normalize the description
             var normalizedDesc = await NormalizeDescriptionSafeAsync(transaction.OriginalDescription, userId, ct);
 
+            // Feature 023: Check if this transaction has a prediction
+            var hasPrediction = predictedTransactionLookup.TryGetValue(transaction.Id, out var prediction);
+
             var line = new ExpenseLine
             {
                 // ReportId will be set automatically by EF Core via navigation property
@@ -103,7 +128,10 @@ public class ReportService : IReportService
                 NormalizedDescription = normalizedDesc,
                 VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName,
                 HasReceipt = true,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                // Feature 023: Mark as auto-suggested if prediction exists
+                IsAutoSuggested = hasPrediction,
+                PredictionId = hasPrediction ? prediction!.PredictionId : null
             };
 
             // Apply GL code suggestion
@@ -140,6 +168,9 @@ public class ReportService : IReportService
             // Normalize the description
             var normalizedDesc = await NormalizeDescriptionSafeAsync(transaction.OriginalDescription, userId, ct);
 
+            // Feature 023: Check if this transaction has a prediction
+            var hasPrediction = predictedTransactionLookup.TryGetValue(transaction.Id, out var prediction);
+
             var line = new ExpenseLine
             {
                 // ReportId will be set automatically by EF Core via navigation property
@@ -150,13 +181,16 @@ public class ReportService : IReportService
                 Amount = transaction.Amount,
                 OriginalDescription = transaction.OriginalDescription,
                 NormalizedDescription = normalizedDesc,
-                VendorName = null, // No receipt to extract vendor from
+                VendorName = hasPrediction ? prediction!.VendorName : null, // Use predicted vendor if available
                 HasReceipt = false,
                 MissingReceiptJustification = MissingReceiptJustification.NotProvided,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                // Feature 023: Mark as auto-suggested if prediction exists
+                IsAutoSuggested = hasPrediction,
+                PredictionId = hasPrediction ? prediction!.PredictionId : null
             };
 
-            // Apply GL code suggestion
+            // Apply GL code suggestion (prefer categorization, fallback to prediction)
             if (categorization?.GL?.TopSuggestion != null)
             {
                 var glSuggestion = categorization.GL.TopSuggestion;
@@ -166,8 +200,15 @@ public class ReportService : IReportService
                 line.GLCodeSource = glSuggestion.Source;
                 UpdateTierCounts(glSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
             }
+            else if (hasPrediction && !string.IsNullOrEmpty(prediction!.SuggestedGLCode))
+            {
+                // Feature 023: Use prediction's GL code if no other categorization available
+                line.GLCodeSuggested = prediction.SuggestedGLCode;
+                line.GLCode = prediction.SuggestedGLCode;
+                line.GLCodeSource = "ExpensePrediction";
+            }
 
-            // Apply department suggestion
+            // Apply department suggestion (prefer categorization, fallback to prediction)
             if (categorization?.Department?.TopSuggestion != null)
             {
                 var deptSuggestion = categorization.Department.TopSuggestion;
@@ -176,6 +217,13 @@ public class ReportService : IReportService
                 line.DepartmentTier = deptSuggestion.Tier;
                 line.DepartmentSource = deptSuggestion.Source;
                 UpdateTierCounts(deptSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
+            }
+            else if (hasPrediction && !string.IsNullOrEmpty(prediction!.SuggestedDepartment))
+            {
+                // Feature 023: Use prediction's department if no other categorization available
+                line.DepartmentSuggested = prediction.SuggestedDepartment;
+                line.DepartmentCode = prediction.SuggestedDepartment;
+                line.DepartmentSource = "ExpensePrediction";
             }
 
             missingReceiptCount++;
@@ -493,6 +541,25 @@ public class ReportService : IReportService
             "Report {ReportId} submitted with status {Status} at {SubmittedAt}",
             report.Id, report.Status, report.SubmittedAt);
 
+        // Feature 023: Learn expense patterns from submitted report
+        if (_predictionService != null)
+        {
+            try
+            {
+                var patternsLearned = await _predictionService.LearnFromReportAsync(userId, reportId);
+                _logger.LogInformation(
+                    "Learned {PatternCount} expense patterns from report {ReportId}",
+                    patternsLearned, reportId);
+            }
+            catch (Exception ex)
+            {
+                // Pattern learning is non-critical - log and continue
+                _logger.LogWarning(ex,
+                    "Failed to learn expense patterns from report {ReportId}",
+                    reportId);
+            }
+        }
+
         return new SubmitReportResponseDto
         {
             ReportId = report.Id,
@@ -697,7 +764,10 @@ public class ReportService : IReportService
             JustificationNote = line.JustificationNote,
             IsUserEdited = line.IsUserEdited,
             CreatedAt = line.CreatedAt,
-            UpdatedAt = line.UpdatedAt
+            UpdatedAt = line.UpdatedAt,
+            // Feature 023: Auto-suggestion tracking
+            IsAutoSuggested = line.IsAutoSuggested,
+            PredictionId = line.PredictionId
         };
     }
 

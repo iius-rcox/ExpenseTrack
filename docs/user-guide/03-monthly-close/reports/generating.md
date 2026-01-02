@@ -36,9 +36,12 @@ The dialog shows:
 - **Total expenses**: Count of matched items
 - **Total amount**: Sum of all expenses
 - **By category**: Breakdown by expense type
+- **Predicted expenses**: High-confidence predictions auto-suggested for inclusion
 - **Missing items**: Unmatched expenses (if any)
 
-> **Warning**: Only matched expenses appear in reports. [Match](../02-daily-use/matching/review-modes.md) your receipts first.
+> **Note**: If you have [expense predictions](../../02-daily-use/predictions/expense-predictions.md) enabled, high-confidence predictions may be automatically suggested for inclusion. Review these carefully before creating the report.
+
+> **Warning**: Only matched expenses appear in reports. [Match](../../02-daily-use/matching/review-modes.md) your receipts first.
 
 ### Step 4: Add Report Notes (Optional)
 
@@ -59,6 +62,7 @@ Include notes for approvers:
 ### Automatically Included
 
 - All matched expenses in the date range
+- Confirmed [expense predictions](../../02-daily-use/predictions/expense-predictions.md)
 - Receipt images
 - Transaction details
 - Categories and GL codes

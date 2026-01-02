@@ -55,6 +55,11 @@ public class ExpenseFlowDbContext : DbContext
     // Sprint 10: Cache Warming
     public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
 
+    // Feature 023: Expense Prediction
+    public DbSet<ExpensePattern> ExpensePatterns => Set<ExpensePattern>();
+    public DbSet<TransactionPrediction> TransactionPredictions => Set<TransactionPrediction>();
+    public DbSet<PredictionFeedback> PredictionFeedback => Set<PredictionFeedback>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

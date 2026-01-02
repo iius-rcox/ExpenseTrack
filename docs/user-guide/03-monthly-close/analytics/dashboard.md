@@ -13,6 +13,10 @@ The Analytics Dashboard provides visual insights into your expense data. View sp
 1. Click **Analytics** in the main navigation
 2. Or click **View Analytics** from the Dashboard metrics section
 
+### Expense Patterns
+
+From the Analytics page, click **Expense Patterns** in the header to manage your learned expense patterns. See [Pattern Management](../../02-daily-use/predictions/pattern-management.md) for details.
+
 ## Dashboard Components
 
 ### Summary Cards
@@ -132,4 +136,5 @@ After reviewing the dashboard:
 - [Trends Analysis](./trends.md) - Compare periods and spot patterns
 - [Category Breakdown](./categories.md) - Deep dive into spending categories
 - [Generating Reports](../reports/generating.md) - Create formal reports
+- [Pattern Management](../../02-daily-use/predictions/pattern-management.md) - View and manage expense patterns
 

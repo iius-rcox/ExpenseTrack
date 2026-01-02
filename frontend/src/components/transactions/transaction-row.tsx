@@ -41,6 +41,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { ExpenseBadge } from '@/components/predictions/expense-badge';
 import type {
   TransactionView,
   TransactionMatchStatus,
@@ -65,6 +66,12 @@ interface TransactionRowComponentProps {
   onClick: () => void;
   /** Whether the row is currently being saved */
   isSaving?: boolean;
+  /** Handler for confirming expense prediction (Feature 023) */
+  onPredictionConfirm?: (predictionId: string) => void;
+  /** Handler for rejecting expense prediction (Feature 023) */
+  onPredictionReject?: (predictionId: string) => void;
+  /** Whether a prediction action is processing */
+  isPredictionProcessing?: boolean;
 }
 
 /**
@@ -131,6 +138,9 @@ export const TransactionRow = memo(function TransactionRow({
   onEdit,
   onClick,
   isSaving = false,
+  onPredictionConfirm,
+  onPredictionReject,
+  isPredictionProcessing = false,
 }: TransactionRowComponentProps) {
   // Editing state
   const [editingField, setEditingField] = useState<'notes' | null>(null);
@@ -272,6 +282,21 @@ export const TransactionRow = memo(function TransactionRow({
             </div>
           )}
         </div>
+      </TableCell>
+
+      {/* Expense Prediction Badge (Feature 023) */}
+      <TableCell className="w-[180px]">
+        {transaction.prediction &&
+          transaction.prediction.status === 'Pending' &&
+          transaction.prediction.confidenceLevel !== 'Low' && (
+            <ExpenseBadge
+              prediction={transaction.prediction}
+              onConfirm={onPredictionConfirm}
+              onReject={onPredictionReject}
+              isProcessing={isPredictionProcessing}
+              compact
+            />
+          )}
       </TableCell>
 
       {/* Amount */}
@@ -483,6 +508,9 @@ export function TransactionRowSkeleton() {
           <div className="h-4 w-32 rounded bg-muted" />
           <div className="h-3 w-48 rounded bg-muted" />
         </div>
+      </TableCell>
+      <TableCell className="w-[180px]">
+        {/* Prediction badge skeleton (sometimes empty) */}
       </TableCell>
       <TableCell className="w-[100px]">
         <div className="h-4 w-16 rounded bg-muted ml-auto" />

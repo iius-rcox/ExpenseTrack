@@ -1,0 +1,747 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Predictions API
+  description: API for expense prediction based on historical reports
+  version: 1.1.0
+
+paths:
+  /api/predictions:
+    get:
+      summary: Get predictions for user's transactions
+      description: Returns transaction predictions with confidence levels. Only Medium and High confidence predictions are included.
+      operationId: getPredictions
+      tags:
+        - Predictions
+      parameters:
+        - name: status
+          in: query
+          description: Filter by prediction status
+          schema:
+            type: string
+            enum: [Pending, Confirmed, Rejected, Ignored]
+        - name: minConfidence
+          in: query
+          description: Minimum confidence level (defaults to Medium)
+          schema:
+            type: string
+            enum: [Medium, High]
+            default: Medium
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: List of predictions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/{id}:
+    get:
+      summary: Get a single prediction by ID
+      description: Returns detailed information about a specific prediction
+      operationId: getPredictionById
+      tags:
+        - Predictions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Prediction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionDetailDto'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/confirm:
+    post:
+      summary: Confirm a prediction
+      description: User confirms that the predicted transaction is a business expense
+      operationId: confirmPrediction
+      tags:
+        - Predictions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmPredictionRequest'
+      responses:
+        '200':
+          description: Prediction confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionActionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/reject:
+    post:
+      summary: Reject a prediction
+      description: User rejects the prediction - transaction is not a business expense
+      operationId: rejectPrediction
+      tags:
+        - Predictions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectPredictionRequest'
+      responses:
+        '200':
+          description: Prediction rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionActionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/bulk:
+    post:
+      summary: Bulk confirm or reject predictions
+      description: Process multiple predictions in a single request
+      operationId: bulkAction
+      tags:
+        - Predictions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkPredictionActionRequest'
+      responses:
+        '200':
+          description: Bulk action completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkPredictionActionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/transaction/{transactionId}:
+    get:
+      summary: Get prediction for a specific transaction
+      description: Returns the prediction for a single transaction, if one exists
+      operationId: getPredictionByTransaction
+      tags:
+        - Predictions
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Prediction found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionSummaryDto'
+        '204':
+          description: No prediction exists for this transaction
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/dashboard:
+    get:
+      summary: Get prediction dashboard data
+      description: Returns pending counts and top predictions for the dashboard
+      operationId: getDashboard
+      tags:
+        - Predictions
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionDashboardDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/stats:
+    get:
+      summary: Get prediction accuracy statistics
+      description: Returns accuracy metrics for user's predictions
+      operationId: getPredictionStats
+      tags:
+        - Predictions
+      responses:
+        '200':
+          description: Prediction statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionAccuracyStatsDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/availability:
+    get:
+      summary: Check if predictions are available
+      description: Returns whether the user has enough data for predictions
+      operationId: checkPredictionAvailability
+      tags:
+        - Predictions
+      responses:
+        '200':
+          description: Availability status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionAvailabilityDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/patterns:
+    get:
+      summary: Get user's learned expense patterns
+      description: Returns all expense patterns learned from user's approved reports
+      operationId: getPatterns
+      tags:
+        - Patterns
+      parameters:
+        - name: includeSuppressed
+          in: query
+          description: Include patterns the user has suppressed
+          schema:
+            type: boolean
+            default: true
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of patterns
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatternListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/patterns/{id}:
+    get:
+      summary: Get a single pattern by ID
+      description: Returns detailed information about a specific pattern
+      operationId: getPatternById
+      tags:
+        - Patterns
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pattern details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatternDetailDto'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      summary: Delete a pattern
+      description: Permanently remove a learned pattern
+      operationId: deletePattern
+      tags:
+        - Patterns
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Pattern deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/patterns/{id}/suppression:
+    patch:
+      summary: Update pattern suppression status
+      description: Suppress or unsuppress a pattern (toggle whether it generates predictions)
+      operationId: updatePatternSuppression
+      tags:
+        - Patterns
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePatternSuppressionRequest'
+      responses:
+        '204':
+          description: Suppression status updated
+        '400':
+          description: ID mismatch between path and body
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/learn/{reportId}:
+    post:
+      summary: Learn patterns from a report
+      description: Extract and learn expense patterns from an approved report
+      operationId: learnFromReport
+      tags:
+        - Learning
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Number of patterns created or updated
+          content:
+            application/json:
+              schema:
+                type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/rebuild:
+    post:
+      summary: Rebuild all patterns
+      description: Clear and rebuild all patterns from approved expense reports
+      operationId: rebuildPatterns
+      tags:
+        - Learning
+      responses:
+        '200':
+          description: Number of patterns rebuilt
+          content:
+            application/json:
+              schema:
+                type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/predictions/generate:
+    post:
+      summary: Generate predictions
+      description: Generate predictions for all pending transactions
+      operationId: generatePredictions
+      tags:
+        - Predictions
+      responses:
+        '200':
+          description: Number of predictions generated
+          content:
+            application/json:
+              schema:
+                type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  schemas:
+    ConfirmPredictionRequest:
+      type: object
+      required:
+        - predictionId
+      properties:
+        predictionId:
+          type: string
+          format: uuid
+
+    RejectPredictionRequest:
+      type: object
+      required:
+        - predictionId
+      properties:
+        predictionId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          nullable: true
+          description: Optional reason for rejection
+
+    BulkPredictionActionRequest:
+      type: object
+      required:
+        - predictionIds
+        - action
+      properties:
+        predictionIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        action:
+          type: string
+          enum: [Confirmed, Rejected]
+
+    BulkPredictionActionResponse:
+      type: object
+      required:
+        - successCount
+        - failedCount
+        - message
+      properties:
+        successCount:
+          type: integer
+        failedCount:
+          type: integer
+        failedIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        message:
+          type: string
+
+    PredictionActionResponse:
+      type: object
+      required:
+        - success
+        - newStatus
+        - message
+      properties:
+        success:
+          type: boolean
+        newStatus:
+          type: string
+          enum: [Pending, Confirmed, Rejected, Ignored]
+        message:
+          type: string
+        patternSuppressed:
+          type: boolean
+          description: True if the pattern was auto-suppressed due to low accuracy
+
+    UpdatePatternSuppressionRequest:
+      type: object
+      required:
+        - id
+        - isSuppressed
+      properties:
+        id:
+          type: string
+          format: uuid
+        isSuppressed:
+          type: boolean
+
+    PredictionSummaryDto:
+      type: object
+      required:
+        - id
+        - patternId
+        - confidenceScore
+        - confidenceLevel
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        patternId:
+          type: string
+          format: uuid
+        confidenceScore:
+          type: number
+          format: decimal
+        confidenceLevel:
+          type: string
+          enum: [Low, Medium, High]
+        status:
+          type: string
+          enum: [Pending, Confirmed, Rejected, Ignored]
+        suggestedCategory:
+          type: string
+          nullable: true
+
+    PredictionDetailDto:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/PredictionSummaryDto'
+        - type: object
+          properties:
+            transactionId:
+              type: string
+              format: uuid
+            vendorName:
+              type: string
+            suggestedGLCode:
+              type: string
+              nullable: true
+            suggestedDepartment:
+              type: string
+              nullable: true
+            createdAt:
+              type: string
+              format: date-time
+            resolvedAt:
+              type: string
+              format: date-time
+              nullable: true
+
+    PredictionListResponse:
+      type: object
+      required:
+        - predictions
+        - totalCount
+        - page
+        - pageSize
+      properties:
+        predictions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PredictionSummaryDto'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    PredictionDashboardDto:
+      type: object
+      required:
+        - pendingCount
+        - highConfidenceCount
+        - topPredictions
+      properties:
+        pendingCount:
+          type: integer
+        highConfidenceCount:
+          type: integer
+        topPredictions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PredictionSummaryDto'
+
+    PredictionAccuracyStatsDto:
+      type: object
+      required:
+        - totalPredictions
+        - confirmedCount
+        - rejectedCount
+        - ignoredCount
+        - accuracyRate
+      properties:
+        totalPredictions:
+          type: integer
+        confirmedCount:
+          type: integer
+        rejectedCount:
+          type: integer
+        ignoredCount:
+          type: integer
+        accuracyRate:
+          type: number
+          format: decimal
+          description: Percentage of confirmed predictions out of resolved (confirmed + rejected)
+        highConfidenceAccuracyRate:
+          type: number
+          format: decimal
+        mediumConfidenceAccuracyRate:
+          type: number
+          format: decimal
+
+    PredictionAvailabilityDto:
+      type: object
+      required:
+        - isAvailable
+        - patternCount
+      properties:
+        isAvailable:
+          type: boolean
+          description: True if user has at least one expense pattern
+        patternCount:
+          type: integer
+          description: Number of learned patterns
+        message:
+          type: string
+          description: User-friendly message explaining availability status
+
+    PatternSummaryDto:
+      type: object
+      required:
+        - id
+        - normalizedVendor
+        - displayName
+        - averageAmount
+        - occurrenceCount
+        - isSuppressed
+      properties:
+        id:
+          type: string
+          format: uuid
+        normalizedVendor:
+          type: string
+        displayName:
+          type: string
+        category:
+          type: string
+          nullable: true
+        averageAmount:
+          type: number
+          format: decimal
+        occurrenceCount:
+          type: integer
+        confirmCount:
+          type: integer
+        rejectCount:
+          type: integer
+        accuracyRate:
+          type: number
+          format: decimal
+        isSuppressed:
+          type: boolean
+        lastSeenAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    PatternDetailDto:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/PatternSummaryDto'
+        - type: object
+          properties:
+            minAmount:
+              type: number
+              format: decimal
+            maxAmount:
+              type: number
+              format: decimal
+            defaultGLCode:
+              type: string
+              nullable: true
+            defaultDepartment:
+              type: string
+              nullable: true
+            updatedAt:
+              type: string
+              format: date-time
+
+    PatternListResponse:
+      type: object
+      required:
+        - patterns
+        - totalCount
+        - page
+        - pageSize
+        - activeCount
+        - suppressedCount
+      properties:
+        patterns:
+          type: array
+          items:
+            $ref: '#/components/schemas/PatternSummaryDto'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        activeCount:
+          type: integer
+        suppressedCount:
+          type: integer
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Predictions
+    description: Transaction expense predictions
+  - name: Patterns
+    description: Learned expense patterns management
+  - name: Learning
+    description: Pattern learning and generation operations

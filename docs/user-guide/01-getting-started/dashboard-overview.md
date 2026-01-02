@@ -51,6 +51,7 @@ The [Action Queue](../04-reference/glossary.md#action-queue) shows tasks that ne
 | Receipt | Review extraction | AI-extracted fields need verification |
 | Link | Review match | A match proposal awaits approval |
 | Category | Categorize | Transaction needs GL code assignment |
+| Lightbulb | Review prediction | An [expense prediction](../02-daily-use/predictions/expense-predictions.md) needs review |
 | Document | Review report | Expense report needs attention |
 
 Click any action item to navigate directly to that task.
@@ -198,3 +199,4 @@ Now that you understand the dashboard:
 - [Quick Start](./quick-start.md) - Upload your first receipt
 - [Uploading Receipts](../02-daily-use/receipts/uploading.md) - All upload methods explained
 - [Matching](../02-daily-use/matching/review-modes.md) - Learn to review match proposals
+- [Expense Predictions](../02-daily-use/predictions/expense-predictions.md) - Understand AI-predicted business expenses
