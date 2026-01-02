@@ -534,7 +534,7 @@ public class PredictionsControllerTests
         };
 
         _predictionServiceMock
-            .Setup(s => s.UpdatePatternSuppressionAsync(_testUserId, patternId, true))
+            .Setup(s => s.UpdatePatternSuppressionAsync(_testUserId, It.Is<UpdatePatternSuppressionRequestDto>(r => r.PatternId == patternId && r.IsSuppressed == true)))
             .ReturnsAsync(true);
 
         // Act
@@ -543,7 +543,7 @@ public class PredictionsControllerTests
         // Assert
         result.Should().BeOfType<NoContentResult>();
         _predictionServiceMock.Verify(
-            s => s.UpdatePatternSuppressionAsync(_testUserId, patternId, true),
+            s => s.UpdatePatternSuppressionAsync(_testUserId, It.Is<UpdatePatternSuppressionRequestDto>(r => r.PatternId == patternId && r.IsSuppressed == true)),
             Times.Once);
     }
 
@@ -559,7 +559,7 @@ public class PredictionsControllerTests
         };
 
         _predictionServiceMock
-            .Setup(s => s.UpdatePatternSuppressionAsync(_testUserId, patternId, false))
+            .Setup(s => s.UpdatePatternSuppressionAsync(_testUserId, It.Is<UpdatePatternSuppressionRequestDto>(r => r.PatternId == patternId && r.IsSuppressed == false)))
             .ReturnsAsync(true);
 
         // Act
@@ -568,7 +568,7 @@ public class PredictionsControllerTests
         // Assert
         result.Should().BeOfType<NoContentResult>();
         _predictionServiceMock.Verify(
-            s => s.UpdatePatternSuppressionAsync(_testUserId, patternId, false),
+            s => s.UpdatePatternSuppressionAsync(_testUserId, It.Is<UpdatePatternSuppressionRequestDto>(r => r.PatternId == patternId && r.IsSuppressed == false)),
             Times.Once);
     }
 
@@ -584,7 +584,7 @@ public class PredictionsControllerTests
         };
 
         _predictionServiceMock
-            .Setup(s => s.UpdatePatternSuppressionAsync(_testUserId, patternId, true))
+            .Setup(s => s.UpdatePatternSuppressionAsync(_testUserId, It.Is<UpdatePatternSuppressionRequestDto>(r => r.PatternId == patternId && r.IsSuppressed == true)))
             .ReturnsAsync(false);
 
         // Act

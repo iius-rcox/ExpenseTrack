@@ -81,7 +81,7 @@ public class ExpensePredictionServiceTests
     }
 
     [Fact]
-    public void CalculateDecayWeight_FutureDate_ReturnsFull Weight()
+    public void CalculateDecayWeight_FutureDate_ReturnsFullWeight()
     {
         // Arrange - future date (edge case)
         var reportDate = DateTime.UtcNow.AddDays(30);
