@@ -146,35 +146,37 @@ function TransactionDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Statement Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Statement Information
-            </CardTitle>
-            <CardDescription>Source statement details</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Statement ID</span>
-              <span className="truncate ml-4">{transaction.statementId.slice(0, 8)}...</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Import Date</span>
-              <span>{formatDateTime(transaction.createdAt)}</span>
-            </div>
-            {transaction.rawDescription && transaction.rawDescription !== transaction.description && (
-              <>
-                <Separator />
-                <div className="space-y-1">
-                  <span className="text-muted-foreground">Original Description</span>
-                  <p className="text-xs bg-muted p-2 rounded">{transaction.rawDescription}</p>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        {/* Statement Info - only show if transaction has a statement */}
+        {transaction.statementId && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Statement Information
+              </CardTitle>
+              <CardDescription>Source statement details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Statement ID</span>
+                <span className="truncate ml-4">{transaction.statementId.slice(0, 8)}...</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Import Date</span>
+                <span>{formatDateTime(transaction.createdAt)}</span>
+              </div>
+              {transaction.rawDescription && transaction.rawDescription !== transaction.description && (
+                <>
+                  <Separator />
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground">Original Description</span>
+                    <p className="text-xs bg-muted p-2 rounded">{transaction.rawDescription}</p>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Matched Receipt */}
         <Card className="lg:col-span-2">
