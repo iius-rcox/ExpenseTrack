@@ -14,27 +14,12 @@
  * - Loading state indicators
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { screen, waitFor } from '@testing-library/react'
 import { server } from '@/test-utils/msw-server'
 import { http, HttpResponse } from 'msw'
 import { renderWithProviders } from '@/test-utils/render-with-providers'
-import {
-  fixtureVariants,
-  createMonthlyComparison,
-  createSpendingTrend,
-  createCategoryBreakdown,
-  createMerchantAnalytics,
-  createSubscriptionDetection,
-  createDashboardSummary,
-} from '@/test-utils/fixtures'
-import {
-  createUnauthorizedHandler,
-  createServerErrorHandler,
-  createEmptyResponseHandler,
-  createMalformedResponseHandler,
-  createNetworkErrorHandler,
-} from '@/test-utils/msw-handlers'
+import { fixtureVariants } from '@/test-utils/fixtures'
 
 // =============================================================================
 // Test Component Import
@@ -69,7 +54,7 @@ function setupSuccessHandlers() {
       return HttpResponse.json(fixtureVariants.monthlyComparison.valid)
     }),
     http.get('*/api/analytics/spending-trends', () => {
-      return HttpResponse.json(fixtureVariants.spendingTrends.valid)
+      return HttpResponse.json(fixtureVariants.spendingTrend.valid)
     }),
     http.get('*/api/analytics/categories', () => {
       return HttpResponse.json(fixtureVariants.categoryBreakdown.valid)
@@ -95,7 +80,7 @@ function setupEmptyHandlers() {
       return HttpResponse.json(fixtureVariants.monthlyComparison.empty)
     }),
     http.get('*/api/analytics/spending-trends', () => {
-      return HttpResponse.json(fixtureVariants.spendingTrends.empty)
+      return HttpResponse.json(fixtureVariants.spendingTrend.empty)
     }),
     http.get('*/api/analytics/categories', () => {
       return HttpResponse.json(fixtureVariants.categoryBreakdown.empty)
@@ -429,7 +414,7 @@ describe('Analytics Page Integration', () => {
         }),
         http.get('*/api/analytics/spending-trends', async () => {
           await new Promise((resolve) => setTimeout(resolve, 100))
-          return HttpResponse.json(fixtureVariants.spendingTrends.valid)
+          return HttpResponse.json(fixtureVariants.spendingTrend.valid)
         }),
         http.get('*/api/analytics/categories', async () => {
           await new Promise((resolve) => setTimeout(resolve, 100))

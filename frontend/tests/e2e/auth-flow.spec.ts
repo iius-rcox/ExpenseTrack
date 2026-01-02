@@ -97,14 +97,16 @@ test.describe('Authentication Flow', () => {
 
       // Mock MSAL's loginRedirect to capture the call
       await page.evaluate(() => {
-        // Override the MSAL instance's loginRedirect
-        const originalLoginRedirect = (
-          window as { msalInstance?: { loginRedirect: (params: unknown) => void } }
-        ).msalInstance?.loginRedirect
+        // Type for extended window with MSAL instance
+        type MsalWindow = Window & typeof globalThis & {
+          msalInstance?: { loginRedirect: (params: unknown) => void }
+          captureLoginRedirect?: (params: unknown) => void
+        }
 
-        if ((window as { msalInstance?: { loginRedirect: (params: unknown) => void } }).msalInstance) {
-          (window as { msalInstance: { loginRedirect: (params: unknown) => void } }).msalInstance.loginRedirect = (params: unknown) => {
-            (window as { captureLoginRedirect: (params: unknown) => void }).captureLoginRedirect(params)
+        const win = window as MsalWindow
+        if (win.msalInstance && win.captureLoginRedirect) {
+          win.msalInstance.loginRedirect = (params: unknown) => {
+            win.captureLoginRedirect!(params)
             // Don't actually redirect in test
           }
         }

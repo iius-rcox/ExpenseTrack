@@ -149,25 +149,11 @@ interface ActivityItem {
 // =============================================================================
 
 /**
- * Type assertion function that ensures two types are compatible.
- * If the types don't match, TypeScript will fail to compile.
- */
-type AssertEqual<T, U> = T extends U ? (U extends T ? true : never) : never
-
-/**
  * Asserts that a value matches the expected type shape.
  * This is a runtime no-op but provides compile-time type checking.
  */
 function assertType<T>(_value: T): void {
   // No-op at runtime - type checking happens at compile time
-}
-
-/**
- * Creates a mock object that satisfies the type.
- * Used to verify type structures are valid.
- */
-function createMock<T>(partial: T): T {
-  return partial
 }
 
 // =============================================================================
