@@ -44,6 +44,12 @@ This section covers your regular ExpenseFlow workflows: uploading receipts, impo
 |-------|-------------|
 | [GL Suggestions](./categorization/gl-suggestions.md) | Confirm or skip AI category suggestions |
 
+### Expense Predictions
+| Guide | Description |
+|-------|-------------|
+| [Expense Predictions](./predictions/expense-predictions.md) | Understand how ExpenseFlow predicts business expenses |
+| [Pattern Management](./predictions/pattern-management.md) | View and manage learned expense patterns |
+
 ### Power User
 | Guide | Description |
 |-------|-------------|
@@ -56,11 +62,13 @@ This section covers your regular ExpenseFlow workflows: uploading receipts, impo
          ↓
 2. Import bank statement (weekly/monthly)
          ↓
-3. Review match proposals
+3. Review expense predictions (auto-suggested expenses)
          ↓
-4. Categorize any unmatched transactions
+4. Review match proposals
          ↓
-5. Split shared expenses if needed
+5. Categorize any unmatched transactions
+         ↓
+6. Split shared expenses if needed
 ```
 
 ## Prerequisites

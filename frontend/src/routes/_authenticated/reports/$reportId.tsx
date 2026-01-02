@@ -45,7 +45,9 @@ import {
   DollarSign,
   Receipt,
   Loader2,
+  X,
 } from 'lucide-react'
+import { AutoSuggestedBadge, AutoSuggestedSummary } from '@/components/predictions'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -250,6 +252,14 @@ function ReportDetailPage() {
         </Card>
       </div>
 
+      {/* Feature 023: Auto-Suggested Summary */}
+      {report.lines.some((line) => line.isAutoSuggested) && (
+        <AutoSuggestedSummary
+          autoSuggestedCount={report.lines.filter((line) => line.isAutoSuggested).length}
+          totalCount={report.lineCount}
+        />
+      )}
+
       {/* Expense Lines Table */}
       <Card>
         <CardHeader>
@@ -266,6 +276,10 @@ function ReportDetailPage() {
                 <TableHead>Category</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="w-[80px] text-center">Receipt</TableHead>
+                <TableHead className="w-[120px] text-center">Source</TableHead>
+                {report.status === 'Draft' && (
+                  <TableHead className="w-[60px]"></TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -303,6 +317,25 @@ function ReportDetailPage() {
                       <span className="text-xs text-muted-foreground">-</span>
                     )}
                   </TableCell>
+                  <TableCell className="text-center">
+                    {line.isAutoSuggested ? (
+                      <AutoSuggestedBadge compact />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Manual</span>
+                    )}
+                  </TableCell>
+                  {report.status === 'Draft' && (
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        title="Remove from report"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

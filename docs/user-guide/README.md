@@ -56,6 +56,10 @@ Upload receipts, import statements, and manage expenses.
 **Categorization**
 - [GL Suggestions](02-daily-use/categorization/gl-suggestions.md) - AI-powered category recommendations
 
+**Expense Predictions**
+- [Expense Predictions](02-daily-use/predictions/expense-predictions.md) - Auto-identify business expenses
+- [Pattern Management](02-daily-use/predictions/pattern-management.md) - View and manage learned patterns
+
 **Power User**
 - [Keyboard Shortcuts](02-daily-use/keyboard-shortcuts.md) - Work efficiently
 

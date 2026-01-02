@@ -70,6 +70,19 @@ public class ExpenseLine : BaseEntity
     /// <summary>True if user modified categorization</summary>
     public bool IsUserEdited { get; set; }
 
+    /// <summary>
+    /// True if this line was auto-suggested by expense prediction (Feature 023).
+    /// Auto-suggested lines were pre-selected based on high-confidence patterns
+    /// learned from previous expense reports.
+    /// </summary>
+    public bool IsAutoSuggested { get; set; }
+
+    /// <summary>
+    /// The prediction ID that suggested this line (nullable).
+    /// Allows tracking which prediction led to auto-suggestion.
+    /// </summary>
+    public Guid? PredictionId { get; set; }
+
     /// <summary>Last modification timestamp</summary>
     public DateTime? UpdatedAt { get; set; }
 

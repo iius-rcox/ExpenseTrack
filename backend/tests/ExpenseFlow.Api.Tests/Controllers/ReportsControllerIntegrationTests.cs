@@ -360,7 +360,456 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
 
     #endregion
 
+    #region T056: Auto-Suggested Predictions Tests
+
+    [Fact]
+    public async Task GenerateDraft_WithHighConfidencePrediction_IncludesAutoSuggestedLine()
+    {
+        // Arrange - seed transaction with a pattern that will generate a high-confidence prediction
+        var period = "2024-11";
+        await SeedTransactionWithPredictionAsync(period, 0.85m, PredictionConfidence.High);
+
+        var request = new GenerateDraftRequest { Period = period };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/reports/draft", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var report = await response.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
+        report.Should().NotBeNull();
+        report!.Lines.Should().HaveCount(1);
+
+        var line = report.Lines.First();
+        line.IsAutoSuggested.Should().BeTrue();
+        line.PredictionId.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GenerateDraft_WithMediumConfidencePrediction_DoesNotAutoSuggest()
+    {
+        // Arrange - medium confidence predictions should not be auto-selected
+        var period = "2024-12";
+        await SeedTransactionWithPredictionAsync(period, 0.60m, PredictionConfidence.Medium);
+
+        var request = new GenerateDraftRequest { Period = period };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/reports/draft", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var report = await response.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
+        report.Should().NotBeNull();
+        report!.Lines.Should().HaveCount(1);
+
+        // Medium confidence = not auto-suggested
+        var line = report.Lines.First();
+        line.IsAutoSuggested.Should().BeFalse();
+        line.PredictionId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GenerateDraft_WithSuppressedPattern_DoesNotAutoSuggest()
+    {
+        // Arrange - suppressed patterns should be excluded from auto-suggestions
+        var period = "2025-01";
+        await SeedTransactionWithSuppressedPatternAsync(period);
+
+        var request = new GenerateDraftRequest { Period = period };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/reports/draft", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var report = await response.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
+        report.Should().NotBeNull();
+        report!.Lines.Should().HaveCount(1);
+
+        // Suppressed pattern = not auto-suggested
+        var line = report.Lines.First();
+        line.IsAutoSuggested.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GenerateDraft_WithMultiplePredictions_IncludesAllHighConfidence()
+    {
+        // Arrange - multiple high-confidence predictions
+        var period = "2025-02";
+        await SeedMultipleTransactionsWithPredictionsAsync(period);
+
+        var request = new GenerateDraftRequest { Period = period };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/reports/draft", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var report = await response.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
+        report.Should().NotBeNull();
+        report!.Lines.Should().HaveCount(3);
+
+        // Only high confidence (2 out of 3) should be auto-suggested
+        var autoSuggestedCount = report.Lines.Count(l => l.IsAutoSuggested);
+        autoSuggestedCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task GenerateDraft_AutoSuggestedLine_UsesPredictedCategorization()
+    {
+        // Arrange - prediction with suggested categorization
+        var period = "2025-03";
+        await SeedTransactionWithCategorizedPredictionAsync(period);
+
+        var request = new GenerateDraftRequest { Period = period };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/reports/draft", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var report = await response.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
+        report.Should().NotBeNull();
+
+        var line = report!.Lines.First();
+        line.IsAutoSuggested.Should().BeTrue();
+        // Should inherit categorization from pattern if not already set
+        line.GlCode.Should().NotBeNullOrEmpty();
+        line.DepartmentCode.Should().NotBeNullOrEmpty();
+    }
+
+    #endregion
+
     #region Helper Methods
+
+    private Task SeedTransactionWithPredictionAsync(string period, decimal confidence, PredictionConfidence level)
+    {
+        _factory.SeedDatabase((db, userId) =>
+        {
+            var year = int.Parse(period[..4]);
+            var month = int.Parse(period[5..7]);
+            var transactionDate = new DateOnly(year, month, 15);
+
+            // Create import
+            var import = new StatementImport
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                FileName = $"test-prediction-{period}.csv",
+                FileSize = 1024,
+                TierUsed = 1,
+                TransactionCount = 1,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.StatementImports.Add(import);
+
+            // Create transaction
+            var transaction = new Transaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                ImportId = import.Id,
+                TransactionDate = transactionDate,
+                PostDate = transactionDate,
+                Description = "STARBUCKS STORE 123",
+                OriginalDescription = "STARBUCKS STORE 123",
+                Amount = 5.75m,
+                DuplicateHash = Guid.NewGuid().ToString("N"),
+                MatchStatus = MatchStatus.Unmatched,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.Transactions.Add(transaction);
+
+            // Create pattern
+            var pattern = new ExpensePattern
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                NormalizedVendor = "starbucks",
+                DisplayName = "Starbucks Coffee",
+                Category = "Food & Beverage",
+                AverageAmount = 5.50m,
+                MinAmount = 4.00m,
+                MaxAmount = 8.00m,
+                OccurrenceCount = 10,
+                ConfirmCount = 8,
+                RejectCount = 1,
+                LastSeenAt = DateTime.UtcNow,
+                IsSuppressed = false,
+                DefaultGLCode = "6250",
+                DefaultDepartment = "IT",
+                CreatedAt = DateTime.UtcNow
+            };
+            db.ExpensePatterns.Add(pattern);
+
+            // Create prediction (only if high confidence)
+            if (level == PredictionConfidence.High)
+            {
+                var prediction = new TransactionPrediction
+                {
+                    Id = Guid.NewGuid(),
+                    TransactionId = transaction.Id,
+                    PatternId = pattern.Id,
+                    UserId = userId,
+                    ConfidenceScore = confidence,
+                    ConfidenceLevel = level,
+                    Status = PredictionStatus.Pending,
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.TransactionPredictions.Add(prediction);
+            }
+
+            db.SaveChanges();
+        });
+        return Task.CompletedTask;
+    }
+
+    private Task SeedTransactionWithSuppressedPatternAsync(string period)
+    {
+        _factory.SeedDatabase((db, userId) =>
+        {
+            var year = int.Parse(period[..4]);
+            var month = int.Parse(period[5..7]);
+            var transactionDate = new DateOnly(year, month, 15);
+
+            var import = new StatementImport
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                FileName = $"test-suppressed-{period}.csv",
+                FileSize = 1024,
+                TierUsed = 1,
+                TransactionCount = 1,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.StatementImports.Add(import);
+
+            var transaction = new Transaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                ImportId = import.Id,
+                TransactionDate = transactionDate,
+                PostDate = transactionDate,
+                Description = "SUPPRESSED VENDOR",
+                OriginalDescription = "SUPPRESSED VENDOR",
+                Amount = 50.00m,
+                DuplicateHash = Guid.NewGuid().ToString("N"),
+                MatchStatus = MatchStatus.Unmatched,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.Transactions.Add(transaction);
+
+            // Create suppressed pattern
+            var pattern = new ExpensePattern
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                NormalizedVendor = "suppressedvendor",
+                DisplayName = "Suppressed Vendor",
+                Category = "Misc",
+                AverageAmount = 50.00m,
+                MinAmount = 40.00m,
+                MaxAmount = 60.00m,
+                OccurrenceCount = 5,
+                ConfirmCount = 1,
+                RejectCount = 10, // Many rejects = suppressed
+                LastSeenAt = DateTime.UtcNow,
+                IsSuppressed = true, // Key: pattern is suppressed
+                CreatedAt = DateTime.UtcNow
+            };
+            db.ExpensePatterns.Add(pattern);
+
+            // Prediction exists but pattern is suppressed - should be excluded
+            var prediction = new TransactionPrediction
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                PatternId = pattern.Id,
+                UserId = userId,
+                ConfidenceScore = 0.90m,
+                ConfidenceLevel = PredictionConfidence.High,
+                Status = PredictionStatus.Pending,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.TransactionPredictions.Add(prediction);
+
+            db.SaveChanges();
+        });
+        return Task.CompletedTask;
+    }
+
+    private Task SeedMultipleTransactionsWithPredictionsAsync(string period)
+    {
+        _factory.SeedDatabase((db, userId) =>
+        {
+            var year = int.Parse(period[..4]);
+            var month = int.Parse(period[5..7]);
+            var transactionDate = new DateOnly(year, month, 15);
+
+            var import = new StatementImport
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                FileName = $"test-multiple-{period}.csv",
+                FileSize = 1024,
+                TierUsed = 1,
+                TransactionCount = 3,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.StatementImports.Add(import);
+
+            // Create pattern
+            var pattern = new ExpensePattern
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                NormalizedVendor = "multivendor",
+                DisplayName = "Multi Vendor",
+                Category = "Test",
+                AverageAmount = 25.00m,
+                MinAmount = 20.00m,
+                MaxAmount = 30.00m,
+                OccurrenceCount = 10,
+                ConfirmCount = 8,
+                RejectCount = 1,
+                LastSeenAt = DateTime.UtcNow,
+                IsSuppressed = false,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.ExpensePatterns.Add(pattern);
+
+            // Create 3 transactions with different confidence levels
+            var confidences = new[]
+            {
+                (0.85m, PredictionConfidence.High),    // Auto-suggested
+                (0.60m, PredictionConfidence.Medium), // Not auto-suggested
+                (0.90m, PredictionConfidence.High)    // Auto-suggested
+            };
+
+            for (int i = 0; i < 3; i++)
+            {
+                var transaction = new Transaction
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    ImportId = import.Id,
+                    TransactionDate = transactionDate.AddDays(i),
+                    PostDate = transactionDate.AddDays(i),
+                    Description = $"MULTI VENDOR STORE {i}",
+                    OriginalDescription = $"MULTI VENDOR STORE {i}",
+                    Amount = 25.00m + i,
+                    DuplicateHash = Guid.NewGuid().ToString("N"),
+                    MatchStatus = MatchStatus.Unmatched,
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.Transactions.Add(transaction);
+
+                var (score, level) = confidences[i];
+                // Only create predictions for high confidence
+                if (level == PredictionConfidence.High)
+                {
+                    var prediction = new TransactionPrediction
+                    {
+                        Id = Guid.NewGuid(),
+                        TransactionId = transaction.Id,
+                        PatternId = pattern.Id,
+                        UserId = userId,
+                        ConfidenceScore = score,
+                        ConfidenceLevel = level,
+                        Status = PredictionStatus.Pending,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    db.TransactionPredictions.Add(prediction);
+                }
+            }
+
+            db.SaveChanges();
+        });
+        return Task.CompletedTask;
+    }
+
+    private Task SeedTransactionWithCategorizedPredictionAsync(string period)
+    {
+        _factory.SeedDatabase((db, userId) =>
+        {
+            var year = int.Parse(period[..4]);
+            var month = int.Parse(period[5..7]);
+            var transactionDate = new DateOnly(year, month, 15);
+
+            var import = new StatementImport
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                FileName = $"test-categorized-{period}.csv",
+                FileSize = 1024,
+                TierUsed = 1,
+                TransactionCount = 1,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.StatementImports.Add(import);
+
+            var transaction = new Transaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                ImportId = import.Id,
+                TransactionDate = transactionDate,
+                PostDate = transactionDate,
+                Description = "OFFICE DEPOT #456",
+                OriginalDescription = "OFFICE DEPOT #456",
+                Amount = 125.99m,
+                DuplicateHash = Guid.NewGuid().ToString("N"),
+                MatchStatus = MatchStatus.Unmatched,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.Transactions.Add(transaction);
+
+            // Pattern with full categorization
+            var pattern = new ExpensePattern
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                NormalizedVendor = "officedepot",
+                DisplayName = "Office Depot",
+                Category = "Office Supplies",
+                AverageAmount = 120.00m,
+                MinAmount = 50.00m,
+                MaxAmount = 200.00m,
+                OccurrenceCount = 15,
+                ConfirmCount = 12,
+                RejectCount = 2,
+                LastSeenAt = DateTime.UtcNow,
+                IsSuppressed = false,
+                DefaultGLCode = "6100",
+                DefaultDepartment = "ADMIN",
+                CreatedAt = DateTime.UtcNow
+            };
+            db.ExpensePatterns.Add(pattern);
+
+            var prediction = new TransactionPrediction
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                PatternId = pattern.Id,
+                UserId = userId,
+                ConfidenceScore = 0.92m,
+                ConfidenceLevel = PredictionConfidence.High,
+                Status = PredictionStatus.Pending,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.TransactionPredictions.Add(prediction);
+
+            db.SaveChanges();
+        });
+        return Task.CompletedTask;
+    }
 
     private Task SeedTransactionForPeriodAsync(string period)
     {

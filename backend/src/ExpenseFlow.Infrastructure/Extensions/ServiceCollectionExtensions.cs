@@ -144,6 +144,11 @@ public static class ServiceCollectionExtensions
         // Feature 021: Analytics Export
         services.AddScoped<IAnalyticsExportService, AnalyticsExportService>();
 
+        // Feature 023: Expense Prediction
+        services.AddScoped<IExpensePatternRepository, ExpensePatternRepository>();
+        services.AddScoped<ITransactionPredictionRepository, TransactionPredictionRepository>();
+        services.AddScoped<IExpensePredictionService, ExpensePredictionService>();
+
         return services;
     }
 }

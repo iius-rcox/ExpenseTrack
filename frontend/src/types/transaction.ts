@@ -9,6 +9,8 @@
  * @see data-model.md Section 4 for type specifications
  */
 
+import type { PredictionSummary } from './prediction';
+
 // =============================================================================
 // View Models
 // =============================================================================
@@ -70,6 +72,8 @@ export interface TransactionView {
   statementId?: string;
   /** Import file name for display */
   importFileName?: string;
+  /** Expense prediction for this transaction (Feature 023) */
+  prediction?: PredictionSummary | null;
 }
 
 // =============================================================================

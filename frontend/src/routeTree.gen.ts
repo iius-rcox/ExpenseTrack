@@ -23,6 +23,7 @@ import { Route as AuthenticatedAnalyticsIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedTransactionsTransactionIdRouteImport } from './routes/_authenticated/transactions/$transactionId'
 import { Route as AuthenticatedReportsReportIdRouteImport } from './routes/_authenticated/reports/$reportId'
 import { Route as AuthenticatedReceiptsReceiptIdRouteImport } from './routes/_authenticated/receipts/$receiptId'
+import { Route as AuthenticatedPredictionsPatternsRouteImport } from './routes/_authenticated/predictions/patterns'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -103,11 +104,18 @@ const AuthenticatedReceiptsReceiptIdRoute =
     path: '/receipts/$receiptId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedPredictionsPatternsRoute =
+  AuthenticatedPredictionsPatternsRouteImport.update({
+    id: '/predictions/patterns',
+    path: '/predictions/patterns',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/predictions/patterns': typeof AuthenticatedPredictionsPatternsRoute
   '/receipts/$receiptId': typeof AuthenticatedReceiptsReceiptIdRoute
   '/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
   '/transactions/$transactionId': typeof AuthenticatedTransactionsTransactionIdRoute
@@ -123,6 +131,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/predictions/patterns': typeof AuthenticatedPredictionsPatternsRoute
   '/receipts/$receiptId': typeof AuthenticatedReceiptsReceiptIdRoute
   '/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
   '/transactions/$transactionId': typeof AuthenticatedTransactionsTransactionIdRoute
@@ -140,6 +149,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/predictions/patterns': typeof AuthenticatedPredictionsPatternsRoute
   '/_authenticated/receipts/$receiptId': typeof AuthenticatedReceiptsReceiptIdRoute
   '/_authenticated/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
   '/_authenticated/transactions/$transactionId': typeof AuthenticatedTransactionsTransactionIdRoute
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/predictions/patterns'
     | '/receipts/$receiptId'
     | '/reports/$reportId'
     | '/transactions/$transactionId'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/predictions/patterns'
     | '/receipts/$receiptId'
     | '/reports/$reportId'
     | '/transactions/$transactionId'
@@ -188,6 +200,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/_authenticated/dashboard'
+    | '/_authenticated/predictions/patterns'
     | '/_authenticated/receipts/$receiptId'
     | '/_authenticated/reports/$reportId'
     | '/_authenticated/transactions/$transactionId'
@@ -306,11 +319,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReceiptsReceiptIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/predictions/patterns': {
+      id: '/_authenticated/predictions/patterns'
+      path: '/predictions/patterns'
+      fullPath: '/predictions/patterns'
+      preLoaderRoute: typeof AuthenticatedPredictionsPatternsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedPredictionsPatternsRoute: typeof AuthenticatedPredictionsPatternsRoute
   AuthenticatedReceiptsReceiptIdRoute: typeof AuthenticatedReceiptsReceiptIdRoute
   AuthenticatedReportsReportIdRoute: typeof AuthenticatedReportsReportIdRoute
   AuthenticatedTransactionsTransactionIdRoute: typeof AuthenticatedTransactionsTransactionIdRoute
@@ -325,6 +346,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedPredictionsPatternsRoute: AuthenticatedPredictionsPatternsRoute,
   AuthenticatedReceiptsReceiptIdRoute: AuthenticatedReceiptsReceiptIdRoute,
   AuthenticatedReportsReportIdRoute: AuthenticatedReportsReportIdRoute,
   AuthenticatedTransactionsTransactionIdRoute:

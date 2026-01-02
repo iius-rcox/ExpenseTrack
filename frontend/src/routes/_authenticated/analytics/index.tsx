@@ -17,7 +17,7 @@
  */
 
 import { useState, useMemo } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { motion } from 'framer-motion'
 import {
   useMonthlyComparison,
@@ -46,6 +46,7 @@ import {
   Database,
   RefreshCcw,
   AlertCircle,
+  Brain,
 } from 'lucide-react'
 import type { AnalyticsDateRange, TimeGranularity } from '@/types/analytics'
 
@@ -308,6 +309,12 @@ function AnalyticsDashboard() {
           />
           <Button variant="outline" size="icon" onClick={() => refetch()}>
             <RefreshCcw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/predictions/patterns" className="gap-2">
+              <Brain className="h-4 w-4" />
+              <span className="hidden sm:inline">Expense Patterns</span>
+            </Link>
           </Button>
         </div>
       </div>

@@ -231,6 +231,10 @@ export interface ExpenseLine {
   missingReceiptJustification: string | null
   notes: string | null
   splitAllocations: SplitAllocation[]
+  /** Feature 023: True if this line was auto-suggested by expense prediction */
+  isAutoSuggested?: boolean
+  /** Feature 023: The prediction ID that suggested this line */
+  predictionId?: string | null
 }
 
 export interface SplitAllocation {
