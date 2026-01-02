@@ -492,12 +492,13 @@ public class ReportsControllerTests
         // Arrange
         var reportId = Guid.NewGuid();
         var generatedAt = DateTimeOffset.UtcNow.AddHours(-1);
+        var submittedAt = DateTimeOffset.UtcNow;
         var expectedResponse = new SubmitReportResponseDto
         {
             ReportId = reportId,
             Status = "Submitted",
             GeneratedAt = generatedAt,
-            SubmittedAt = DateTimeOffset.UtcNow
+            SubmittedAt = submittedAt
         };
 
         _reportServiceMock
@@ -513,6 +514,7 @@ public class ReportsControllerTests
         response.Status.Should().Be("Submitted");
         response.ReportId.Should().Be(reportId);
         response.GeneratedAt.Should().Be(generatedAt);
+        response.SubmittedAt.Should().Be(submittedAt);
     }
 
     [Fact]

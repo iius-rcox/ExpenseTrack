@@ -13,6 +13,9 @@ public class SubmitReportResponseDto
     /// <summary>New report status (Submitted)</summary>
     public string Status { get; set; } = ReportStatus.Submitted.ToString();
 
+    /// <summary>Timestamp when the report was originally generated</summary>
+    public DateTimeOffset GeneratedAt { get; set; }
+
     /// <summary>Timestamp when the report was submitted</summary>
     public DateTimeOffset SubmittedAt { get; set; }
 }

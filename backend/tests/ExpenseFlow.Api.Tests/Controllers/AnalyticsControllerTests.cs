@@ -271,18 +271,18 @@ public class AnalyticsControllerTests : IDisposable
         // Arrange
         var request = new AnalyticsExportRequestDto
         {
-            StartDate = new DateOnly(2024, 1, 1),
-            EndDate = new DateOnly(2024, 6, 30),
+            StartDate = "2024-01-01",
+            EndDate = "2024-06-30",
             Format = "csv",
-            Sections = new[] { "trends", "categories" }
+            Sections = "trends,categories"
         };
 
         var csvContent = "Test CSV Content"u8.ToArray();
         _analyticsExportServiceMock
             .Setup(x => x.ExportAsync(
                 _testUserId,
-                request.StartDate,
-                request.EndDate,
+                It.IsAny<DateOnly>(),
+                It.IsAny<DateOnly>(),
                 "csv",
                 It.Is<IReadOnlyList<string>>(s => s.Contains("trends") && s.Contains("categories")),
                 It.IsAny<CancellationToken>()))
@@ -303,18 +303,18 @@ public class AnalyticsControllerTests : IDisposable
         // Arrange
         var request = new AnalyticsExportRequestDto
         {
-            StartDate = new DateOnly(2024, 1, 1),
-            EndDate = new DateOnly(2024, 12, 31),
+            StartDate = "2024-01-01",
+            EndDate = "2024-12-31",
             Format = "xlsx",
-            Sections = new[] { "trends", "categories", "vendors" }
+            Sections = "trends,categories,vendors"
         };
 
         var excelContent = new byte[] { 0x50, 0x4B, 0x03, 0x04 }; // XLSX magic bytes
         _analyticsExportServiceMock
             .Setup(x => x.ExportAsync(
                 _testUserId,
-                request.StartDate,
-                request.EndDate,
+                It.IsAny<DateOnly>(),
+                It.IsAny<DateOnly>(),
                 "xlsx",
                 It.IsAny<IReadOnlyList<string>>(),
                 It.IsAny<CancellationToken>()))
@@ -335,10 +335,10 @@ public class AnalyticsControllerTests : IDisposable
         // Arrange
         var request = new AnalyticsExportRequestDto
         {
-            StartDate = new DateOnly(2019, 1, 1),
-            EndDate = new DateOnly(2025, 6, 1), // > 5 years
+            StartDate = "2019-01-01",
+            EndDate = "2025-06-01", // > 5 years
             Format = "csv",
-            Sections = new[] { "trends" }
+            Sections = "trends"
         };
 
         _analyticsExportServiceMock
@@ -364,10 +364,10 @@ public class AnalyticsControllerTests : IDisposable
         // Arrange
         var request = new AnalyticsExportRequestDto
         {
-            StartDate = new DateOnly(2024, 12, 1),
-            EndDate = new DateOnly(2024, 1, 1), // Before start
+            StartDate = "2024-12-01",
+            EndDate = "2024-01-01", // Before start
             Format = "csv",
-            Sections = new[] { "trends" }
+            Sections = "trends"
         };
 
         _analyticsExportServiceMock
@@ -393,8 +393,8 @@ public class AnalyticsControllerTests : IDisposable
         // Arrange
         var request = new AnalyticsExportRequestDto
         {
-            StartDate = new DateOnly(2024, 1, 1),
-            EndDate = new DateOnly(2024, 6, 30),
+            StartDate = "2024-01-01",
+            EndDate = "2024-06-30",
             Format = "csv",
             Sections = null // Default
         };
@@ -402,8 +402,8 @@ public class AnalyticsControllerTests : IDisposable
         _analyticsExportServiceMock
             .Setup(x => x.ExportAsync(
                 _testUserId,
-                request.StartDate,
-                request.EndDate,
+                It.IsAny<DateOnly>(),
+                It.IsAny<DateOnly>(),
                 "csv",
                 It.Is<IReadOnlyList<string>>(s => s.Count == 3), // Default sections: trends, categories, vendors
                 It.IsAny<CancellationToken>()))
@@ -416,8 +416,8 @@ public class AnalyticsControllerTests : IDisposable
         _analyticsExportServiceMock.Verify(
             x => x.ExportAsync(
                 _testUserId,
-                request.StartDate,
-                request.EndDate,
+                It.IsAny<DateOnly>(),
+                It.IsAny<DateOnly>(),
                 "csv",
                 It.Is<IReadOnlyList<string>>(s => s.Count == 3),
                 It.IsAny<CancellationToken>()),
@@ -430,10 +430,10 @@ public class AnalyticsControllerTests : IDisposable
         // Arrange
         var request = new AnalyticsExportRequestDto
         {
-            StartDate = new DateOnly(2024, 1, 1),
-            EndDate = new DateOnly(2024, 6, 30),
+            StartDate = "2024-01-01",
+            EndDate = "2024-06-30",
             Format = "csv",
-            Sections = new[] { "trends" }
+            Sections = "trends"
         };
 
         _analyticsExportServiceMock
@@ -460,17 +460,17 @@ public class AnalyticsControllerTests : IDisposable
         // Arrange
         var request = new AnalyticsExportRequestDto
         {
-            StartDate = new DateOnly(2024, 1, 1),
-            EndDate = new DateOnly(2024, 6, 30),
+            StartDate = "2024-01-01",
+            EndDate = "2024-06-30",
             Format = "csv",
-            Sections = new[] { "transactions" }
+            Sections = "transactions"
         };
 
         _analyticsExportServiceMock
             .Setup(x => x.ExportAsync(
                 _testUserId,
-                request.StartDate,
-                request.EndDate,
+                It.IsAny<DateOnly>(),
+                It.IsAny<DateOnly>(),
                 "csv",
                 It.Is<IReadOnlyList<string>>(s => s.Contains("transactions")),
                 It.IsAny<CancellationToken>()))
