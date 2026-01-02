@@ -65,7 +65,7 @@ describe('Settings Page Integration', () => {
         })
       }),
       http.put('*/api/users/preferences', async ({ request }) => {
-        const body = await request.json()
+        const body = await request.json() as Record<string, unknown>
         return HttpResponse.json({
           ...body,
           updatedAt: new Date().toISOString(),

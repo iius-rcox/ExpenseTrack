@@ -9,7 +9,7 @@
  * - Route guards function correctly
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { screen, waitFor, cleanup } from '@testing-library/react'
 import { server } from '@/test-utils/msw-server'
 import { http, HttpResponse } from 'msw'
@@ -59,7 +59,7 @@ function setupSuccessHandlers() {
       return HttpResponse.json(fixtureVariants.monthlyComparison.valid)
     }),
     http.get('*/api/analytics/spending-trends', () => {
-      return HttpResponse.json(fixtureVariants.spendingTrends.valid)
+      return HttpResponse.json(fixtureVariants.spendingTrend.valid)
     }),
     http.get('*/api/analytics/categories', () => {
       return HttpResponse.json(fixtureVariants.categoryBreakdown.valid)

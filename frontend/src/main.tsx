@@ -16,18 +16,24 @@ const msalInstance = new PublicClientApplication(msalConfig)
 // Share MSAL instance with API service
 setMsalInstance(msalInstance)
 
-// Handle redirect promise on page load
-msalInstance.initialize().then(() => {
-  // Handle redirect response if coming back from login
-  msalInstance.handleRedirectPromise().then((response) => {
+// Initialize MSAL and handle authentication
+async function initializeApp() {
+  // Initialize MSAL instance
+  await msalInstance.initialize()
+
+  // CRITICAL: Wait for redirect promise to complete before rendering
+  // This handles the case when the user returns from Microsoft login
+  try {
+    const response = await msalInstance.handleRedirectPromise()
     if (response) {
+      // User just logged in via redirect - set them as active
       msalInstance.setActiveAccount(response.account)
     }
-  }).catch((error) => {
+  } catch (error) {
     console.error('Redirect error:', error)
-  })
+  }
 
-  // Set active account on login success
+  // Set active account on login success (for popup flow, if used later)
   msalInstance.addEventCallback((event: EventMessage) => {
     if (event.eventType === EventType.LOGIN_SUCCESS && event.payload) {
       const payload = event.payload as AuthenticationResult
@@ -35,13 +41,13 @@ msalInstance.initialize().then(() => {
     }
   })
 
-  // Check if there's already an active account
+  // Check if there's already an active account (returning user with cached session)
   const accounts = msalInstance.getAllAccounts()
-  if (accounts.length > 0) {
+  if (accounts.length > 0 && !msalInstance.getActiveAccount()) {
     msalInstance.setActiveAccount(accounts[0])
   }
 
-  // Get the active account for router context
+  // Get the active account for router context - now properly set after redirect handling
   const account = msalInstance.getActiveAccount()
 
   // Render app
@@ -62,4 +68,7 @@ msalInstance.initialize().then(() => {
       </QueryClientProvider>
     </StrictMode>
   )
-})
+}
+
+// Start the app
+initializeApp()

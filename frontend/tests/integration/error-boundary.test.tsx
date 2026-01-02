@@ -9,7 +9,6 @@
  * - Section isolation (errors in one section don't affect others)
  */
 
-import { useState } from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ErrorBoundary } from '@/components/error-boundary/ErrorBoundary'
@@ -29,37 +28,9 @@ function ThrowingComponent({ shouldThrow = true }: { shouldThrow?: boolean }) {
   return <div data-testid="working-component">Component rendered successfully</div>
 }
 
-/**
- * Component that throws on specific interaction
- */
-function ConditionalThrowingComponent() {
-  const [shouldThrow, setShouldThrow] = useState(false)
-  if (shouldThrow) {
-    throw new Error('Conditional error')
-  }
-  return (
-    <div>
-      <button onClick={() => setShouldThrow(true)}>Trigger Error</button>
-    </div>
-  )
-}
-
-/**
- * Component that throws after initial render
- */
-function DelayedThrowingComponent({ throwAfter = 0 }: { throwAfter?: number }) {
-  const [hasThrown, setHasThrown] = useState(false)
-
-  if (hasThrown) {
-    throw new Error('Delayed error')
-  }
-
-  if (throwAfter > 0) {
-    setTimeout(() => setHasThrown(true), throwAfter)
-  }
-
-  return <div>Waiting to throw...</div>
-}
+// Note: Future test utilities for interactive and delayed error testing
+// are intentionally not defined here to avoid unused variable warnings.
+// Add them when writing tests that require controlled error triggering.
 
 // =============================================================================
 // ErrorBoundary Tests
@@ -446,8 +417,8 @@ describe('ErrorBoundary with ErrorFallback Integration', () => {
   it('works with CompactErrorFallback as render prop', () => {
     render(
       <ErrorBoundary
-        fallback={(error, resetError) => (
-          <CompactErrorFallback error={error} resetError={resetError} />
+        fallback={(_error, resetError) => (
+          <CompactErrorFallback resetError={resetError} />
         )}
       >
         <ThrowingComponent />
