@@ -1,6 +1,6 @@
 "use client"
 
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useMsal } from '@azure/msal-react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,12 @@ const loginSearchSchema = z.object({
 
 export const Route = createFileRoute('/login')({
   validateSearch: loginSearchSchema,
+  beforeLoad: ({ context, search }) => {
+    // If user is already authenticated, redirect to dashboard or requested page
+    if (context.isAuthenticated && context.account) {
+      throw redirect({ to: search.redirect || '/dashboard' })
+    }
+  },
   component: LoginPage,
 })
 
