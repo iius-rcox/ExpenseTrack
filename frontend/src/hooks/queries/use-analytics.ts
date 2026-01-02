@@ -133,7 +133,7 @@ export function getDateRangeFromPreset(preset: DateRangePreset): AnalyticsDateRa
 export function useMonthlyComparison(period: string) {
   return useQuery({
     queryKey: analyticsKeys.monthlyComparison(period),
-    queryFn: () => apiFetch<MonthlyComparison>(`/analytics/monthly-comparison?period=${period}`),
+    queryFn: () => apiFetch<MonthlyComparison>(`/analytics/comparison?currentPeriod=${period}`),
     enabled: !!period,
     staleTime: 5 * 60 * 1000, // 5 minutes
   })

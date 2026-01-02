@@ -16,8 +16,8 @@ import { http, HttpResponse, delay } from 'msw'
 // =============================================================================
 
 export const analyticsHandlers = [
-  // Monthly Comparison - GET /api/analytics/monthly-comparison
-  http.get('/api/analytics/monthly-comparison', async () => {
+  // Monthly Comparison - GET /api/analytics/comparison
+  http.get('/api/analytics/comparison', async () => {
     await delay(50) // Simulate network latency
     return HttpResponse.json({
       currentTotal: 2547.89,
@@ -375,9 +375,9 @@ export const errorHandlers = {
   analytics: {
     monthlyComparison: {
       unauthorized: createUnauthorizedHandler(
-        '/api/analytics/monthly-comparison'
+        '/api/analytics/comparison'
       ),
-      serverError: createServerErrorHandler('/api/analytics/monthly-comparison'),
+      serverError: createServerErrorHandler('/api/analytics/comparison'),
     },
     spendingTrend: {
       unauthorized: createUnauthorizedHandler('/api/analytics/spending-trend'),

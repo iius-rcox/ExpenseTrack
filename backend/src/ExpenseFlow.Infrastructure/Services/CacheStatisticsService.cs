@@ -41,11 +41,15 @@ public class CacheStatisticsService : ICacheStatisticsService
         // Parse period into date range
         var (startDate, endDate) = ParsePeriodRange(period);
 
+        // Convert to UTC DateTime for PostgreSQL timestamp with time zone compatibility
+        var startDateTime = DateTime.SpecifyKind(startDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        var endDateTime = DateTime.SpecifyKind(endDate.ToDateTime(TimeOnly.MaxValue), DateTimeKind.Utc);
+
         // Query tier usage logs for the period
         var logsQuery = _context.TierUsageLogs
             .Where(l => l.UserId == userId &&
-                       l.CreatedAt >= startDate.ToDateTime(TimeOnly.MinValue) &&
-                       l.CreatedAt <= endDate.ToDateTime(TimeOnly.MaxValue));
+                       l.CreatedAt >= startDateTime &&
+                       l.CreatedAt <= endDateTime);
 
         // Calculate overall statistics
         var overall = await CalculateOverallStatisticsAsync(logsQuery, ct);
