@@ -1,0 +1,476 @@
+# OpenAPI Subset for Frontend Contract Validation
+# Feature: 022-frontend-integration-tests
+#
+# This file defines the API contracts that the frontend depends on.
+# It is a subset of the full backend OpenAPI spec, focused on endpoints
+# that are critical for frontend integration tests.
+#
+# Usage: The contract tests compare these schemas against:
+#   1. Backend-generated OpenAPI spec (source of truth)
+#   2. Frontend TypeScript types (must match)
+#
+# During CI, the contract validation step:
+#   1. Fetches the latest OpenAPI spec from the backend
+#   2. Uses openapi-typescript to generate TypeScript types
+#   3. Compares generated types against frontend types
+#   4. Fails if any mismatches are detected
+
+openapi: 3.0.3
+info:
+  title: ExpenseFlow API - Frontend Contract Subset
+  version: 1.0.0
+  description: |
+    Subset of ExpenseFlow API contracts critical for frontend integration.
+    These contracts are validated automatically in CI.
+
+paths:
+  # ============================================
+  # Analytics Endpoints (Critical for Dashboard)
+  # ============================================
+
+  /api/analytics/monthly-comparison:
+    get:
+      summary: Get month-over-month spending comparison
+      operationId: getMonthlyComparison
+      tags: [Analytics]
+      parameters:
+        - name: currentMonth
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: previousMonth
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Monthly comparison data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyComparisonResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/analytics/spending-trend:
+    get:
+      summary: Get spending trend over time
+      operationId: getSpendingTrend
+      tags: [Analytics]
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: granularity
+          in: query
+          schema:
+            type: string
+            enum: [daily, weekly, monthly]
+            default: daily
+      responses:
+        '200':
+          description: Spending trend data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SpendingTrendItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/analytics/spending-by-category:
+    get:
+      summary: Get spending breakdown by category
+      operationId: getSpendingByCategory
+      tags: [Analytics]
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Category breakdown data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryBreakdownItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/analytics/merchants:
+    get:
+      summary: Get top merchants analytics
+      operationId: getMerchantAnalytics
+      tags: [Analytics]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Merchant analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchantAnalyticsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/analytics/subscriptions:
+    get:
+      summary: Get detected subscriptions
+      operationId: getSubscriptions
+      tags: [Analytics]
+      responses:
+        '200':
+          description: Subscription detection results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionDetectionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================
+  # Dashboard Endpoints
+  # ============================================
+
+  /api/dashboard/summary:
+    get:
+      summary: Get dashboard summary metrics
+      operationId: getDashboardSummary
+      tags: [Dashboard]
+      responses:
+        '200':
+          description: Dashboard summary data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummaryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  schemas:
+    # ============================================
+    # Analytics Schemas
+    # ============================================
+
+    MonthlyComparisonResponse:
+      type: object
+      required:
+        - currentTotal
+        - previousTotal
+        - percentageChange
+      properties:
+        currentTotal:
+          type: number
+          format: double
+          minimum: 0
+          description: Total spending in current period
+        previousTotal:
+          type: number
+          format: double
+          minimum: 0
+          description: Total spending in previous period
+        percentageChange:
+          type: number
+          format: double
+          description: Percentage change between periods
+        newVendors:
+          type: array
+          items:
+            $ref: '#/components/schemas/VendorChange'
+          description: Vendors appearing in current period but not previous
+        missingRecurring:
+          type: array
+          items:
+            $ref: '#/components/schemas/VendorChange'
+          description: Expected recurring vendors not seen in current period
+        significantChanges:
+          type: array
+          items:
+            $ref: '#/components/schemas/VendorChange'
+          description: Vendors with notable spending changes
+
+    VendorChange:
+      type: object
+      required:
+        - vendorName
+        - currentAmount
+        - previousAmount
+      properties:
+        vendorName:
+          type: string
+        currentAmount:
+          type: number
+          format: double
+        previousAmount:
+          type: number
+          format: double
+        changePercentage:
+          type: number
+          format: double
+
+    SpendingTrendItem:
+      type: object
+      required:
+        - date
+        - amount
+        - transactionCount
+      properties:
+        date:
+          type: string
+          format: date-time
+          description: Period date in ISO 8601 format
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          description: Total spending for this period
+        transactionCount:
+          type: integer
+          minimum: 0
+          description: Number of transactions in this period
+
+    CategoryBreakdownItem:
+      type: object
+      required:
+        - category
+        - amount
+        - percentageOfTotal
+        - transactionCount
+      properties:
+        category:
+          type: string
+          description: Category name
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          description: Total amount in this category
+        percentageOfTotal:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          description: Percentage of total spending
+        transactionCount:
+          type: integer
+          minimum: 0
+          description: Number of transactions in this category
+
+    MerchantAnalyticsResponse:
+      type: object
+      required:
+        - merchants
+        - totalMerchants
+      properties:
+        merchants:
+          type: array
+          items:
+            $ref: '#/components/schemas/MerchantItem'
+        totalMerchants:
+          type: integer
+          minimum: 0
+          description: Total unique merchants in the system
+
+    MerchantItem:
+      type: object
+      required:
+        - merchantName
+        - totalSpent
+        - transactionCount
+      properties:
+        merchantName:
+          type: string
+        totalSpent:
+          type: number
+          format: double
+          minimum: 0
+        transactionCount:
+          type: integer
+          minimum: 0
+        lastTransaction:
+          type: string
+          format: date-time
+        averageTransaction:
+          type: number
+          format: double
+
+    SubscriptionDetectionResponse:
+      type: object
+      required:
+        - subscriptions
+        - totalMonthlyEstimate
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionItem'
+        totalMonthlyEstimate:
+          type: number
+          format: double
+          minimum: 0
+          description: Estimated total monthly subscription cost
+
+    SubscriptionItem:
+      type: object
+      required:
+        - merchantName
+        - estimatedAmount
+        - frequency
+        - confidence
+      properties:
+        merchantName:
+          type: string
+        estimatedAmount:
+          type: number
+          format: double
+          minimum: 0
+        frequency:
+          type: string
+          enum: [weekly, biweekly, monthly, quarterly, annual]
+        confidence:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: Detection confidence score (0-1)
+        lastOccurrence:
+          type: string
+          format: date-time
+        nextExpected:
+          type: string
+          format: date-time
+
+    # ============================================
+    # Dashboard Schemas
+    # ============================================
+
+    DashboardSummaryResponse:
+      type: object
+      required:
+        - totalTransactions
+        - totalSpending
+        - pendingReceipts
+        - recentActivity
+      properties:
+        totalTransactions:
+          type: integer
+          minimum: 0
+        totalSpending:
+          type: number
+          format: double
+          minimum: 0
+        pendingReceipts:
+          type: integer
+          minimum: 0
+        matchedReceipts:
+          type: integer
+          minimum: 0
+        recentActivity:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivityItem'
+
+    ActivityItem:
+      type: object
+      required:
+        - type
+        - description
+        - timestamp
+      properties:
+        type:
+          type: string
+          enum: [transaction, receipt, report, match]
+        description:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        amount:
+          type: number
+          format: double
+
+    # ============================================
+    # Error Schemas (RFC 7807 ProblemDetails)
+    # ============================================
+
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+      properties:
+        type:
+          type: string
+          format: uri
+          description: A URI reference that identifies the problem type
+        title:
+          type: string
+          description: A short, human-readable summary
+        status:
+          type: integer
+          description: The HTTP status code
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence
+        instance:
+          type: string
+          format: uri
+          description: A URI reference that identifies the specific occurrence
+
+  responses:
+    Unauthorized:
+      description: Authentication required or token expired
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://tools.ietf.org/html/rfc7235#section-3.1"
+            title: "Unauthorized"
+            status: 401
+            detail: "Bearer token is missing or expired"
+            instance: "/api/analytics/monthly-comparison"
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://tools.ietf.org/html/rfc7807"
+            title: "Internal Server Error"
+            status: 500
+            detail: "An unexpected error occurred"

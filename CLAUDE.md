@@ -57,6 +57,8 @@ Reference data (departments, projects, GL accounts) is synced from Viewpoint Vis
 - Repository files in `docs/user-guide/` directory (018-end-user-guide)
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, FluentValidation (019-analytics-dashboard)
 - PostgreSQL 15+ (Supabase self-hosted), existing Transaction/VendorAlias tables (019-analytics-dashboard)
+- TypeScript 5.7+ with React 18.3+ + Vitest 4.x, Playwright 1.57+, MSW (Mock Service Worker), TanStack Query, TanStack Router (022-frontend-integration-tests)
+- N/A (testing infrastructure only) (022-frontend-integration-tests)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -145,9 +147,9 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 022-frontend-integration-tests: Added TypeScript 5.7+ with React 18.3+ + Vitest 4.x, Playwright 1.57+, MSW (Mock Service Worker), TanStack Query, TanStack Router
 - 019-analytics-dashboard: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, FluentValidation
 - 018-end-user-guide: Added Markdown (GitHub Flavored Markdown) + None (documentation only)
-- 017-how-to-guide: Added Markdown (GitHub Flavored Markdown) + None (documentation only)
   - Entities: ImportJob (for tracking cache warming import jobs)
   - Services: CacheWarmingService (historical data import, job management)
   - Jobs: CacheWarmingJob (Hangfire background processing)

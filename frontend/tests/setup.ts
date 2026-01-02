@@ -1,12 +1,34 @@
 import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import { vi, beforeAll, afterEach, afterAll } from 'vitest';
 import React from 'react';
+import { server } from '@/test-utils/msw-server';
 
 // Global test setup for the ExpenseFlow frontend redesign
 // This file runs before each test file and sets up the testing environment
 
 // Extend Vitest's expect with jest-dom matchers for better DOM assertions
 // This enables assertions like: expect(element).toBeInTheDocument()
+
+// =============================================================================
+// MSW Server Setup for Integration Tests
+// =============================================================================
+
+// Start MSW server before all tests
+beforeAll(() => {
+  server.listen({
+    onUnhandledRequest: 'warn', // Warn about unhandled requests
+  });
+});
+
+// Reset handlers after each test to ensure test isolation
+afterEach(() => {
+  server.resetHandlers();
+});
+
+// Close MSW server after all tests
+afterAll(() => {
+  server.close();
+});
 
 // Mock TanStack Router globally for all tests
 // This is needed because many components use Link which requires router context
