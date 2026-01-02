@@ -278,4 +278,85 @@ az aks get-credentials --resource-group rg_prod --name dev-aks --public-fqdn
 
 **Error signature**: `dial tcp: lookup *.private.southcentralus.azmk8s.io: no such host`
 
+## Testing Infrastructure (020-testing-suite)
+
+ExpenseFlow implements a **three-layer testing strategy**:
+
+| Layer | CI Workflow | Target Duration | Test Categories |
+|-------|-------------|-----------------|-----------------|
+| Fast Feedback | ci-quick.yml | <3 min | Unit, Contract |
+| PR Validation | ci-full.yml | <15 min | All except Chaos |
+| Nightly Resilience | ci-nightly.yml | 30-60 min | Chaos, Property, Load |
+
+### Test Projects
+
+| Project | Purpose | Key Packages |
+|---------|---------|--------------|
+| `ExpenseFlow.Contracts.Tests` | OpenAPI contract validation | Microsoft.OpenApi.Readers |
+| `ExpenseFlow.PropertyTests` | Property-based testing | FsCheck 3.0.0-rc3 |
+| `ExpenseFlow.Scenarios.Tests` | Integration + chaos testing | Testcontainers, WireMock, Polly |
+| `ExpenseFlow.TestCommon` | Shared utilities | - |
+
+### Running Tests Locally
+
+```bash
+# Fast tests (unit + contract) - use for development
+./scripts/test-quick.ps1
+
+# Full test suite (requires Docker)
+./scripts/test-all.ps1
+
+# Start test infrastructure
+docker-compose -f docker-compose.test.yml up -d
+
+# Run specific test category
+dotnet test --filter "Category=Unit"
+dotnet test --filter "Category=Contract"
+dotnet test --filter "Category=Scenario"
+dotnet test --filter "Category=Property"
+```
+
+### Chaos Testing
+
+```bash
+# Enable chaos injection
+export CHAOS_ENABLED=true
+export CHAOS_INJECTION_RATE=0.10  # 10% failure rate
+export CHAOS_MAX_LATENCY_MS=3000
+
+# Run chaos tests
+dotnet test backend/tests/ExpenseFlow.Scenarios.Tests --filter "Category=Chaos"
+
+# Run resilience tests
+dotnet test backend/tests/ExpenseFlow.Scenarios.Tests --filter "Category=Resilience"
+```
+
+### Test Categories
+
+Use `[Trait("Category", TestCategories.X)]` for test filtering:
+
+| Category | Description | When Run |
+|----------|-------------|----------|
+| `Unit` | Isolated unit tests | Every commit |
+| `Contract` | API contract validation | Every commit |
+| `Integration` | Component integration | PRs |
+| `Scenario` | End-to-end workflows | PRs |
+| `Property` | Property-based (FsCheck) | PRs + Nightly |
+| `Chaos` | Fault injection | Nightly |
+| `Resilience` | Recovery verification | Nightly |
+| `Load` | Performance tests | Nightly |
+| `Quarantined` | Flaky tests | Excluded |
+
+### Coverage Requirements
+
+- **Target**: 80% overall, 80% on new code (patches)
+- **Enforcement**: Codecov PR checks (blocks merge if below threshold)
+- **Config**: `.github/codecov.yml`
+
+### Documentation
+
+- **Architecture**: `docs/testing/architecture.md`
+- **Chaos Runbook**: `docs/testing/chaos-runbook.md`
+- **Category Validation**: `./scripts/validate-test-categories.ps1`
+
 <!-- MANUAL ADDITIONS END -->

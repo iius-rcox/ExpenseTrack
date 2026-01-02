@@ -1,0 +1,81 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "POST",
+        "urlPattern": "/formrecognizer/documentModels/prebuilt-receipt:analyze.*"
+      },
+      "response": {
+        "status": 202,
+        "headers": {
+          "Operation-Location": "{{request.baseUrl}}/formrecognizer/operations/test-operation-id"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "urlPattern": "/formrecognizer/operations/.*"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "succeeded",
+          "analyzeResult": {
+            "documents": [
+              {
+                "docType": "receipt.retailMeal",
+                "fields": {
+                  "MerchantName": {
+                    "type": "string",
+                    "valueString": "Test Merchant",
+                    "confidence": 0.95
+                  },
+                  "Total": {
+                    "type": "number",
+                    "valueNumber": 42.50,
+                    "confidence": 0.98
+                  },
+                  "TransactionDate": {
+                    "type": "date",
+                    "valueDate": "2024-12-15",
+                    "confidence": 0.92
+                  },
+                  "Items": {
+                    "type": "array",
+                    "valueArray": [
+                      {
+                        "Description": {
+                          "type": "string",
+                          "valueString": "Test Item 1"
+                        },
+                        "TotalPrice": {
+                          "type": "number",
+                          "valueNumber": 25.00
+                        }
+                      },
+                      {
+                        "Description": {
+                          "type": "string",
+                          "valueString": "Test Item 2"
+                        },
+                        "TotalPrice": {
+                          "type": "number",
+                          "valueNumber": 17.50
+                        }
+                      }
+                    ]
+                  }
+                },
+                "confidence": 0.94
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

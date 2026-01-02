@@ -1,0 +1,94 @@
+# OpenAPI Fragment: Report Submit Endpoint
+# Feature: 021-missing-api-endpoints
+
+paths:
+  /api/reports/{reportId}/submit:
+    post:
+      summary: Submit a generated report
+      description: |
+        Marks a generated report as submitted for tracking/audit purposes.
+        After submission:
+        - Report status changes to "Submitted"
+        - SubmittedAt timestamp is recorded
+
+        Note: This is for audit trail only. No approval workflow is triggered.
+      operationId: submitReport
+      tags:
+        - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          description: Report ID to submit
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Report successfully submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitReportResponse"
+        "400":
+          description: Report not in Generated status
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "401":
+          description: Unauthorized - missing or invalid JWT token
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Report not found or not owned by user
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "409":
+          description: Conflict - report already submitted
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+components:
+  schemas:
+    SubmitReportResponse:
+      type: object
+      properties:
+        reportId:
+          type: string
+          format: uuid
+          description: Report ID
+        status:
+          type: string
+          enum: [Submitted]
+          description: New report status
+        submittedAt:
+          type: string
+          format: date-time
+          description: Timestamp when report was submitted
+      required:
+        - reportId
+        - status
+        - submittedAt
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string

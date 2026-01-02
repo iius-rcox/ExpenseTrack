@@ -1,0 +1,66 @@
+# Codecov Configuration for ExpenseFlow
+# https://docs.codecov.com/docs/codecov-yaml
+
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 1%
+        if_not_found: success
+        only_pulls: true
+
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+        if_not_found: success
+        only_pulls: true
+
+parsers:
+  gcov:
+    branch_detection:
+      conditional: true
+      loop: true
+      method: false
+      macro: false
+
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default
+  require_changes: true
+  require_base: false
+  require_head: true
+
+flags:
+  backend:
+    paths:
+      - backend/
+    carryforward: true
+    after_n_builds: 1
+
+  frontend:
+    paths:
+      - frontend/
+    carryforward: true
+    after_n_builds: 1
+
+ignore:
+  - "**/*.Tests/**"
+  - "**/tests/**"
+  - "**/Migrations/**"
+  - "**/*.Designer.cs"
+  - "**/Program.cs"
+  - "**/obj/**"
+  - "**/bin/**"
+  - "**/*.d.ts"
+  - "**/node_modules/**"
+  - "**/*.config.ts"
+  - "**/*.config.js"

@@ -1,0 +1,110 @@
+using System.Net;
+using FluentAssertions;
+using Xunit;
+
+namespace ExpenseFlow.Contracts.Tests;
+
+/// <summary>
+/// Contract tests for Transaction API endpoints.
+/// Validates that endpoints conform to OpenAPI specification.
+/// </summary>
+[Trait("Category", "Contract")]
+public class TransactionEndpointContractTests : ContractTestBase
+{
+    public TransactionEndpointContractTests(ContractTestWebApplicationFactory factory)
+        : base(factory)
+    {
+    }
+
+    [Fact]
+    public async Task GetTransactions_Endpoint_ExistsInSpec()
+    {
+        await ValidateEndpointContractAsync(
+            "/api/transactions",
+            "GET",
+            (200, "Success - Returns list of transactions"),
+            (401, "Unauthorized"));
+    }
+
+    [Fact]
+    public async Task GetTransactionById_Endpoint_ExistsInSpec()
+    {
+        await ValidateEndpointContractAsync(
+            "/api/transactions/{id}",
+            "GET",
+            (200, "Success - Returns transaction details"),
+            (404, "Not Found"),
+            (401, "Unauthorized"));
+    }
+
+    [Fact(Skip = "Endpoint not yet implemented - transactions are created via statement import")]
+    public async Task PostTransaction_Endpoint_ExistsInSpec()
+    {
+        await ValidateEndpointContractAsync(
+            "/api/transactions",
+            "POST",
+            (201, "Created - Transaction created"),
+            (400, "Bad Request - Invalid data"),
+            (401, "Unauthorized"));
+    }
+
+    [Fact(Skip = "Endpoint not yet implemented - transactions are immutable after import")]
+    public async Task PutTransaction_Endpoint_ExistsInSpec()
+    {
+        await ValidateEndpointContractAsync(
+            "/api/transactions/{id}",
+            "PUT",
+            (200, "Success - Transaction updated"),
+            (400, "Bad Request - Invalid data"),
+            (404, "Not Found"),
+            (401, "Unauthorized"));
+    }
+
+    [Fact]
+    public async Task DeleteTransaction_Endpoint_ExistsInSpec()
+    {
+        await ValidateEndpointContractAsync(
+            "/api/transactions/{id}",
+            "DELETE",
+            (204, "No Content - Transaction deleted"),
+            (404, "Not Found"),
+            (401, "Unauthorized"));
+    }
+
+    [Fact]
+    public async Task GetTransactionsList_ReturnsValidResponse()
+    {
+        // Arrange & Act - Use the actual transactions list endpoint
+        var response = await Client.GetAsync("/api/transactions");
+
+        // Assert
+        response.StatusCode.Should().BeOneOf(
+            HttpStatusCode.OK,
+            HttpStatusCode.Unauthorized,
+            HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task GetUnmatchedTransactions_ViaMatchingController_ReturnsValidResponse()
+    {
+        // Arrange & Act - Unmatched transactions are available via /api/matching/transactions/unmatched
+        var response = await Client.GetAsync("/api/matching/transactions/unmatched");
+
+        // Assert
+        response.StatusCode.Should().BeOneOf(
+            HttpStatusCode.OK,
+            HttpStatusCode.Unauthorized,
+            HttpStatusCode.Forbidden);
+    }
+
+    [Fact(Skip = "Endpoint not yet implemented - categorization is via /api/categorization/transactions/{id}/confirm")]
+    public async Task CategorizeTransaction_Endpoint_ExistsInSpec()
+    {
+        await ValidateEndpointContractAsync(
+            "/api/transactions/{id}/categorize",
+            "POST",
+            (200, "Success - Transaction categorized"),
+            (404, "Not Found"),
+            (401, "Unauthorized"));
+    }
+}

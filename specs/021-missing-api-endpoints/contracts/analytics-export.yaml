@@ -1,0 +1,101 @@
+# OpenAPI Fragment: Analytics Export Endpoint
+# Feature: 021-missing-api-endpoints
+
+paths:
+  /api/analytics/export:
+    get:
+      summary: Export analytics data
+      description: |
+        Exports analytics data (spending trends, category breakdown, vendor breakdown)
+        to CSV or Excel format. User can select which sections to include.
+      operationId: exportAnalytics
+      tags:
+        - Analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          description: Start date (ISO format YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+            example: "2025-01-01"
+        - name: endDate
+          in: query
+          required: true
+          description: End date (ISO format YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+            example: "2025-12-31"
+        - name: format
+          in: query
+          required: true
+          description: Export format
+          schema:
+            type: string
+            enum: [csv, xlsx]
+            example: xlsx
+        - name: sections
+          in: query
+          required: false
+          description: |
+            Comma-separated list of sections to include.
+            Options: trends, categories, vendors, transactions.
+            If omitted, defaults to all aggregated summaries (trends, categories, vendors).
+          schema:
+            type: string
+            example: "trends,categories,vendors"
+      responses:
+        "200":
+          description: Export file
+          headers:
+            Content-Disposition:
+              description: Attachment filename
+              schema:
+                type: string
+                example: 'attachment; filename="analytics_2025-01-01_2025-12-31.xlsx"'
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Validation error (invalid dates, format, or sections)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "401":
+          description: Unauthorized - missing or invalid JWT token
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+components:
+  schemas:
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "https://tools.ietf.org/html/rfc7807"
+        title:
+          type: string
+          example: "Validation Error"
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          example: "Invalid date range: startDate must be before endDate"
+        instance:
+          type: string
+          example: "/api/analytics/export"

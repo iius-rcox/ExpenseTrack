@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using ExpenseFlow.Api.Controllers;
 using ExpenseFlow.Api.Tests.Infrastructure;
 using ExpenseFlow.Core.Entities;
@@ -19,6 +21,13 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
+
+    // Match API JSON serialization options (especially JsonStringEnumConverter)
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     public ReportsControllerIntegrationTests(CustomWebApplicationFactory factory)
     {
@@ -52,7 +61,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var report = await response.Content.ReadFromJsonAsync<ExpenseReportDto>();
+        var report = await response.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
         report.Should().NotBeNull();
         report!.Period.Should().Be("2024-01");
         report.Status.Should().Be(ReportStatus.Draft);
@@ -111,7 +120,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<ExistingDraftResponse>();
+        var result = await response.Content.ReadFromJsonAsync<ExistingDraftResponse>(JsonOptions);
         result.Should().NotBeNull();
         result!.Exists.Should().BeFalse();
         result.ReportId.Should().BeNull();
@@ -124,7 +133,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         await SeedTransactionForPeriodAsync("2024-03");
         var createRequest = new GenerateDraftRequest { Period = "2024-03" };
         var createResponse = await _client.PostAsJsonAsync("/api/reports/draft", createRequest);
-        var createdReport = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>();
+        var createdReport = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
 
         // Act
         var response = await _client.GetAsync("/api/reports/draft/exists?period=2024-03");
@@ -132,7 +141,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<ExistingDraftResponse>();
+        var result = await response.Content.ReadFromJsonAsync<ExistingDraftResponse>(JsonOptions);
         result.Should().NotBeNull();
         result!.Exists.Should().BeTrue();
         result.ReportId.Should().Be(createdReport!.Id);
@@ -149,7 +158,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         await SeedTransactionForPeriodAsync("2024-04");
         var createRequest = new GenerateDraftRequest { Period = "2024-04" };
         var createResponse = await _client.PostAsJsonAsync("/api/reports/draft", createRequest);
-        var createdReport = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>();
+        var createdReport = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
 
         // Act
         var response = await _client.GetAsync($"/api/reports/{createdReport!.Id}");
@@ -157,7 +166,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var report = await response.Content.ReadFromJsonAsync<ExpenseReportDto>();
+        var report = await response.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
         report.Should().NotBeNull();
         report!.Id.Should().Be(createdReport.Id);
         report.Period.Should().Be("2024-04");
@@ -190,7 +199,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<ReportListResponse>();
+        var result = await response.Content.ReadFromJsonAsync<ReportListResponse>(JsonOptions);
         result.Should().NotBeNull();
         result!.Items.Should().NotBeEmpty();
         result.Page.Should().Be(1);
@@ -210,7 +219,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<ReportListResponse>();
+        var result = await response.Content.ReadFromJsonAsync<ReportListResponse>(JsonOptions);
         result.Should().NotBeNull();
         result!.Items.Should().OnlyContain(r => r.Status == ReportStatus.Draft);
     }
@@ -226,7 +235,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         await SeedTransactionForPeriodAsync("2024-07");
         var createResponse = await _client.PostAsJsonAsync("/api/reports/draft",
             new GenerateDraftRequest { Period = "2024-07" });
-        var report = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>();
+        var report = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
 
         var lineId = report!.Lines.First().Id;
         var updateRequest = new UpdateLineRequest
@@ -242,7 +251,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var updatedLine = await response.Content.ReadFromJsonAsync<ExpenseLineDto>();
+        var updatedLine = await response.Content.ReadFromJsonAsync<ExpenseLineDto>(JsonOptions);
         updatedLine.Should().NotBeNull();
         updatedLine!.GlCode.Should().Be("65000");
         updatedLine.DepartmentCode.Should().Be("IT");
@@ -270,7 +279,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         await SeedTransactionForPeriodAsync("2024-08");
         var createResponse = await _client.PostAsJsonAsync("/api/reports/draft",
             new GenerateDraftRequest { Period = "2024-08" });
-        var report = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>();
+        var report = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
 
         var lineId = report!.Lines.First().Id;
         var updateRequest = new UpdateLineRequest
@@ -294,7 +303,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         await SeedTransactionForPeriodAsync("2024-09");
         var createResponse = await _client.PostAsJsonAsync("/api/reports/draft",
             new GenerateDraftRequest { Period = "2024-09" });
-        var report = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>();
+        var report = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
 
         var lineId = report!.Lines.First().Id;
         var updateRequest = new UpdateLineRequest
@@ -310,7 +319,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var updatedLine = await response.Content.ReadFromJsonAsync<ExpenseLineDto>();
+        var updatedLine = await response.Content.ReadFromJsonAsync<ExpenseLineDto>(JsonOptions);
         updatedLine!.MissingReceiptJustification.Should().Be(MissingReceiptJustification.Other);
         updatedLine.JustificationNote.Should().Be("Receipt was emailed but not saved");
     }
@@ -326,7 +335,7 @@ public class ReportsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         await SeedTransactionForPeriodAsync("2024-10");
         var createResponse = await _client.PostAsJsonAsync("/api/reports/draft",
             new GenerateDraftRequest { Period = "2024-10" });
-        var report = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>();
+        var report = await createResponse.Content.ReadFromJsonAsync<ExpenseReportDto>(JsonOptions);
 
         // Act
         var response = await _client.DeleteAsync($"/api/reports/{report!.Id}");

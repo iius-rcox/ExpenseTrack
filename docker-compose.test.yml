@@ -1,0 +1,53 @@
+version: '3.8'
+
+# Local test infrastructure for ExpenseFlow
+# Usage: docker-compose -f docker-compose.test.yml up -d
+
+services:
+  # PostgreSQL database for integration tests
+  postgres:
+    image: postgres:15-alpine
+    container_name: expenseflow-test-db
+    environment:
+      POSTGRES_DB: expenseflow_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d expenseflow_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # WireMock for mocking external HTTP services
+  wiremock:
+    image: wiremock/wiremock:3.3.1
+    container_name: expenseflow-wiremock
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/tests/ExpenseFlow.Scenarios.Tests/Mocks:/home/wiremock/mappings:ro
+    command: --verbose
+
+  # Azure Blob Storage emulator (Azurite)
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: expenseflow-azurite
+    ports:
+      - "10000:10000"  # Blob
+      - "10001:10001"  # Queue
+      - "10002:10002"  # Table
+    volumes:
+      - azurite-data:/data
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+
+volumes:
+  postgres-test-data:
+  azurite-data:
+
+networks:
+  default:
+    name: expenseflow-test-network

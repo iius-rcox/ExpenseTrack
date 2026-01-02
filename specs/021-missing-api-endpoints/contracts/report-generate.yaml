@@ -1,0 +1,138 @@
+# OpenAPI Fragment: Report Generate Endpoint
+# Feature: 021-missing-api-endpoints
+
+paths:
+  /api/reports/{reportId}/generate:
+    post:
+      summary: Finalize a draft report
+      description: |
+        Validates and finalizes a draft expense report. After generation:
+        - Report status changes to "Generated"
+        - Report becomes immutable (no modifications allowed)
+        - GeneratedAt timestamp is recorded
+
+        Validation rules:
+        - Report must be in Draft status
+        - Report must have at least one expense line
+        - Each line must have: category assigned, amount > $0, attached receipt
+      operationId: generateReport
+      tags:
+        - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          description: Report ID to finalize
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Report successfully generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateReportResponse"
+        "400":
+          description: Validation failed - see errors for details
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ProblemDetails"
+                  - type: object
+                    properties:
+                      errors:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ValidationError"
+        "401":
+          description: Unauthorized - missing or invalid JWT token
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Report not found or not owned by user
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "409":
+          description: Conflict - report already generated or concurrent modification
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+components:
+  schemas:
+    GenerateReportResponse:
+      type: object
+      properties:
+        reportId:
+          type: string
+          format: uuid
+          description: Report ID
+        status:
+          type: string
+          enum: [Generated]
+          description: New report status
+        generatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when report was finalized
+        lineCount:
+          type: integer
+          description: Number of expense lines
+        totalAmount:
+          type: number
+          format: decimal
+          description: Total amount of all lines
+      required:
+        - reportId
+        - status
+        - generatedAt
+        - lineCount
+        - totalAmount
+
+    ValidationError:
+      type: object
+      properties:
+        lineId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Line ID if error is line-specific
+        field:
+          type: string
+          description: Field with the error
+        message:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Error code for programmatic handling
+          enum:
+            - REPORT_EMPTY
+            - LINE_NO_CATEGORY
+            - LINE_INVALID_AMOUNT
+            - LINE_NO_RECEIPT
+            - REPORT_NOT_DRAFT
+            - REPORT_ALREADY_GENERATED
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string

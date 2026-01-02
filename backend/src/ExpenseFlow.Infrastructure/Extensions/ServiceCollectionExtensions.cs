@@ -141,6 +141,9 @@ public static class ServiceCollectionExtensions
         // Feature 019: Analytics Dashboard
         services.AddScoped<IAnalyticsService, AnalyticsService>();
 
+        // Feature 021: Analytics Export
+        services.AddScoped<IAnalyticsExportService, AnalyticsExportService>();
+
         return services;
     }
 }

@@ -91,10 +91,10 @@ public class DashboardControllerTests : IDisposable
             UserId = _testUserId,
             OriginalFilename = "receipt.jpg",
             VendorExtracted = "Starbucks",
-            Status = ReceiptStatus.Processed,
-            StorageUrl = "https://blob.test/receipts/receipt.jpg",
+            Status = ReceiptStatus.Ready,
+            BlobUrl = "https://blob.test/receipts/receipt.jpg",
             ContentType = "image/jpeg",
-            FileSizeBytes = 1024
+            FileSize = 1024
         };
         _dbContext.Receipts.Add(receipt);
 
@@ -232,10 +232,10 @@ public class DashboardControllerTests : IDisposable
             UserId = _testUserId,
             OriginalFilename = filename,
             VendorExtracted = vendor,
-            Status = ReceiptStatus.Processed,
-            StorageUrl = $"https://blob.test/receipts/{filename}",
+            Status = ReceiptStatus.Ready,
+            BlobUrl = $"https://blob.test/receipts/{filename}",
             ContentType = "image/jpeg",
-            FileSizeBytes = 1024
+            FileSize = 1024
         };
     }
 
