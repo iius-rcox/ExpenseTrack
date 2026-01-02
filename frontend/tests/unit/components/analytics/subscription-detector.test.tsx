@@ -26,16 +26,17 @@ function createMockSubscription(overrides: Partial<SubscriptionDetection> = {}):
   return {
     id: 'sub-1',
     merchantName: 'Netflix',
-    displayName: 'Netflix',
     amount: 15.99,
     frequency: 'monthly',
     confidence: 'high',
+    confidenceScore: 0.95,
+    detectedAt: '2024-03-15T10:00:00Z',
     firstSeen: '2024-01-15',
     lastSeen: '2024-03-15',
-    occurrences: 3,
+    occurrenceCount: 3,
     totalSpent: 47.97,
     isAcknowledged: false,
-    nextExpectedDate: '2024-04-15',
+    nextExpected: '2024-04-15',
     category: 'Entertainment',
     ...overrides,
   }
@@ -65,7 +66,9 @@ const mockSubscriptionData: SubscriptionDetectionResponse = {
     createMockSubscription({ id: 'sub-4', merchantName: 'Amazon Prime', amount: 139.00, frequency: 'annual' }),
   ],
   summary: createMockSummary(),
-  detectedAt: '2024-03-15T10:00:00Z',
+  newSubscriptions: [],
+  possiblyEnded: [],
+  analyzedAt: '2024-03-15T10:00:00Z',
 }
 
 describe('SubscriptionDetector', () => {

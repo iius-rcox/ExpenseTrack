@@ -22,8 +22,8 @@ const mockItems: ActionQueueItem[] = [
     title: 'Review Starbucks Match',
     description: 'AI confidence is low, needs manual verification',
     priority: 'high',
-    dueDate: new Date().toISOString(),
-    link: '/matching/123',
+    createdAt: new Date().toISOString(),
+    actionUrl: '/matching/123',
   },
   {
     id: 'action-2',
@@ -31,7 +31,8 @@ const mockItems: ActionQueueItem[] = [
     title: 'Correct Amazon Receipt',
     description: 'Multiple potential matches found',
     priority: 'medium',
-    link: '/receipts/456',
+    createdAt: new Date().toISOString(),
+    actionUrl: '/receipts/456',
   },
   {
     id: 'action-3',
@@ -39,7 +40,8 @@ const mockItems: ActionQueueItem[] = [
     title: 'Categorize Transaction',
     description: 'New vendor detected',
     priority: 'low',
-    link: '/transactions/789',
+    createdAt: new Date().toISOString(),
+    actionUrl: '/transactions/789',
   },
 ];
 

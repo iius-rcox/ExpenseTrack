@@ -6,9 +6,25 @@
  * Tests for the spending trend visualization component.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { SpendingTrendChart } from '@/components/analytics/spending-trend-chart'
+
+// Suppress specific console warnings from Recharts linearGradient
+const originalWarn = console.warn
+beforeAll(() => {
+  console.warn = (...args: unknown[]) => {
+    const message = args[0]
+    if (typeof message === 'string' && message.includes('linearGradient')) {
+      return // Suppress linearGradient casing warnings
+    }
+    originalWarn.apply(console, args)
+  }
+})
+
+afterAll(() => {
+  console.warn = originalWarn
+})
 
 // Mock framer-motion
 vi.mock('framer-motion', () => ({
