@@ -14,9 +14,14 @@ COPY src/ExpenseFlow.Shared/ExpenseFlow.Shared.csproj src/ExpenseFlow.Shared/
 COPY tests/ExpenseFlow.Api.Tests/ExpenseFlow.Api.Tests.csproj tests/ExpenseFlow.Api.Tests/
 COPY tests/ExpenseFlow.Core.Tests/ExpenseFlow.Core.Tests.csproj tests/ExpenseFlow.Core.Tests/
 COPY tests/ExpenseFlow.Infrastructure.Tests/ExpenseFlow.Infrastructure.Tests.csproj tests/ExpenseFlow.Infrastructure.Tests/
+COPY tests/ExpenseFlow.Contracts.Tests/ExpenseFlow.Contracts.Tests.csproj tests/ExpenseFlow.Contracts.Tests/
+COPY tests/ExpenseFlow.PropertyTests/ExpenseFlow.PropertyTests.csproj tests/ExpenseFlow.PropertyTests/
+COPY tests/ExpenseFlow.Scenarios.Tests/ExpenseFlow.Scenarios.Tests.csproj tests/ExpenseFlow.Scenarios.Tests/
+COPY tests/ExpenseFlow.TestCommon/ExpenseFlow.TestCommon.csproj tests/ExpenseFlow.TestCommon/
+COPY tests/ExpenseFlow.LoadTests/ExpenseFlow.LoadTests.csproj tests/ExpenseFlow.LoadTests/
 
-# Restore dependencies
-RUN dotnet restore
+# Restore dependencies (only API project - tests use different SDK)
+RUN dotnet restore src/ExpenseFlow.Api/ExpenseFlow.Api.csproj
 
 # Copy source code
 COPY src/ src/
