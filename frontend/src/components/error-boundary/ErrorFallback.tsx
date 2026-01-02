@@ -64,7 +64,9 @@ export function ErrorFallback({
   resetError,
   title = 'Something went wrong',
   description = "We're sorry, but something unexpected happened. Please try again.",
-  showDetails = process.env.NODE_ENV !== 'production',
+  // Show details in development or staging (staging URL contains 'staging')
+  showDetails = process.env.NODE_ENV !== 'production' ||
+                (typeof window !== 'undefined' && window.location.hostname.includes('staging')),
   className,
 }: ErrorFallbackProps) {
   return (

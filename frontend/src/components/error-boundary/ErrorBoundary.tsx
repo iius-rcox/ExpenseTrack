@@ -83,13 +83,27 @@ export class ErrorBoundary extends Component<
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     const { onError, boundaryId } = this.props
 
-    // Log to console in development
-    if (process.env.NODE_ENV !== 'production') {
-      console.group(`[ErrorBoundary${boundaryId ? `: ${boundaryId}` : ''}]`)
-      console.error('Caught error:', error)
-      console.error('Component stack:', errorInfo.componentStack)
-      console.groupEnd()
+    // Always log errors (including in production/staging) for debugging React hook issues
+    const isHookError = error.message?.includes('Rendered more hooks') ||
+                        error.message?.includes('Rendered fewer hooks') ||
+                        error.message?.includes('order of Hooks')
+
+    console.group(`[ErrorBoundary${boundaryId ? `: ${boundaryId}` : ''}]`)
+    console.error('Caught error:', error.message)
+
+    if (isHookError) {
+      console.error('🔴 REACT HOOK ERROR DETECTED!')
+      console.error('This error occurs when hooks are called conditionally.')
+      console.error('Check the component stack below to identify the source:')
     }
+
+    console.error('Component stack:', errorInfo.componentStack)
+
+    if (error.stack) {
+      console.error('Error stack:', error.stack)
+    }
+
+    console.groupEnd()
 
     // Call optional error handler
     if (onError) {
