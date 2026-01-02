@@ -1,6 +1,7 @@
 using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Shared.Enums;
 using FluentAssertions;
+using Xunit;
 
 namespace ExpenseFlow.Core.Tests.Entities;
 
