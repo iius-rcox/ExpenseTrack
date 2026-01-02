@@ -448,6 +448,98 @@ function ThemeToggle() {
 
 ---
 
+## Testing Infrastructure
+
+ExpenseFlow frontend uses a comprehensive three-layer testing strategy (Feature 022):
+
+### Test Types
+
+| Type | Directory | Purpose | Command |
+|------|-----------|---------|---------|
+| Unit | `tests/unit/` | Component isolation | `pnpm test:unit` |
+| Integration | `tests/integration/` | Page-level with MSW mocks | `pnpm test:integration` |
+| Contract | `tests/contracts/` | API type validation | `pnpm test:contracts` |
+| E2E | `tests/e2e/` | Full browser flows | `pnpm test:e2e` |
+
+### Test Utilities (`src/test-utils/`)
+
+| Module | Purpose |
+|--------|---------|
+| `msw-handlers.ts` | MSW 2.x request handlers for all API endpoints |
+| `fixtures.ts` | Type-safe test data factories |
+| `auth-mock.ts` | MSAL authentication mocking |
+| `render-with-providers.tsx` | Test wrapper with Query/Router providers |
+| `index.ts` | Consolidated exports |
+
+### Running Tests
+
+```bash
+# Run all tests
+pnpm test:all
+
+# Run specific categories
+pnpm test:unit          # Unit tests only
+pnpm test:integration   # Integration tests with MSW
+pnpm test:contracts     # API contract validation
+pnpm test:e2e           # Playwright E2E tests
+
+# Watch mode (development)
+pnpm test
+```
+
+### MSW Handler Usage
+
+```typescript
+import { server } from '@/test-utils'
+import { createServerErrorHandler, createEmptyResponseHandler } from '@/test-utils/msw-handlers'
+
+// Override handlers for specific test scenarios
+beforeEach(() => {
+  server.use(
+    createServerErrorHandler('/api/analytics/spending-trends')
+  )
+})
+```
+
+### Test Fixtures
+
+```typescript
+import { createMockMonthlyComparison } from '@/test-utils/fixtures'
+
+// Generate type-safe test data
+const mockData = createMockMonthlyComparison({
+  currentPeriodTotal: 5000,
+  vendorChanges: [{ vendorName: 'Test', change: 100, changePercentage: 10 }]
+})
+```
+
+### Error Boundary Testing
+
+The `ErrorBoundary` component (`src/components/error-boundary/`) provides graceful degradation:
+
+```typescript
+import { ErrorBoundary } from '@/components/error-boundary'
+
+// Wrap sections for isolation
+<ErrorBoundary boundaryId="analytics-chart" fallback={<ChartError />}>
+  <SpendingChart />
+</ErrorBoundary>
+```
+
+### Contract Validation
+
+Contract tests ensure frontend types match backend OpenAPI spec:
+
+```typescript
+// Generate types from backend
+pnpm generate:api-types
+
+// Run contract validation
+pnpm test:contracts
+```
+
+---
+
 ## Testing Considerations
 
 ### Component Testing
@@ -462,12 +554,25 @@ function ThemeToggle() {
 
 | Feature | Test Case |
 |---------|-----------|
+| Auth Flow | Login redirect, session expiry, deep links |
 | Receipt Upload | Upload single/multiple files |
 | Statement Import | Complete wizard flow |
 | Matching | Auto-match and manual match |
 | Analytics | Date range selection, tab switching |
 | Reports | Create draft, edit lines, export |
 | Settings | Theme change, preference save |
+
+### Integration Test Patterns
+
+| Scenario | Handler Factory | Example |
+|----------|-----------------|---------|
+| Success | Default handlers | `analyticsHandlers` |
+| 401 Unauthorized | `createUnauthorizedHandler(path)` | Auth failures |
+| 500 Server Error | `createServerErrorHandler(path)` | Server crashes |
+| Empty Data | `createEmptyResponseHandler(path)` | Empty arrays |
+| Malformed | `createMalformedResponseHandler(path)` | Invalid shapes |
+| Network | `createNetworkErrorHandler(path)` | Connection failures |
+| Rate Limit | `createRateLimitHandler(path)` | 429 responses |
 
 ### Accessibility Testing
 
@@ -483,6 +588,7 @@ function ThemeToggle() {
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-01-02 | 1.17.0 | Added Testing Infrastructure (Feature 022) |
 | 2025-12-31 | 1.16.0 | Added Analytics Dashboard (Feature 019) |
 | 2025-12-29 | 1.15.0 | Added User Preferences (Feature 016) |
 | 2025-12-27 | 1.14.0 | Added Dual Theme System (Feature 015) |

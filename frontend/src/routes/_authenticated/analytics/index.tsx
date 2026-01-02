@@ -60,6 +60,9 @@ import {
   ComparisonDateRange,
 } from '@/components/analytics'
 
+// Import error boundary for graceful degradation
+import { ErrorBoundary, CompactErrorFallback } from '@/components/error-boundary'
+
 export const Route = createFileRoute('/_authenticated/analytics/')({
   component: AnalyticsDashboard,
 })
@@ -371,36 +374,76 @@ function AnalyticsDashboard() {
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
           {/* Spending Trend */}
-          <SpendingTrendChart
-            data={chartTrendData}
-            isLoading={loadingTrend}
-            chartType="area"
-            granularity={trendGranularity}
-            showComparison={!!comparisonRange}
-            title="Spending Over Time"
-          />
+          <ErrorBoundary
+            boundaryId="spending-trend"
+            fallback={(_error: Error, resetError: () => void) => (
+              <CompactErrorFallback
+                resetError={resetError}
+                title="Failed to load spending trends"
+              />
+            )}
+          >
+            <SpendingTrendChart
+              data={chartTrendData}
+              isLoading={loadingTrend}
+              chartType="area"
+              granularity={trendGranularity}
+              showComparison={!!comparisonRange}
+              title="Spending Over Time"
+            />
+          </ErrorBoundary>
 
           {/* Category and Merchant Grid */}
           <div className="grid gap-6 lg:grid-cols-2">
-            <CategoryBreakdown
-              data={chartCategoryData}
-              isLoading={loadingCategory}
-              chartType="donut"
-              maxCategories={6}
-              title="Category Distribution"
-            />
-            <MerchantAnalytics
-              data={merchantData}
-              isLoading={loadingMerchant}
-              topCount={5}
-              showTrends
-              showNewMerchants={false}
-              title="Top Merchants"
-            />
+            <ErrorBoundary
+              boundaryId="category-breakdown"
+              fallback={(_error: Error, resetError: () => void) => (
+                <CompactErrorFallback
+                  resetError={resetError}
+                  title="Failed to load categories"
+                />
+              )}
+            >
+              <CategoryBreakdown
+                data={chartCategoryData}
+                isLoading={loadingCategory}
+                chartType="donut"
+                maxCategories={6}
+                title="Category Distribution"
+              />
+            </ErrorBoundary>
+            <ErrorBoundary
+              boundaryId="merchant-analytics"
+              fallback={(_error: Error, resetError: () => void) => (
+                <CompactErrorFallback
+                  resetError={resetError}
+                  title="Failed to load merchants"
+                />
+              )}
+            >
+              <MerchantAnalytics
+                data={merchantData}
+                isLoading={loadingMerchant}
+                topCount={5}
+                showTrends
+                showNewMerchants={false}
+                title="Top Merchants"
+              />
+            </ErrorBoundary>
           </div>
 
           {/* Cache Stats */}
-          <CacheStatsCard period={period} isLoading={loadingComparison} />
+          <ErrorBoundary
+            boundaryId="cache-stats"
+            fallback={(_error: Error, resetError: () => void) => (
+              <CompactErrorFallback
+                resetError={resetError}
+                title="Failed to load cache statistics"
+              />
+            )}
+          >
+            <CacheStatsCard period={period} isLoading={loadingComparison} />
+          </ErrorBoundary>
 
           {/* Monthly Changes */}
           {monthlyComparison && (
@@ -482,38 +525,68 @@ function AnalyticsDashboard() {
 
         {/* Categories Tab */}
         <TabsContent value="categories">
-          <CategoryBreakdown
-            data={chartCategoryData}
-            isLoading={loadingCategory}
-            chartType="donut"
-            showComparison={!!comparisonRange}
-            maxCategories={12}
-            height={400}
-            title="Spending by Category"
-          />
+          <ErrorBoundary
+            boundaryId="category-breakdown-full"
+            fallback={(_error: Error, resetError: () => void) => (
+              <CompactErrorFallback
+                resetError={resetError}
+                title="Failed to load category breakdown"
+              />
+            )}
+          >
+            <CategoryBreakdown
+              data={chartCategoryData}
+              isLoading={loadingCategory}
+              chartType="donut"
+              showComparison={!!comparisonRange}
+              maxCategories={12}
+              height={400}
+              title="Spending by Category"
+            />
+          </ErrorBoundary>
         </TabsContent>
 
         {/* Merchants Tab */}
         <TabsContent value="merchants">
-          <MerchantAnalytics
-            data={merchantData}
-            isLoading={loadingMerchant}
-            topCount={20}
-            showTrends
-            showNewMerchants
-            title="Merchant Analysis"
-          />
+          <ErrorBoundary
+            boundaryId="merchant-analytics-full"
+            fallback={(_error: Error, resetError: () => void) => (
+              <CompactErrorFallback
+                resetError={resetError}
+                title="Failed to load merchant analytics"
+              />
+            )}
+          >
+            <MerchantAnalytics
+              data={merchantData}
+              isLoading={loadingMerchant}
+              topCount={20}
+              showTrends
+              showNewMerchants
+              title="Merchant Analysis"
+            />
+          </ErrorBoundary>
         </TabsContent>
 
         {/* Subscriptions Tab */}
         <TabsContent value="subscriptions">
-          <SubscriptionDetector
-            data={subscriptionData}
-            isLoading={loadingSubscriptions}
-            showSummary
-            groupByCategory
-            title="Detected Subscriptions"
-          />
+          <ErrorBoundary
+            boundaryId="subscription-detector"
+            fallback={(_error: Error, resetError: () => void) => (
+              <CompactErrorFallback
+                resetError={resetError}
+                title="Failed to load subscription detection"
+              />
+            )}
+          >
+            <SubscriptionDetector
+              data={subscriptionData}
+              isLoading={loadingSubscriptions}
+              showSummary
+              groupByCategory
+              title="Detected Subscriptions"
+            />
+          </ErrorBoundary>
         </TabsContent>
       </Tabs>
     </motion.div>

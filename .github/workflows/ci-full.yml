@@ -75,7 +75,7 @@ jobs:
 
   frontend-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
 
     defaults:
       run:
@@ -101,6 +101,15 @@ jobs:
         run: npm run type-check
 
       - name: Unit Tests
+        run: npm run test:unit
+
+      - name: Integration Tests
+        run: npm run test:integration
+
+      - name: Contract Tests
+        run: npm run test:contracts
+
+      - name: Coverage Report
         run: npm run test:coverage
 
       - name: Upload Coverage
