@@ -316,13 +316,55 @@ export interface CategoryBreakdown {
   percentageChange: number
 }
 
+/**
+ * Backend API response for cache statistics.
+ * Contains nested Overall object with per-tier statistics.
+ */
+export interface CacheStatisticsApiResponse {
+  period: string
+  overall: CacheStatisticsDto
+  byOperation?: CacheStatsByOperationDto[]
+}
+
+/**
+ * Cache tier usage statistics from backend.
+ */
+export interface CacheStatisticsDto {
+  tier1Hits: number
+  tier2Hits: number
+  tier3Hits: number
+  totalOperations: number
+  tier1HitRate: number
+  tier2HitRate: number
+  tier3HitRate: number
+  estimatedMonthlyCost: number
+  avgResponseTimeMs: number
+  belowTarget: boolean
+}
+
+/**
+ * Per-operation cache statistics from backend.
+ */
+export interface CacheStatsByOperationDto {
+  operationType: string
+  tier1Hits: number
+  tier2Hits: number
+  tier3Hits: number
+  tier1HitRate: number
+}
+
+/**
+ * Transformed cache statistics for UI display.
+ * Flattened structure with computed fields.
+ */
 export interface CacheStatisticsResponse {
   period: string
   totalOperations: number
   hitRate: number
   estimatedCostSaved: number
   tierBreakdown: TierBreakdown[]
-  dailyBreakdown?: DailyBreakdown[]
+  avgResponseTimeMs: number
+  belowTarget: boolean
 }
 
 export interface TierBreakdown {
@@ -330,13 +372,6 @@ export interface TierBreakdown {
   tierName: string
   count: number
   percentage: number
-  estimatedCost: number
-}
-
-export interface DailyBreakdown {
-  date: string
-  operations: number
-  hitRate: number
 }
 
 // Statement Types

@@ -203,6 +203,28 @@ export const analyticsHandlers = [
       totalMonthlyEstimate: 85.97,
     })
   }),
+
+  // Cache Statistics - GET /api/analytics/cache-stats
+  // Response matches backend CacheStatisticsResponse with nested Overall object
+  http.get('/api/analytics/cache-stats', async () => {
+    await delay(50)
+    return HttpResponse.json({
+      period: '2025-12',
+      overall: {
+        tier1Hits: 850,
+        tier2Hits: 120,
+        tier3Hits: 30,
+        totalOperations: 1000,
+        tier1HitRate: 85.0,
+        tier2HitRate: 12.0,
+        tier3HitRate: 3.0,
+        estimatedMonthlyCost: 0.30,
+        avgResponseTimeMs: 45,
+        belowTarget: false,
+      },
+      byOperation: null,
+    })
+  }),
 ]
 
 // =============================================================================

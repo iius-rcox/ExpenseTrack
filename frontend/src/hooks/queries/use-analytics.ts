@@ -10,6 +10,8 @@ import { apiFetch } from '@/services/api'
 import type {
   MonthlyComparison,
   CacheStatisticsResponse,
+  CacheStatisticsApiResponse,
+  TierBreakdown,
 } from '@/types/api'
 import type {
   AnalyticsDateRange,
@@ -139,10 +141,65 @@ export function useMonthlyComparison(period: string) {
   })
 }
 
+/**
+ * Transform backend cache statistics to UI-friendly format.
+ * Backend returns nested Overall object; UI expects flat structure with tier breakdown array.
+ */
+function transformCacheStatistics(api: CacheStatisticsApiResponse): CacheStatisticsResponse {
+  const { overall } = api
+
+  // Calculate overall hit rate (Tier 1 + Tier 2 hits as a percentage of total)
+  // Tier 1 = cache, Tier 2 = embedding, Tier 3 = AI (most expensive)
+  const hitRate = overall.totalOperations > 0
+    ? ((overall.tier1Hits + overall.tier2Hits) / overall.totalOperations) * 100
+    : 0
+
+  // Build tier breakdown array
+  const tierBreakdown: TierBreakdown[] = [
+    {
+      tier: 1,
+      tierName: 'Cache',
+      count: overall.tier1Hits,
+      percentage: overall.tier1HitRate,
+    },
+    {
+      tier: 2,
+      tierName: 'Embedding',
+      count: overall.tier2Hits,
+      percentage: overall.tier2HitRate,
+    },
+    {
+      tier: 3,
+      tierName: 'AI',
+      count: overall.tier3Hits,
+      percentage: overall.tier3HitRate,
+    },
+  ]
+
+  // Estimate cost saved: If all operations used Tier 3 (AI), cost would be ~$0.01/op
+  // Actual cost is estimatedMonthlyCost. Saved = (total * $0.01) - actual
+  const costPerAICall = 0.01
+  const maxCost = overall.totalOperations * costPerAICall
+  const estimatedCostSaved = Math.max(0, maxCost - overall.estimatedMonthlyCost)
+
+  return {
+    period: api.period,
+    totalOperations: overall.totalOperations,
+    hitRate,
+    estimatedCostSaved,
+    tierBreakdown,
+    avgResponseTimeMs: overall.avgResponseTimeMs,
+    belowTarget: overall.belowTarget,
+  }
+}
+
 export function useCacheStatistics(period: string) {
   return useQuery({
     queryKey: analyticsKeys.cacheStats(period),
-    queryFn: () => apiFetch<CacheStatisticsResponse>(`/analytics/cache-stats?period=${period}`),
+    queryFn: async () => {
+      const response = await apiFetch<CacheStatisticsApiResponse>(`/analytics/cache-stats?period=${period}`)
+      return transformCacheStatistics(response)
+    },
     enabled: !!period,
     staleTime: 5 * 60 * 1000,
   })

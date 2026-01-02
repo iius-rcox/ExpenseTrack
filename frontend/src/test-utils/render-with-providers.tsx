@@ -11,6 +11,9 @@
  *   const { getByText } = renderWithProviders(<MyComponent />)
  */
 
+/* eslint-disable react-refresh/only-export-components */
+// This is a test utility file, not a component file - Fast Refresh doesn't apply
+
 import React from 'react'
 import { render, RenderOptions, RenderResult } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
