@@ -32,7 +32,7 @@ export function StatementImportPage() {
     setError(errorMessage);
   }, []);
 
-  const getToken = async (): Promise<string | null> => {
+  const getToken = useCallback(async (): Promise<string | null> => {
     if (accounts.length === 0) return null;
     try {
       const response = await instance.acquireTokenSilent({
@@ -50,7 +50,7 @@ export function StatementImportPage() {
       console.error('Failed to acquire token:', error);
       return null;
     }
-  };
+  }, [accounts, instance]);
 
   const handleConfirmMapping = useCallback(
     async (
@@ -97,7 +97,7 @@ export function StatementImportPage() {
         }
       }
     },
-    [analysisResult, accounts, instance]
+    [analysisResult, getToken]
   );
 
   const handleCancel = useCallback(() => {

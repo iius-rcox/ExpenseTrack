@@ -61,7 +61,7 @@ describe('ConfidenceIndicator', () => {
     const { rerender, container } = render(<ConfidenceIndicator score={1.5} />);
 
     // Score > 1 should be clamped to 1 (5 filled dots, high confidence)
-    let filledDots = container.querySelectorAll('[class*="bg-confidence-high"]');
+    const filledDots = container.querySelectorAll('[class*="bg-confidence-high"]');
     expect(filledDots.length).toBe(5);
 
     rerender(<ConfidenceIndicator score={-0.5} />);

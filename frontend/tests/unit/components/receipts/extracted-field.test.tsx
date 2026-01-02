@@ -1,7 +1,7 @@
 'use client';
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ExtractedField, ExtractedFieldSkeleton } from '@/components/receipts/extracted-field';
 import type { ExtractedField as ExtractedFieldType } from '@/types/receipt';

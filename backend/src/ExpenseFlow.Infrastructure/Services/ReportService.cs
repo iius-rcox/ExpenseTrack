@@ -497,7 +497,8 @@ public class ReportService : IReportService
         {
             ReportId = report.Id,
             Status = ReportStatus.Submitted.ToString(),
-            SubmittedAt = report.SubmittedAt.Value
+            GeneratedAt = report.GeneratedAt!.Value,
+            SubmittedAt = report.SubmittedAt!.Value
         };
     }
 

@@ -8,7 +8,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MatchReviewWorkspace } from '@/components/matching/match-review-workspace'
 import type { MatchProposal } from '@/types/api'
@@ -264,11 +263,6 @@ describe('MatchReviewWorkspace', () => {
           currentIndex={0}
           onIndexChange={mockOnIndexChange}
         />
-      )
-
-      const nextButton = screen.getAllByRole('button').find(
-        btn => btn.querySelector('svg[class*="ChevronRight"]') ||
-               btn.querySelector('.lucide-chevron-right')
       )
 
       // Find the next navigation button (has ChevronRight icon)

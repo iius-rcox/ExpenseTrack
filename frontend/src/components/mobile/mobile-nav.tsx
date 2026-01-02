@@ -227,14 +227,17 @@ export function MobileNavSpacer({ className }: { className?: string }) {
 
 /**
  * useMobileNav - Hook to detect if mobile nav should be visible
+ * Note: Hooks must be called unconditionally (Rules of Hooks).
+ * SSR check is done inside useEffect instead of early return.
  */
 export function useIsMobile(): boolean {
-  if (typeof window === 'undefined') return false
-
-  // Use media query for SSR safety
+  // Always call hooks unconditionally - SSR check moves inside useEffect
   const [isMobile, setIsMobile] = React.useState(false)
 
   React.useEffect(() => {
+    // SSR safety: window is only available in browser
+    if (typeof window === 'undefined') return
+
     const mediaQuery = window.matchMedia('(max-width: 767px)')
     setIsMobile(mediaQuery.matches)
 

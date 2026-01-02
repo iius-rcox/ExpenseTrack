@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import path from 'path';
 
 /**
  * E2E Tests for Receipt Upload and Extraction (T048)
@@ -380,7 +379,7 @@ test.describe('Image Viewer', () => {
   test('should support zoom controls', async ({ page }) => {
     // Find zoom buttons
     const zoomIn = page.locator('button').filter({ has: page.locator('[class*="zoom-in"]') });
-    const zoomOut = page.locator('button').filter({ has: page.locator('[class*="zoom-out"]') });
+    // Note: zoomOut locator available if needed for future tests
 
     // Check for zoom percentage display
     const zoomIndicator = page.getByText('100%');

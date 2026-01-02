@@ -40,7 +40,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
-          cache: true
 
       - name: Restore
         run: dotnet restore backend/ExpenseFlow.sln
@@ -123,7 +122,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
-          cache: true
 
       - name: Setup Node
         uses: actions/setup-node@v4
