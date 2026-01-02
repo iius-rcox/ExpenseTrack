@@ -106,6 +106,8 @@ export interface TransactionFilters {
   matchStatus: TransactionMatchStatus[];
   /** Filter by tags (AND logic - must have all) */
   tags: string[];
+  /** Filter to show only transactions with pending expense predictions (Feature 023) */
+  hasPendingPrediction: boolean;
 }
 
 /**
@@ -118,6 +120,7 @@ export const DEFAULT_TRANSACTION_FILTERS: TransactionFilters = {
   amountRange: { min: null, max: null },
   matchStatus: [],
   tags: [],
+  hasPendingPrediction: false,
 };
 
 /**

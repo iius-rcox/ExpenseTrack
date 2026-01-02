@@ -157,6 +157,7 @@ const DEFAULT_FILTERS: TransactionFilters = {
   amountRange: { min: null, max: null },
   matchStatus: [],
   tags: [],
+  hasPendingPrediction: false,
 }
 
 const DEFAULT_SORT: TransactionSortConfig = {
@@ -200,6 +201,11 @@ function buildSearchString(
   filters.categories.forEach((cat) => searchParams.append('categories', cat))
   filters.matchStatus.forEach((status) => searchParams.append('matchStatus', status))
   filters.tags.forEach((tag) => searchParams.append('tags', tag))
+
+  // Predictions filter (Feature 023)
+  if (filters.hasPendingPrediction) {
+    searchParams.set('hasPendingPrediction', 'true')
+  }
 
   return searchParams.toString()
 }
@@ -417,6 +423,7 @@ export function getActiveFilterCount(filters: TransactionFilters): number {
   if (filters.amountRange.min !== null || filters.amountRange.max !== null) count++
   if (filters.matchStatus.length > 0) count++
   if (filters.tags.length > 0) count++
+  if (filters.hasPendingPrediction) count++
 
   return count
 }
@@ -439,6 +446,7 @@ export function getDefaultFilters(): TransactionFilters {
     amountRange: { min: null, max: null },
     matchStatus: [],
     tags: [],
+    hasPendingPrediction: false,
   }
 }
 

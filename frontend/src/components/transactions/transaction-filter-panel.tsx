@@ -25,6 +25,7 @@ import {
   ChevronDown,
   ChevronUp,
   Filter,
+  Lightbulb,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -168,6 +169,14 @@ export function TransactionFilterPanel({
     });
   }, [filters, onChange]);
 
+  // Toggle predictions filter
+  const handlePredictionToggle = useCallback(() => {
+    onChange({
+      ...filters,
+      hasPendingPrediction: !filters.hasPendingPrediction,
+    });
+  }, [filters, onChange]);
+
   return (
     <div className="space-y-4">
       {/* Search Bar Row */}
@@ -197,6 +206,18 @@ export function TransactionFilterPanel({
 
         {/* Quick Filters */}
         <div className="flex items-center gap-2">
+          {/* Pending Predictions Filter (Feature 023) */}
+          <Button
+            variant={filters.hasPendingPrediction ? 'default' : 'outline'}
+            size="sm"
+            onClick={handlePredictionToggle}
+            className="gap-2"
+            title="Show transactions with pending expense predictions"
+          >
+            <Lightbulb className="h-4 w-4" />
+            <span className="hidden sm:inline">Reimbursable</span>
+          </Button>
+
           {/* Date Range Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -468,6 +489,18 @@ export function TransactionFilterPanel({
       {/* Active Filters Display */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap gap-2">
+          {filters.hasPendingPrediction && (
+            <Badge variant="default" className="gap-1 bg-amber-500">
+              <Lightbulb className="h-3 w-3" />
+              Showing Reimbursable
+              <button
+                onClick={handlePredictionToggle}
+                className="ml-1 hover:text-white/80"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
           {filters.search && (
             <Badge variant="secondary" className="gap-1">
               Search: &quot;{filters.search}&quot;

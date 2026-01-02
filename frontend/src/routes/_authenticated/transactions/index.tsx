@@ -22,25 +22,12 @@ import {
   useBulkUpdateTransactions,
   useBulkDeleteTransactions,
   useExportTransactions,
-  useImportStatement,
 } from '@/hooks/queries/use-transactions'
+import { Link } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import {
-  Upload,
-  FileSpreadsheet,
-  Loader2,
-} from 'lucide-react'
+import { Upload } from 'lucide-react'
 import { TransactionFilterPanel } from '@/components/transactions/transaction-filter-panel'
 import { TransactionGrid } from '@/components/transactions/transaction-grid'
 import { BulkActionsBar } from '@/components/transactions/bulk-actions-bar'
@@ -74,9 +61,6 @@ export const Route = createFileRoute('/_authenticated/transactions/')({
 function TransactionsPage() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-
-  // Import dialog state
-  const [importDialogOpen, setImportDialogOpen] = useState(false)
 
   // Filter state (local, not persisted in URL for simplicity)
   const [filters, setFilters] = useState<TransactionFilters>({
@@ -303,23 +287,12 @@ function TransactionsPage() {
             View, filter, and manage your imported transactions
           </p>
         </div>
-        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Upload className="mr-2 h-4 w-4" />
-              Import Statement
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Import Bank Statement</DialogTitle>
-              <DialogDescription>
-                Upload a CSV or Excel file from your bank
-              </DialogDescription>
-            </DialogHeader>
-            <StatementImportForm onSuccess={() => setImportDialogOpen(false)} />
-          </DialogContent>
-        </Dialog>
+        <Button asChild>
+          <Link to="/statements">
+            <Upload className="mr-2 h-4 w-4" />
+            Import Statement
+          </Link>
+        </Button>
       </div>
 
       {/* Filter Panel */}
@@ -412,94 +385,3 @@ function TransactionsPage() {
   )
 }
 
-// Statement Import Form component
-interface StatementImportFormProps {
-  onSuccess: () => void
-}
-
-function StatementImportForm({ onSuccess }: StatementImportFormProps) {
-  const [file, setFile] = useState<File | null>(null)
-  const [progress, setProgress] = useState(0)
-  const { mutate: importStatement, isPending } = useImportStatement()
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
-      setFile(selectedFile)
-    }
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!file) return
-
-    setProgress(0)
-    importStatement(
-      {
-        file,
-        onProgress: (p) => setProgress(Math.round(p)),
-      },
-      {
-        onSuccess: (result) => {
-          toast.success(
-            `Imported ${result.transactionCount} transactions (${result.duplicateCount} duplicates skipped)`
-          )
-          setFile(null)
-          onSuccess()
-        },
-        onError: (error) => {
-          toast.error(`Import failed: ${error.message}`)
-        },
-      }
-    )
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="border-2 border-dashed rounded-lg p-6 text-center">
-        <FileSpreadsheet className="mx-auto h-10 w-10 text-muted-foreground" />
-        <p className="mt-2 text-sm text-muted-foreground">
-          {file ? file.name : 'Select a CSV or Excel file'}
-        </p>
-        <Input
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          onChange={handleFileChange}
-          className="mt-4"
-          disabled={isPending}
-        />
-      </div>
-      {isPending && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span>Uploading...</span>
-            <span>{progress}%</span>
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-      )}
-      <Button
-        type="submit"
-        className="w-full"
-        disabled={!file || isPending}
-      >
-        {isPending ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Importing...
-          </>
-        ) : (
-          <>
-            <Upload className="mr-2 h-4 w-4" />
-            Import Statement
-          </>
-        )}
-      </Button>
-    </form>
-  )
-}
