@@ -38,6 +38,11 @@ public class TransactionsController : ApiControllerBase
     /// <param name="matched">Optional filter by receipt match status.</param>
     /// <param name="importId">Optional filter by specific import batch.</param>
     /// <param name="search">Optional text search on description (case-insensitive).</param>
+    /// <param name="sortBy">Field to sort by: date (default), amount, description.</param>
+    /// <param name="sortOrder">Sort direction: desc (default) or asc.</param>
+    /// <param name="minAmount">Optional minimum amount filter.</param>
+    /// <param name="maxAmount">Optional maximum amount filter.</param>
+    /// <param name="hasPendingPrediction">Filter to transactions with pending expense predictions.</param>
     /// <returns>Paginated list of transactions.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(TransactionListResponse), StatusCodes.Status200OK)]
@@ -48,7 +53,12 @@ public class TransactionsController : ApiControllerBase
         [FromQuery] DateOnly? endDate = null,
         [FromQuery] bool? matched = null,
         [FromQuery] Guid? importId = null,
-        [FromQuery] string? search = null)
+        [FromQuery] string? search = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortOrder = null,
+        [FromQuery] decimal? minAmount = null,
+        [FromQuery] decimal? maxAmount = null,
+        [FromQuery] bool? hasPendingPrediction = null)
     {
         // Validate pagination parameters
         if (page < 1) page = 1;
@@ -65,7 +75,12 @@ public class TransactionsController : ApiControllerBase
             endDate,
             matched,
             importId,
-            search);
+            search,
+            sortBy,
+            sortOrder,
+            minAmount,
+            maxAmount,
+            hasPendingPrediction);
 
         var response = new TransactionListResponse
         {

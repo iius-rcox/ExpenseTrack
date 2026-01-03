@@ -33,7 +33,12 @@ public class TransactionRepository : ITransactionRepository
         DateOnly? endDate = null,
         bool? matched = null,
         Guid? importId = null,
-        string? search = null)
+        string? search = null,
+        string? sortBy = null,
+        string? sortOrder = null,
+        decimal? minAmount = null,
+        decimal? maxAmount = null,
+        bool? hasPendingPrediction = null)
     {
         var query = _context.Transactions.Where(t => t.UserId == userId);
 
@@ -66,6 +71,26 @@ public class TransactionRepository : ITransactionRepository
             query = query.Where(t => EF.Functions.ILike(t.Description, $"%{search}%"));
         }
 
+        // Apply amount range filters
+        if (minAmount.HasValue)
+        {
+            query = query.Where(t => t.Amount >= minAmount.Value);
+        }
+
+        if (maxAmount.HasValue)
+        {
+            query = query.Where(t => t.Amount <= maxAmount.Value);
+        }
+
+        // Apply pending prediction filter (Feature 023)
+        if (hasPendingPrediction == true)
+        {
+            var transactionIdsWithPendingPredictions = _context.TransactionPredictions
+                .Where(p => p.UserId == userId && p.Status == ExpenseFlow.Shared.Enums.PredictionStatus.Pending)
+                .Select(p => p.TransactionId);
+            query = query.Where(t => transactionIdsWithPendingPredictions.Contains(t.Id));
+        }
+
         var totalCount = await query.CountAsync();
 
         // Get unmatched count (for all user transactions, not filtered)
@@ -73,9 +98,27 @@ public class TransactionRepository : ITransactionRepository
             .Where(t => t.UserId == userId && t.MatchedReceiptId == null)
             .CountAsync();
 
-        var transactions = await query
-            .OrderByDescending(t => t.TransactionDate)
-            .ThenByDescending(t => t.CreatedAt)
+        // Apply sorting
+        var isDescending = string.Equals(sortOrder, "desc", StringComparison.OrdinalIgnoreCase);
+        IOrderedQueryable<Transaction> orderedQuery = sortBy?.ToLowerInvariant() switch
+        {
+            "amount" => isDescending
+                ? query.OrderByDescending(t => t.Amount)
+                : query.OrderBy(t => t.Amount),
+            "description" => isDescending
+                ? query.OrderByDescending(t => t.Description)
+                : query.OrderBy(t => t.Description),
+            _ => isDescending
+                ? query.OrderByDescending(t => t.TransactionDate)
+                : query.OrderBy(t => t.TransactionDate)
+        };
+
+        // Secondary sort by CreatedAt for stable ordering
+        orderedQuery = isDescending
+            ? orderedQuery.ThenByDescending(t => t.CreatedAt)
+            : orderedQuery.ThenBy(t => t.CreatedAt);
+
+        var transactions = await orderedQuery
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();

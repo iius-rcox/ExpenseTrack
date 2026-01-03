@@ -26,6 +26,11 @@ public interface ITransactionRepository
     /// <param name="matched">Optional matched receipt filter.</param>
     /// <param name="importId">Optional import batch filter.</param>
     /// <param name="search">Optional text search on description (case-insensitive).</param>
+    /// <param name="sortBy">Field to sort by (date, amount, description). Defaults to date.</param>
+    /// <param name="sortOrder">Sort direction (asc or desc). Defaults to desc.</param>
+    /// <param name="minAmount">Optional minimum amount filter.</param>
+    /// <param name="maxAmount">Optional maximum amount filter.</param>
+    /// <param name="hasPendingPrediction">Optional filter for transactions with pending expense predictions.</param>
     /// <returns>Tuple of transactions list, total count, and unmatched count.</returns>
     Task<(List<Transaction> Transactions, int TotalCount, int UnmatchedCount)> GetPagedAsync(
         Guid userId,
@@ -35,7 +40,12 @@ public interface ITransactionRepository
         DateOnly? endDate = null,
         bool? matched = null,
         Guid? importId = null,
-        string? search = null);
+        string? search = null,
+        string? sortBy = null,
+        string? sortOrder = null,
+        decimal? minAmount = null,
+        decimal? maxAmount = null,
+        bool? hasPendingPrediction = null);
 
     /// <summary>
     /// Checks if a duplicate transaction exists.
