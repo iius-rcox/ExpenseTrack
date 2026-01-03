@@ -158,6 +158,115 @@ public class ExpensePredictionService : IExpensePredictionService
         return await LearnFromReportsAsync(userId, approvedReportIds);
     }
 
+    /// <inheritdoc />
+    public async Task<ImportPatternsResponseDto> ImportPatternsAsync(Guid userId, ImportPatternsRequestDto request)
+    {
+        _logger.LogInformation("Importing {Count} expense entries for user {UserId}", request.Entries.Count, userId);
+
+        var createdCount = 0;
+        var updatedCount = 0;
+
+        // Group entries by vendor for efficient pattern creation
+        var entriesByVendor = request.Entries
+            .GroupBy(e => e.Vendor.ToUpperInvariant().Trim())
+            .ToList();
+
+        foreach (var vendorGroup in entriesByVendor)
+        {
+            var entries = vendorGroup.ToList();
+            var firstEntry = entries.First();
+            var normalized = await NormalizeVendorAsync(firstEntry.Vendor);
+
+            var existingPattern = await _patternRepository.GetByNormalizedVendorAsync(userId, normalized);
+
+            if (existingPattern == null)
+            {
+                // Create new pattern from aggregated entries
+                var amounts = entries.Select(e => e.Amount).ToList();
+                var dates = entries.Select(e => e.Date).ToList();
+
+                // Use mode for GL code and department
+                var glCode = entries
+                    .Where(e => !string.IsNullOrWhiteSpace(e.GLCode))
+                    .GroupBy(e => e.GLCode)
+                    .OrderByDescending(g => g.Count())
+                    .FirstOrDefault()?.Key;
+
+                var department = entries
+                    .Where(e => !string.IsNullOrWhiteSpace(e.Department))
+                    .GroupBy(e => e.Department)
+                    .OrderByDescending(g => g.Count())
+                    .FirstOrDefault()?.Key;
+
+                var pattern = new ExpensePattern
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    NormalizedVendor = normalized,
+                    DisplayName = !string.IsNullOrWhiteSpace(firstEntry.DisplayName)
+                        ? firstEntry.DisplayName
+                        : firstEntry.Vendor,
+                    Category = firstEntry.Category ?? glCode,
+                    AverageAmount = amounts.Average(),
+                    MinAmount = amounts.Min(),
+                    MaxAmount = amounts.Max(),
+                    OccurrenceCount = entries.Count,
+                    LastSeenAt = dates.Max(),
+                    DefaultGLCode = glCode,
+                    DefaultDepartment = department,
+                    ConfirmCount = entries.Count, // Treat imported entries as confirmed
+                    RejectCount = 0,
+                    IsSuppressed = false,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await _patternRepository.AddAsync(pattern);
+                createdCount++;
+            }
+            else
+            {
+                // Update existing pattern with new occurrences
+                foreach (var entry in entries)
+                {
+                    existingPattern.OccurrenceCount++;
+                    existingPattern.ConfirmCount++;
+
+                    // Weighted average update
+                    existingPattern.AverageAmount =
+                        ((existingPattern.AverageAmount * (existingPattern.OccurrenceCount - 1)) + entry.Amount)
+                        / existingPattern.OccurrenceCount;
+
+                    existingPattern.MinAmount = Math.Min(existingPattern.MinAmount, entry.Amount);
+                    existingPattern.MaxAmount = Math.Max(existingPattern.MaxAmount, entry.Amount);
+
+                    if (entry.Date > existingPattern.LastSeenAt)
+                    {
+                        existingPattern.LastSeenAt = entry.Date;
+                    }
+                }
+
+                existingPattern.UpdatedAt = DateTime.UtcNow;
+                await _patternRepository.UpdateAsync(existingPattern);
+                updatedCount++;
+            }
+        }
+
+        await _patternRepository.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Pattern import complete: {Created} created, {Updated} updated for user {UserId}",
+            createdCount, updatedCount, userId);
+
+        return new ImportPatternsResponseDto
+        {
+            CreatedCount = createdCount,
+            UpdatedCount = updatedCount,
+            TotalProcessed = request.Entries.Count,
+            Message = $"Successfully imported {request.Entries.Count} entries: {createdCount} patterns created, {updatedCount} patterns updated"
+        };
+    }
+
     #endregion
 
     #region Prediction Generation

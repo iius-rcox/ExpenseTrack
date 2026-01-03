@@ -39,6 +39,15 @@ public interface IExpensePredictionService
     /// <returns>Total number of patterns rebuilt.</returns>
     Task<int> RebuildPatternsAsync(Guid userId);
 
+    /// <summary>
+    /// Imports expense patterns from external data (CSV, historical records).
+    /// Creates or updates patterns based on the imported entries.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="request">Import request with expense entries.</param>
+    /// <returns>Import result with counts.</returns>
+    Task<ImportPatternsResponseDto> ImportPatternsAsync(Guid userId, ImportPatternsRequestDto request);
+
     #endregion
 
     #region Prediction Generation

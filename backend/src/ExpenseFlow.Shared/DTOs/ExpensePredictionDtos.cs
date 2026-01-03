@@ -395,6 +395,64 @@ public class PredictionAvailabilityDto
     public string Message { get; set; } = string.Empty;
 }
 
+#region Pattern Import
+
+/// <summary>
+/// Request DTO for importing a single expense pattern.
+/// </summary>
+public class ImportPatternDto
+{
+    /// <summary>Vendor name (raw, will be normalized).</summary>
+    public string Vendor { get; set; } = string.Empty;
+
+    /// <summary>Human-readable display name.</summary>
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>Category for this vendor's expenses.</summary>
+    public string? Category { get; set; }
+
+    /// <summary>Expense amount for this occurrence.</summary>
+    public decimal Amount { get; set; }
+
+    /// <summary>GL code for this expense.</summary>
+    public string? GLCode { get; set; }
+
+    /// <summary>Department for this expense.</summary>
+    public string? Department { get; set; }
+
+    /// <summary>Date of this expense occurrence.</summary>
+    public DateTime Date { get; set; }
+}
+
+/// <summary>
+/// Request DTO for bulk importing expense patterns.
+/// </summary>
+public class ImportPatternsRequestDto
+{
+    /// <summary>List of expense entries to learn patterns from.</summary>
+    public List<ImportPatternDto> Entries { get; set; } = new();
+}
+
+/// <summary>
+/// Response DTO for pattern import results.
+/// </summary>
+public class ImportPatternsResponseDto
+{
+    /// <summary>Number of patterns created.</summary>
+    public int CreatedCount { get; set; }
+
+    /// <summary>Number of patterns updated.</summary>
+    public int UpdatedCount { get; set; }
+
+    /// <summary>Total entries processed.</summary>
+    public int TotalProcessed { get; set; }
+
+    /// <summary>Summary message.</summary>
+    public string Message { get; set; } = string.Empty;
+}
+
+#endregion
+
 #region User Story 2 - Draft Pre-Population
 
 /// <summary>

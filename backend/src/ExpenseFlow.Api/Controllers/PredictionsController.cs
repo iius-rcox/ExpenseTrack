@@ -329,6 +329,26 @@ public class PredictionsController : ApiControllerBase
     #region Pattern Learning
 
     /// <summary>
+    /// Imports expense patterns from external data (CSV, historical records).
+    /// </summary>
+    /// <param name="request">Import request with expense entries.</param>
+    /// <returns>Import results with created/updated counts.</returns>
+    [HttpPost("patterns/import")]
+    [ProducesResponseType(typeof(ImportPatternsResponseDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ImportPatternsResponseDto>> ImportPatterns(
+        [FromBody] ImportPatternsRequestDto request)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+        var result = await _predictionService.ImportPatternsAsync(user.Id, request);
+
+        _logger.LogInformation(
+            "Imported patterns for user {UserId}: {Created} created, {Updated} updated",
+            user.Id, result.CreatedCount, result.UpdatedCount);
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Manually triggers pattern learning from a specific report.
     /// </summary>
     /// <param name="reportId">Report ID to learn from.</param>
