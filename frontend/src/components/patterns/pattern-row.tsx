@@ -247,7 +247,7 @@ export const PatternRow = memo(function PatternRow({
                 transition={{ duration: 0.15, ease: 'easeInOut' }}
                 className="overflow-hidden"
               >
-                <div className="px-10 py-2.5 flex items-center gap-6">
+                <div className="pl-14 pr-4 py-1.5 flex items-center gap-4">
                   {/* Compact Stats - inline */}
                   <div className="flex items-center gap-4 text-sm">
                     <span className="text-muted-foreground">
