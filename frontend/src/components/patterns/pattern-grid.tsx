@@ -279,7 +279,6 @@ export function PatternGrid({
 
   // Get visible rows
   const virtualRows = virtualizer.getVirtualItems()
-  const totalHeight = virtualizer.getTotalSize()
 
   // Handle sort column click
   const handleSortClick = useCallback(
@@ -522,12 +521,7 @@ export function PatternGrid({
             </TableRow>
           </TableHeader>
 
-          <TableBody
-            style={{
-              height: `${totalHeight}px`,
-              position: 'relative',
-            }}
-          >
+          <TableBody>
             {isLoading ? (
               <LoadingSkeleton count={8} />
             ) : (
