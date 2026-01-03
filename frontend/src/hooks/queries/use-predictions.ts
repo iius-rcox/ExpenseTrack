@@ -17,6 +17,7 @@ import type {
   BulkPredictionActionRequest,
   BulkPatternActionRequest,
   UpdatePatternSuppressionRequest,
+  UpdatePatternReceiptMatchRequest,
   PredictionStatus,
   PredictionConfidence,
   PatternStatusFilter,
@@ -415,6 +416,78 @@ export function useUpdatePatternSuppression() {
 }
 
 /**
+ * Hook to update pattern receipt match requirement with optimistic updates.
+ * When enabled, predictions are only generated for transactions with confirmed receipt matches.
+ * Shows toast notification on success/error.
+ */
+export function useUpdatePatternReceiptMatch() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      requiresReceiptMatch,
+    }: {
+      id: string
+      requiresReceiptMatch: boolean
+    }) => {
+      return apiFetch(`/predictions/patterns/${id}/receipt-match`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patternId: id,
+          requiresReceiptMatch,
+        } as UpdatePatternReceiptMatchRequest),
+      })
+    },
+    onMutate: async ({ id, requiresReceiptMatch }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: predictionKeys.patterns() })
+
+      // Snapshot previous values for rollback
+      const previousLists = queryClient.getQueriesData<PatternListResponse>({
+        queryKey: predictionKeys.patterns(),
+      })
+
+      // Optimistically update pattern in all list queries
+      queryClient.setQueriesData<PatternListResponse>(
+        { queryKey: predictionKeys.patterns() },
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            patterns: old.patterns.map((p) =>
+              p.id === id ? { ...p, requiresReceiptMatch } : p
+            ),
+          }
+        }
+      )
+
+      return { previousLists }
+    },
+    onError: (_error, { requiresReceiptMatch }, context) => {
+      // Rollback on error
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data)
+        })
+      }
+      toast.error(
+        `Failed to ${requiresReceiptMatch ? 'enable' : 'disable'} receipt match requirement`
+      )
+    },
+    onSuccess: (_, { requiresReceiptMatch }) => {
+      toast.success(
+        requiresReceiptMatch
+          ? 'Receipt match now required for predictions'
+          : 'Receipt match no longer required'
+      )
+      queryClient.invalidateQueries({ queryKey: predictionKeys.patterns() })
+    },
+  })
+}
+
+/**
  * Hook to delete a pattern.
  * Shows toast notification on success/error.
  */
@@ -722,12 +795,14 @@ export function usePatternWorkspace(params: UsePatternWorkspaceParams = {}) {
 
   const patternsQuery = usePatterns({ ...queryParams })
   const updateSuppression = useUpdatePatternSuppression()
+  const updateReceiptMatch = useUpdatePatternReceiptMatch()
   const deletePatternMutation = useDeletePattern()
   const bulkPatternAction = useBulkPatternAction()
   const rebuildPatterns = useRebuildPatterns()
 
   const isProcessing =
     updateSuppression.isPending ||
+    updateReceiptMatch.isPending ||
     deletePatternMutation.isPending ||
     bulkPatternAction.isPending ||
     rebuildPatterns.isPending
@@ -749,6 +824,8 @@ export function usePatternWorkspace(params: UsePatternWorkspaceParams = {}) {
     // Individual actions
     toggleSuppression: (id: string, isSuppressed: boolean) =>
       updateSuppression.mutate({ id, isSuppressed }),
+    toggleReceiptMatch: (id: string, requiresReceiptMatch: boolean) =>
+      updateReceiptMatch.mutate({ id, requiresReceiptMatch }),
     deletePattern: (id: string) => deletePatternMutation.mutate(id),
     rebuild: () => rebuildPatterns.mutateAsync(),
 
@@ -763,6 +840,7 @@ export function usePatternWorkspace(params: UsePatternWorkspaceParams = {}) {
     // Processing states
     isProcessing,
     isTogglingSupppression: updateSuppression.isPending,
+    isTogglingReceiptMatch: updateReceiptMatch.isPending,
     isDeleting: deletePatternMutation.isPending,
     isBulkProcessing: bulkPatternAction.isPending,
     isRebuilding: rebuildPatterns.isPending,

@@ -80,6 +80,10 @@ public class ExpensePatternConfiguration : IEntityTypeConfiguration<ExpensePatte
             .HasColumnName("is_suppressed")
             .HasDefaultValue(false);
 
+        builder.Property(e => e.RequiresReceiptMatch)
+            .HasColumnName("requires_receipt_match")
+            .HasDefaultValue(false);
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
             .HasDefaultValueSql("NOW()")

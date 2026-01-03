@@ -310,6 +310,37 @@ public class PredictionsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Updates whether a pattern requires receipt match for predictions.
+    /// When enabled, predictions are only generated for transactions with confirmed receipt matches.
+    /// </summary>
+    /// <param name="id">Pattern ID.</param>
+    /// <param name="request">Receipt match requirement update request.</param>
+    /// <returns>No content on success, 404 if not found.</returns>
+    [HttpPatch("patterns/{id:guid}/receipt-match")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdatePatternReceiptMatch(
+        Guid id,
+        [FromBody] UpdatePatternReceiptMatchRequestDto request)
+    {
+        request.PatternId = id; // Ensure route ID matches request
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+        var success = await _predictionService.UpdatePatternReceiptMatchAsync(user.Id, request);
+
+        if (!success)
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Pattern not found",
+                Detail = $"No pattern found with ID {id}"
+            });
+        }
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Deletes a pattern and all associated predictions.
     /// </summary>
     /// <param name="id">Pattern ID.</param>

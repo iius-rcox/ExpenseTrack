@@ -45,6 +45,8 @@ export interface PatternRowProps {
   onToggleExpand: (id: string) => void
   /** Called when suppression is toggled */
   onToggleSuppression: (id: string, isSuppressed: boolean) => void
+  /** Called when receipt match requirement is toggled */
+  onToggleReceiptMatch: (id: string, requiresReceiptMatch: boolean) => void
   /** Called when delete is confirmed */
   onDelete: (id: string) => void
   /** Whether a mutation is in progress */
@@ -89,6 +91,7 @@ export const PatternRow = memo(function PatternRow({
   onSelect,
   onToggleExpand,
   onToggleSuppression,
+  onToggleReceiptMatch,
   onDelete,
   isProcessing = false,
 }: PatternRowProps) {
@@ -126,6 +129,13 @@ export const PatternRow = memo(function PatternRow({
       onToggleSuppression(pattern.id, !checked)
     },
     [pattern.id, onToggleSuppression]
+  )
+
+  const handleReceiptMatchChange = useCallback(
+    (checked: boolean) => {
+      onToggleReceiptMatch(pattern.id, checked)
+    },
+    [pattern.id, onToggleReceiptMatch]
   )
 
   const handleDelete = useCallback(() => {
@@ -277,6 +287,36 @@ export const PatternRow = memo(function PatternRow({
                       {Math.round(confirmRate * 100)}%
                     </span>
                   </div>
+
+                  {/* Divider */}
+                  <span className="text-muted-foreground">•</span>
+
+                  {/* Receipt Match Requirement Toggle */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={pattern.requiresReceiptMatch}
+                          onCheckedChange={handleReceiptMatchChange}
+                          disabled={isProcessing}
+                          className="scale-90"
+                          aria-label={
+                            pattern.requiresReceiptMatch
+                              ? 'Disable receipt requirement'
+                              : 'Enable receipt requirement'
+                          }
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {pattern.requiresReceiptMatch ? 'Receipt required' : 'Any transaction'}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      {pattern.requiresReceiptMatch
+                        ? 'Only transactions with matched receipts will be predicted'
+                        : 'All matching transactions will be predicted'}
+                    </TooltipContent>
+                  </Tooltip>
 
                   {/* Spacer */}
                   <div className="flex-1" />

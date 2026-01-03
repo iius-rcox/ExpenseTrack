@@ -28,6 +28,9 @@ public class PatternSummaryDto
     /// <summary>True if user suppressed predictions for this vendor.</summary>
     public bool IsSuppressed { get; set; }
 
+    /// <summary>When true, predictions only generated for transactions with confirmed receipt matches.</summary>
+    public bool RequiresReceiptMatch { get; set; }
+
     /// <summary>Calculated accuracy from confirm/reject ratio.</summary>
     public decimal AccuracyRate { get; set; }
 }
@@ -78,6 +81,9 @@ public class PatternDetailDto
 
     /// <summary>True if user suppressed predictions for this vendor.</summary>
     public bool IsSuppressed { get; set; }
+
+    /// <summary>When true, predictions only generated for transactions with confirmed receipt matches.</summary>
+    public bool RequiresReceiptMatch { get; set; }
 
     /// <summary>Accuracy rate (ConfirmCount / (ConfirmCount + RejectCount)).</summary>
     public decimal AccuracyRate { get; set; }
@@ -240,6 +246,18 @@ public class UpdatePatternSuppressionRequestDto
 
     /// <summary>Whether to suppress predictions for this pattern.</summary>
     public bool IsSuppressed { get; set; }
+}
+
+/// <summary>
+/// Request DTO for updating pattern receipt match requirement.
+/// </summary>
+public class UpdatePatternReceiptMatchRequestDto
+{
+    /// <summary>Pattern ID to update.</summary>
+    public Guid PatternId { get; set; }
+
+    /// <summary>Whether to require receipt matches for predictions from this pattern.</summary>
+    public bool RequiresReceiptMatch { get; set; }
 }
 
 /// <summary>
