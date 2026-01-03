@@ -249,7 +249,7 @@ export const PatternRow = memo(function PatternRow({
               >
                 <div className="pl-14 pr-4 py-0.5 flex items-center gap-4">
                   {/* Compact Stats - inline */}
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-3 text-xs leading-none">
                     <span className="text-muted-foreground">
                       <span className="font-mono">{formatAmount(pattern.averageAmount * 0.7)}</span>
                       <span className="mx-1">–</span>
@@ -284,9 +284,9 @@ export const PatternRow = memo(function PatternRow({
                   {/* Compact Actions */}
                   <div className="flex items-center gap-1.5">
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      className="gap-1"
+                      className="h-6 px-2 text-xs gap-1"
                       onClick={(e) => {
                         e.stopPropagation()
                         // TODO: Navigate to transactions filtered by this vendor
@@ -294,7 +294,7 @@ export const PatternRow = memo(function PatternRow({
                       }}
                     >
                       <ExternalLink className="h-3 w-3" />
-                      View Transactions
+                      View
                     </Button>
 
                     <AlertDialog
@@ -303,9 +303,9 @@ export const PatternRow = memo(function PatternRow({
                     >
                       <AlertDialogTrigger asChild>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          className="h-6 px-2 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <Trash2 className="h-3 w-3" />
