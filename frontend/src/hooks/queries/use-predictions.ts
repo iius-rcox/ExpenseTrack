@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiFetch } from '@/services/api'
+import { DEFAULT_PATTERN_SORT } from '@/types/prediction'
 import type {
   PredictionSummary,
   PredictionDetail,
@@ -14,9 +15,12 @@ import type {
   ConfirmPredictionRequest,
   RejectPredictionRequest,
   BulkPredictionActionRequest,
+  BulkPatternActionRequest,
   UpdatePatternSuppressionRequest,
   PredictionStatus,
   PredictionConfidence,
+  PatternStatusFilter,
+  PatternSortConfig,
 } from '@/types/prediction'
 
 // Query key factory for predictions
@@ -44,6 +48,11 @@ interface PatternListParams {
   page?: number
   pageSize?: number
   includeSuppressed?: boolean
+  status?: PatternStatusFilter
+  category?: string
+  search?: string
+  sortBy?: PatternSortConfig['field']
+  sortOrder?: PatternSortConfig['direction']
 }
 
 /**
@@ -276,20 +285,56 @@ export function useBulkPredictionAction() {
 
 /**
  * Hook to fetch paginated list of patterns.
+ *
+ * @example
+ * ```tsx
+ * const { data, isLoading } = usePatterns({
+ *   status: 'active',
+ *   search: 'uber',
+ *   sortBy: 'accuracyRate',
+ *   sortOrder: 'desc',
+ * });
+ * ```
  */
 export function usePatterns(params: PatternListParams = {}) {
-  const { page = 1, pageSize = 20, includeSuppressed = false } = params
+  const {
+    page = 1,
+    pageSize = 20,
+    includeSuppressed = false,
+    status,
+    category,
+    search,
+    sortBy = DEFAULT_PATTERN_SORT.field,
+    sortOrder = DEFAULT_PATTERN_SORT.direction,
+  } = params
+
+  const queryParams = { page, pageSize, includeSuppressed, status, category, search, sortBy, sortOrder }
 
   return useQuery({
-    queryKey: predictionKeys.patternList({ page, pageSize, includeSuppressed }),
+    queryKey: predictionKeys.patternList(queryParams),
     queryFn: async () => {
       const searchParams = new URLSearchParams()
       searchParams.set('page', String(page))
       searchParams.set('pageSize', String(pageSize))
-      searchParams.set('includeSuppressed', String(includeSuppressed))
+      searchParams.set('sortBy', sortBy)
+      searchParams.set('sortOrder', sortOrder)
+
+      // Status filter determines includeSuppressed behavior
+      if (status === 'all') {
+        searchParams.set('includeSuppressed', 'true')
+      } else if (status === 'suppressed') {
+        searchParams.set('includeSuppressed', 'true')
+        searchParams.set('suppressedOnly', 'true')
+      } else {
+        searchParams.set('includeSuppressed', String(includeSuppressed))
+      }
+
+      if (category) searchParams.set('category', category)
+      if (search) searchParams.set('search', search)
 
       return apiFetch<PatternListResponse>(`/predictions/patterns?${searchParams}`)
     },
+    staleTime: 30_000,
   })
 }
 
@@ -307,7 +352,8 @@ export function usePattern(id: string) {
 }
 
 /**
- * Hook to update pattern suppression.
+ * Hook to update pattern suppression with optimistic updates.
+ * Shows toast notification on success/error.
  */
 export function useUpdatePatternSuppression() {
   const queryClient = useQueryClient()
@@ -320,7 +366,48 @@ export function useUpdatePatternSuppression() {
         body: JSON.stringify({ patternId: id, isSuppressed } as UpdatePatternSuppressionRequest),
       })
     },
-    onSuccess: () => {
+    onMutate: async ({ id, isSuppressed }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: predictionKeys.patterns() })
+
+      // Snapshot previous values for rollback
+      const previousLists = queryClient.getQueriesData<PatternListResponse>({
+        queryKey: predictionKeys.patterns(),
+      })
+
+      // Optimistically update pattern in all list queries
+      queryClient.setQueriesData<PatternListResponse>(
+        { queryKey: predictionKeys.patterns() },
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            patterns: old.patterns.map((p) =>
+              p.id === id ? { ...p, isSuppressed } : p
+            ),
+            activeCount: isSuppressed
+              ? Math.max(0, old.activeCount - 1)
+              : old.activeCount + 1,
+            suppressedCount: isSuppressed
+              ? old.suppressedCount + 1
+              : Math.max(0, old.suppressedCount - 1),
+          }
+        }
+      )
+
+      return { previousLists }
+    },
+    onError: (_error, { isSuppressed }, context) => {
+      // Rollback on error
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data)
+        })
+      }
+      toast.error(`Failed to ${isSuppressed ? 'suppress' : 'enable'} pattern`)
+    },
+    onSuccess: (_, { isSuppressed }) => {
+      toast.success(isSuppressed ? 'Pattern suppressed' : 'Pattern enabled')
       queryClient.invalidateQueries({ queryKey: predictionKeys.patterns() })
     },
   })
@@ -328,6 +415,7 @@ export function useUpdatePatternSuppression() {
 
 /**
  * Hook to delete a pattern.
+ * Shows toast notification on success/error.
  */
 export function useDeletePattern() {
   const queryClient = useQueryClient()
@@ -338,7 +426,152 @@ export function useDeletePattern() {
         method: 'DELETE',
       })
     },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: predictionKeys.patterns() })
+
+      const previousLists = queryClient.getQueriesData<PatternListResponse>({
+        queryKey: predictionKeys.patterns(),
+      })
+
+      // Optimistically remove pattern from lists
+      queryClient.setQueriesData<PatternListResponse>(
+        { queryKey: predictionKeys.patterns() },
+        (old) => {
+          if (!old) return old
+          const pattern = old.patterns.find((p) => p.id === id)
+          return {
+            ...old,
+            patterns: old.patterns.filter((p) => p.id !== id),
+            totalCount: Math.max(0, old.totalCount - 1),
+            activeCount: pattern && !pattern.isSuppressed
+              ? Math.max(0, old.activeCount - 1)
+              : old.activeCount,
+            suppressedCount: pattern?.isSuppressed
+              ? Math.max(0, old.suppressedCount - 1)
+              : old.suppressedCount,
+          }
+        }
+      )
+
+      return { previousLists }
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data)
+        })
+      }
+      toast.error('Failed to delete pattern')
+    },
     onSuccess: () => {
+      toast.success('Pattern deleted')
+      queryClient.invalidateQueries({ queryKey: predictionKeys.patterns() })
+    },
+  })
+}
+
+/**
+ * Response for bulk pattern action.
+ */
+interface BulkPatternActionResponse {
+  successCount: number
+  failedCount: number
+  failedIds: string[]
+  message: string
+}
+
+/**
+ * Hook for bulk pattern actions (suppress, enable, delete).
+ * Provides optimistic updates and rollback on error.
+ */
+export function useBulkPatternAction() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (request: BulkPatternActionRequest) => {
+      return apiFetch<BulkPatternActionResponse>('/predictions/patterns/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      })
+    },
+    onMutate: async ({ patternIds, action }) => {
+      await queryClient.cancelQueries({ queryKey: predictionKeys.patterns() })
+
+      const previousLists = queryClient.getQueriesData<PatternListResponse>({
+        queryKey: predictionKeys.patterns(),
+      })
+
+      const idSet = new Set(patternIds)
+
+      // Optimistically update patterns based on action
+      queryClient.setQueriesData<PatternListResponse>(
+        { queryKey: predictionKeys.patterns() },
+        (old) => {
+          if (!old) return old
+
+          if (action === 'delete') {
+            const deletedPatterns = old.patterns.filter((p) => idSet.has(p.id))
+            const activeDeleted = deletedPatterns.filter((p) => !p.isSuppressed).length
+            const suppressedDeleted = deletedPatterns.filter((p) => p.isSuppressed).length
+
+            return {
+              ...old,
+              patterns: old.patterns.filter((p) => !idSet.has(p.id)),
+              totalCount: Math.max(0, old.totalCount - patternIds.length),
+              activeCount: Math.max(0, old.activeCount - activeDeleted),
+              suppressedCount: Math.max(0, old.suppressedCount - suppressedDeleted),
+            }
+          }
+
+          const isSuppressed = action === 'suppress'
+          let activeChange = 0
+          let suppressedChange = 0
+
+          const updatedPatterns = old.patterns.map((p) => {
+            if (!idSet.has(p.id)) return p
+            // Only count changes for patterns that are actually changing
+            if (p.isSuppressed !== isSuppressed) {
+              if (isSuppressed) {
+                activeChange--
+                suppressedChange++
+              } else {
+                activeChange++
+                suppressedChange--
+              }
+            }
+            return { ...p, isSuppressed }
+          })
+
+          return {
+            ...old,
+            patterns: updatedPatterns,
+            activeCount: Math.max(0, old.activeCount + activeChange),
+            suppressedCount: Math.max(0, old.suppressedCount + suppressedChange),
+          }
+        }
+      )
+
+      return { previousLists }
+    },
+    onError: (_error, { action }, context) => {
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data)
+        })
+      }
+      const actionText = action === 'delete' ? 'delete' : action === 'suppress' ? 'suppress' : 'enable'
+      toast.error(`Failed to ${actionText} patterns`)
+    },
+    onSuccess: (response, { action }) => {
+      const actionText = action === 'delete' ? 'deleted' : action === 'suppress' ? 'suppressed' : 'enabled'
+      if (response.failedCount > 0) {
+        toast.warning(
+          `${response.successCount} patterns ${actionText}, ${response.failedCount} failed`
+        )
+      } else {
+        toast.success(`${response.successCount} patterns ${actionText}`)
+      }
       queryClient.invalidateQueries({ queryKey: predictionKeys.patterns() })
     },
   })
@@ -447,5 +680,93 @@ export function usePredictionWorkspace(params: PredictionListParams = {}) {
     // Refetch
     refetch: predictionsQuery.refetch,
     refetchDashboard: dashboardQuery.refetch,
+  }
+}
+
+// =============================================================================
+// Pattern Workspace Hook
+// =============================================================================
+
+/**
+ * Parameters for the pattern workspace hook.
+ */
+export interface UsePatternWorkspaceParams extends PatternListParams {
+  /** Enable/disable the query */
+  enabled?: boolean
+}
+
+/**
+ * Combined hook for the patterns workspace.
+ * Provides all state and actions needed for the pattern management UI.
+ *
+ * @example
+ * ```tsx
+ * const {
+ *   patterns,
+ *   activeCount,
+ *   suppressedCount,
+ *   isLoading,
+ *   toggleSuppression,
+ *   deletePattern,
+ *   bulkAction,
+ * } = usePatternWorkspace({
+ *   status: 'active',
+ *   search: 'uber',
+ *   sortBy: 'accuracyRate',
+ * });
+ * ```
+ */
+export function usePatternWorkspace(params: UsePatternWorkspaceParams = {}) {
+  const { enabled = true, ...queryParams } = params
+
+  const patternsQuery = usePatterns({ ...queryParams })
+  const updateSuppression = useUpdatePatternSuppression()
+  const deletePatternMutation = useDeletePattern()
+  const bulkPatternAction = useBulkPatternAction()
+  const rebuildPatterns = useRebuildPatterns()
+
+  const isProcessing =
+    updateSuppression.isPending ||
+    deletePatternMutation.isPending ||
+    bulkPatternAction.isPending ||
+    rebuildPatterns.isPending
+
+  return {
+    // Pattern data
+    patterns: patternsQuery.data?.patterns ?? [],
+    totalCount: patternsQuery.data?.totalCount ?? 0,
+    page: patternsQuery.data?.page ?? 1,
+    pageSize: patternsQuery.data?.pageSize ?? 20,
+    activeCount: patternsQuery.data?.activeCount ?? 0,
+    suppressedCount: patternsQuery.data?.suppressedCount ?? 0,
+
+    // Loading states
+    isLoading: patternsQuery.isLoading,
+    isError: patternsQuery.isError,
+    error: patternsQuery.error,
+
+    // Individual actions
+    toggleSuppression: (id: string, isSuppressed: boolean) =>
+      updateSuppression.mutate({ id, isSuppressed }),
+    deletePattern: (id: string) => deletePatternMutation.mutate(id),
+    rebuild: () => rebuildPatterns.mutateAsync(),
+
+    // Bulk actions
+    bulkSuppress: (patternIds: string[]) =>
+      bulkPatternAction.mutate({ patternIds, action: 'suppress' }),
+    bulkEnable: (patternIds: string[]) =>
+      bulkPatternAction.mutate({ patternIds, action: 'enable' }),
+    bulkDelete: (patternIds: string[]) =>
+      bulkPatternAction.mutate({ patternIds, action: 'delete' }),
+
+    // Processing states
+    isProcessing,
+    isTogglingSupppression: updateSuppression.isPending,
+    isDeleting: deletePatternMutation.isPending,
+    isBulkProcessing: bulkPatternAction.isPending,
+    isRebuilding: rebuildPatterns.isPending,
+
+    // Refetch
+    refetch: patternsQuery.refetch,
   }
 }
