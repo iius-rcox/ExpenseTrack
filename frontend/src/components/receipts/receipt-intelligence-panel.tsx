@@ -17,10 +17,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ZoomIn,
-  ZoomOut,
-  RotateCw,
-  Maximize2,
   RotateCcw,
   Save,
   X,
@@ -34,6 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { DocumentViewer } from '@/components/ui/document-viewer';
 import { ExtractedField, ExtractedFieldSkeleton } from './extracted-field';
 import { useUndo } from '@/hooks/ui/use-undo';
 import type {
@@ -78,9 +75,7 @@ export function ReceiptIntelligencePanel({
   isLoading = false,
   className,
 }: ReceiptIntelligencePanelProps) {
-  // Image viewer state
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
+  // Field highlight state (for future bounding box feature)
   const [highlightedField] = useState<ExtractedFieldKey | null>(null);
 
   // Track field edits with undo support
@@ -167,15 +162,6 @@ export function ReceiptIntelligencePanel({
     onDiscard?.();
   };
 
-  // Image controls
-  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.25, 3));
-  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));
-  const handleRotate = () => setRotation((r) => (r + 90) % 360);
-  const handleReset = () => {
-    setZoom(1);
-    setRotation(0);
-  };
-
   // Check if there are unsaved changes
   const hasChanges = editedFields.size > 0;
 
@@ -192,100 +178,43 @@ export function ReceiptIntelligencePanel({
 
   return (
     <div className={cn('flex gap-4 h-full', className)}>
-      {/* Left: Image Viewer */}
+      {/* Left: Document Viewer */}
       <Card className="flex-1 flex flex-col min-w-0">
         <CardHeader className="pb-2 shrink-0">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Receipt Image</CardTitle>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-11 w-11 md:h-8 md:w-8"
-                onClick={handleZoomOut}
-                disabled={zoom <= 0.5}
-              >
-                <ZoomOut className="h-5 w-5 md:h-4 md:w-4" />
-              </Button>
-              <span className="text-xs text-muted-foreground w-12 text-center">
-                {Math.round(zoom * 100)}%
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-11 w-11 md:h-8 md:w-8"
-                onClick={handleZoomIn}
-                disabled={zoom >= 3}
-              >
-                <ZoomIn className="h-5 w-5 md:h-4 md:w-4" />
-              </Button>
-              <Separator orientation="vertical" className="h-4 mx-1 hidden md:block" />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-11 w-11 md:h-8 md:w-8"
-                onClick={handleRotate}
-              >
-                <RotateCw className="h-5 w-5 md:h-4 md:w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-11 w-11 md:h-8 md:w-8"
-                onClick={handleReset}
-              >
-                <Maximize2 className="h-5 w-5 md:h-4 md:w-4" />
-              </Button>
-            </div>
-          </div>
+          <CardTitle className="text-base">Receipt Document</CardTitle>
         </CardHeader>
         <CardContent className="flex-1 overflow-hidden p-2">
-          <div className="relative h-full w-full overflow-auto rounded-lg bg-muted/50">
-            <div
-              className="min-h-full min-w-full flex items-center justify-center p-4"
-              style={{
-                transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                transformOrigin: 'center center',
-                transition: 'transform 0.2s ease',
-              }}
-            >
-              {receipt.imageUrl ? (
-                <img
-                  src={receipt.imageUrl}
-                  alt="Receipt"
-                  className="max-w-full max-h-full object-contain shadow-lg rounded"
-                  draggable={false}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center text-muted-foreground">
-                  <AlertTriangle className="h-12 w-12 mb-2" />
-                  <span>Image not available</span>
-                </div>
-              )}
+          <div className="relative h-full w-full rounded-lg bg-muted/50">
+            <DocumentViewer
+              src={receipt.imageUrl}
+              filename={receipt.filename}
+              alt="Receipt"
+              showControls={true}
+              className="h-full"
+            />
 
-              {/* Field highlight overlay (when bounding boxes available) */}
-              {highlightedField && (
-                <div className="absolute inset-0 pointer-events-none">
-                  {receipt.extractedFields
-                    .filter((f) => f.key === highlightedField && f.boundingBox)
-                    .map((field) => (
-                      <motion.div
-                        key={field.key}
-                        className="absolute border-2 border-primary bg-primary/10 rounded"
-                        style={{
-                          left: `${field.boundingBox!.x}%`,
-                          top: `${field.boundingBox!.y}%`,
-                          width: `${field.boundingBox!.width}%`,
-                          height: `${field.boundingBox!.height}%`,
-                        }}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0 }}
-                      />
-                    ))}
-                </div>
-              )}
-            </div>
+            {/* Field highlight overlay (when bounding boxes available) */}
+            {highlightedField && (
+              <div className="absolute inset-0 pointer-events-none">
+                {receipt.extractedFields
+                  .filter((f) => f.key === highlightedField && f.boundingBox)
+                  .map((field) => (
+                    <motion.div
+                      key={field.key}
+                      className="absolute border-2 border-primary bg-primary/10 rounded"
+                      style={{
+                        left: `${field.boundingBox!.x}%`,
+                        top: `${field.boundingBox!.y}%`,
+                        width: `${field.boundingBox!.width}%`,
+                        height: `${field.boundingBox!.height}%`,
+                      }}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0 }}
+                    />
+                  ))}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

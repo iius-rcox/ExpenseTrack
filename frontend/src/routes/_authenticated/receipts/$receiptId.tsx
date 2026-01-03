@@ -31,9 +31,9 @@ import {
   Calendar,
   DollarSign,
   Store,
-  FileText,
   Loader2,
 } from 'lucide-react'
+import { DocumentViewer } from '@/components/ui/document-viewer'
 
 export const Route = createFileRoute('/_authenticated/receipts/$receiptId')({
   component: ReceiptDetailPage,
@@ -192,27 +192,23 @@ function ReceiptDetailPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Receipt Image */}
-        <Card>
-          <CardHeader>
+        {/* Receipt Document Viewer */}
+        <Card className="flex flex-col">
+          <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
               <FileImage className="h-5 w-5" />
-              Receipt Image
+              Receipt Document
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="relative aspect-[3/4] bg-muted rounded-lg overflow-hidden">
-              {receipt.blobUrl ? (
-                <img
-                  src={receipt.blobUrl}
-                  alt={receipt.originalFilename}
-                  className="object-contain w-full h-full"
-                />
-              ) : (
-                <div className="flex items-center justify-center w-full h-full text-muted-foreground">
-                  <FileText className="h-16 w-16" />
-                </div>
-              )}
+          <CardContent className="flex-1 p-2">
+            <div className="h-[500px] bg-muted rounded-lg overflow-hidden">
+              <DocumentViewer
+                src={receipt.blobUrl}
+                contentType={receipt.contentType}
+                filename={receipt.originalFilename}
+                alt={receipt.originalFilename}
+                showControls={true}
+              />
             </div>
             {receipt.blobUrl && (
               <Button variant="outline" className="w-full mt-4" asChild>
