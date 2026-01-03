@@ -23,6 +23,9 @@ import {
   useBulkUpdateTransactions,
   useBulkDeleteTransactions,
   useExportTransactions,
+  useMarkTransactionReimbursable,
+  useMarkTransactionNotReimbursable,
+  useClearReimbursabilityOverride,
 } from '@/hooks/queries/use-transactions'
 import { usePatternWorkspace, useGeneratePredictions } from '@/hooks/queries/use-predictions'
 import { Link } from '@tanstack/react-router'
@@ -189,6 +192,11 @@ function TransactionsPage() {
   const bulkDelete = useBulkDeleteTransactions()
   const exportTransactions = useExportTransactions()
 
+  // Reimbursability mutations
+  const markReimbursable = useMarkTransactionReimbursable()
+  const markNotReimbursable = useMarkTransactionNotReimbursable()
+  const clearReimbursabilityOverride = useClearReimbursabilityOverride()
+
   // Handle filter changes
   const handleFilterChange = useCallback(
     (newFilters: TransactionFilters) => {
@@ -275,6 +283,49 @@ function TransactionsPage() {
       })
     },
     [navigate]
+  )
+
+  // Reimbursability handlers
+  const handleMarkReimbursable = useCallback(
+    (transactionId: string) => {
+      markReimbursable.mutate(transactionId, {
+        onSuccess: () => {
+          toast.success('Transaction marked as reimbursable')
+        },
+        onError: (error) => {
+          toast.error(`Failed: ${error.message}`)
+        },
+      })
+    },
+    [markReimbursable]
+  )
+
+  const handleMarkNotReimbursable = useCallback(
+    (transactionId: string) => {
+      markNotReimbursable.mutate(transactionId, {
+        onSuccess: () => {
+          toast.success('Transaction marked as not reimbursable')
+        },
+        onError: (error) => {
+          toast.error(`Failed: ${error.message}`)
+        },
+      })
+    },
+    [markNotReimbursable]
+  )
+
+  const handleClearReimbursabilityOverride = useCallback(
+    (transactionId: string) => {
+      clearReimbursabilityOverride.mutate(transactionId, {
+        onSuccess: () => {
+          toast.success('Manual override cleared')
+        },
+        onError: (error) => {
+          toast.error(`Failed: ${error.message}`)
+        },
+      })
+    },
+    [clearReimbursabilityOverride]
   )
 
   // Bulk actions
@@ -492,6 +543,14 @@ function TransactionsPage() {
             onTransactionClick={handleTransactionClick}
             savingIds={savingIds}
             containerHeight={Math.min(600, Math.max(400, transactions.length * 56))}
+            onMarkReimbursable={handleMarkReimbursable}
+            onMarkNotReimbursable={handleMarkNotReimbursable}
+            onClearReimbursabilityOverride={handleClearReimbursabilityOverride}
+            isPredictionProcessing={
+              markReimbursable.isPending ||
+              markNotReimbursable.isPending ||
+              clearReimbursabilityOverride.isPending
+            }
           />
 
           {/* Pagination Info */}

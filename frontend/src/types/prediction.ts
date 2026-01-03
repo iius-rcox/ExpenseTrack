@@ -94,9 +94,9 @@ export interface PredictionSummary {
   id: string;
   /** Transaction ID this prediction applies to */
   transactionId: string;
-  /** Pattern that generated this prediction */
-  patternId: string;
-  /** Vendor display name from pattern */
+  /** Pattern that generated this prediction (null for manual overrides) */
+  patternId: string | null;
+  /** Vendor display name from pattern (or "Manual" for manual overrides) */
   vendorName: string;
   /** Confidence score (0.00 - 1.00) */
   confidenceScore: number;
@@ -108,6 +108,8 @@ export interface PredictionSummary {
   suggestedCategory: string | null;
   /** Suggested GL code from pattern */
   suggestedGLCode: string | null;
+  /** True if this was manually set by user (not auto-predicted) */
+  isManualOverride: boolean;
 }
 
 /**

@@ -732,3 +732,105 @@ export function useExportTransactions() {
     },
   })
 }
+
+// =============================================================================
+// Reimbursability Mutation Hooks
+// =============================================================================
+
+import type { PredictionActionResponse } from '@/types/prediction'
+
+// Also import predictionKeys for cache invalidation
+import { predictionKeys } from './use-predictions'
+
+/**
+ * Hook for marking a transaction as reimbursable (business expense).
+ *
+ * Creates or updates a manual override prediction with Confirmed status.
+ * This marks the transaction as a valid business expense.
+ *
+ * @example
+ * ```tsx
+ * const markReimbursable = useMarkTransactionReimbursable();
+ * markReimbursable.mutate('tx-123');
+ * ```
+ */
+export function useMarkTransactionReimbursable() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (transactionId: string) => {
+      return apiFetch<PredictionActionResponse>(
+        `/transactions/${transactionId}/reimbursable`,
+        { method: 'POST' }
+      )
+    },
+
+    onSuccess: () => {
+      // Invalidate both transaction and prediction caches
+      queryClient.invalidateQueries({ queryKey: transactionKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: predictionKeys.all })
+    },
+  })
+}
+
+/**
+ * Hook for marking a transaction as not reimbursable (personal expense).
+ *
+ * Creates or updates a manual override prediction with Rejected status.
+ * Use this for personal purchases that shouldn't be included in expense reports.
+ *
+ * @example
+ * ```tsx
+ * const markNotReimbursable = useMarkTransactionNotReimbursable();
+ * markNotReimbursable.mutate('tx-123');
+ * ```
+ */
+export function useMarkTransactionNotReimbursable() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (transactionId: string) => {
+      return apiFetch<PredictionActionResponse>(
+        `/transactions/${transactionId}/not-reimbursable`,
+        { method: 'POST' }
+      )
+    },
+
+    onSuccess: () => {
+      // Invalidate both transaction and prediction caches
+      queryClient.invalidateQueries({ queryKey: transactionKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: predictionKeys.all })
+    },
+  })
+}
+
+/**
+ * Hook for clearing a manual reimbursability override.
+ *
+ * Removes the manual prediction, allowing the system to auto-predict
+ * based on learned patterns on the next prediction cycle.
+ *
+ * @example
+ * ```tsx
+ * const clearOverride = useClearReimbursabilityOverride();
+ * clearOverride.mutate('tx-123');
+ * ```
+ */
+export function useClearReimbursabilityOverride() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (transactionId: string) => {
+      return apiFetch<PredictionActionResponse>(
+        `/transactions/${transactionId}/reimbursability-override`,
+        { method: 'DELETE' }
+      )
+    },
+
+    onSuccess: () => {
+      // Invalidate both transaction and prediction caches
+      queryClient.invalidateQueries({ queryKey: transactionKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: predictionKeys.all })
+    },
+  })
+}

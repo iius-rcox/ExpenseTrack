@@ -106,10 +106,10 @@ public class PredictionSummaryDto
     /// <summary>Transaction ID this prediction applies to.</summary>
     public Guid TransactionId { get; set; }
 
-    /// <summary>Pattern that generated this prediction.</summary>
-    public Guid PatternId { get; set; }
+    /// <summary>Pattern that generated this prediction (null for manual overrides).</summary>
+    public Guid? PatternId { get; set; }
 
-    /// <summary>Vendor display name from pattern.</summary>
+    /// <summary>Vendor display name from pattern (or "Manual" for manual overrides).</summary>
     public string VendorName { get; set; } = string.Empty;
 
     /// <summary>Confidence score (0.00 - 1.00).</summary>
@@ -126,6 +126,9 @@ public class PredictionSummaryDto
 
     /// <summary>Suggested GL code from pattern.</summary>
     public string? SuggestedGLCode { get; set; }
+
+    /// <summary>True if this was manually set by user (not auto-predicted).</summary>
+    public bool IsManualOverride { get; set; }
 }
 
 /// <summary>
@@ -139,10 +142,10 @@ public class PredictionDetailDto
     /// <summary>Transaction ID this prediction applies to.</summary>
     public Guid TransactionId { get; set; }
 
-    /// <summary>Pattern that generated this prediction.</summary>
-    public Guid PatternId { get; set; }
+    /// <summary>Pattern that generated this prediction (null for manual overrides).</summary>
+    public Guid? PatternId { get; set; }
 
-    /// <summary>Vendor display name from pattern.</summary>
+    /// <summary>Vendor display name from pattern (or "Manual" for manual overrides).</summary>
     public string VendorName { get; set; } = string.Empty;
 
     /// <summary>Confidence score (0.00 - 1.00).</summary>
@@ -174,6 +177,9 @@ public class PredictionDetailDto
 
     /// <summary>When the user acted on the prediction (nullable).</summary>
     public DateTime? ResolvedAt { get; set; }
+
+    /// <summary>True if this was manually set by user (not auto-predicted).</summary>
+    public bool IsManualOverride { get; set; }
 }
 
 /// <summary>

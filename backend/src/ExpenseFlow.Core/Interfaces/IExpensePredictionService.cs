@@ -115,6 +115,39 @@ public interface IExpensePredictionService
 
     #endregion
 
+    #region Manual Transaction Marking
+
+    /// <summary>
+    /// Manually marks a transaction as reimbursable.
+    /// Creates a manual override prediction if no prediction exists,
+    /// or updates existing prediction to Confirmed status.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="transactionId">Transaction ID to mark.</param>
+    /// <returns>Action result with new status.</returns>
+    Task<PredictionActionResponseDto> MarkTransactionReimbursableAsync(Guid userId, Guid transactionId);
+
+    /// <summary>
+    /// Manually marks a transaction as not reimbursable.
+    /// Creates a manual override prediction if no prediction exists,
+    /// or updates existing prediction to Rejected status.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="transactionId">Transaction ID to mark.</param>
+    /// <returns>Action result with new status.</returns>
+    Task<PredictionActionResponseDto> MarkTransactionNotReimbursableAsync(Guid userId, Guid transactionId);
+
+    /// <summary>
+    /// Clears manual reimbursability override for a transaction.
+    /// Removes manual prediction, allowing auto-prediction on next generation cycle.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="transactionId">Transaction ID to clear override.</param>
+    /// <returns>Action result.</returns>
+    Task<PredictionActionResponseDto> ClearManualOverrideAsync(Guid userId, Guid transactionId);
+
+    #endregion
+
     #region Pattern Management
 
     /// <summary>

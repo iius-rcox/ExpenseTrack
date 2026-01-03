@@ -42,6 +42,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ExpenseBadge } from '@/components/predictions/expense-badge';
+import { ReimbursabilityActions } from '@/components/transactions/reimbursability-actions';
 import type {
   TransactionView,
   TransactionMatchStatus,
@@ -72,6 +73,12 @@ interface TransactionRowComponentProps {
   onPredictionReject?: (predictionId: string) => void;
   /** Whether a prediction action is processing */
   isPredictionProcessing?: boolean;
+  /** Handler for marking transaction as reimbursable */
+  onMarkReimbursable?: (transactionId: string) => void;
+  /** Handler for marking transaction as not reimbursable */
+  onMarkNotReimbursable?: (transactionId: string) => void;
+  /** Handler for clearing manual reimbursability override */
+  onClearReimbursabilityOverride?: (transactionId: string) => void;
 }
 
 /**
@@ -141,6 +148,9 @@ export const TransactionRow = memo(function TransactionRow({
   onPredictionConfirm,
   onPredictionReject,
   isPredictionProcessing = false,
+  onMarkReimbursable,
+  onMarkNotReimbursable,
+  onClearReimbursabilityOverride,
 }: TransactionRowComponentProps) {
   // Editing state
   const [editingField, setEditingField] = useState<'notes' | null>(null);
@@ -284,17 +294,28 @@ export const TransactionRow = memo(function TransactionRow({
         </div>
       </TableCell>
 
-      {/* Expense Prediction Badge (Feature 023) */}
+      {/* Expense Prediction Badge / Reimbursability Status (Feature 023) */}
       <TableCell className="w-[180px]">
+        {/* Show ExpenseBadge for pending predictions */}
         {transaction.prediction &&
           transaction.prediction.status === 'Pending' &&
-          transaction.prediction.confidenceLevel !== 'Low' && (
+          transaction.prediction.confidenceLevel !== 'Low' ? (
             <ExpenseBadge
               prediction={transaction.prediction}
               onConfirm={onPredictionConfirm}
               onReject={onPredictionReject}
               isProcessing={isPredictionProcessing}
               compact
+            />
+          ) : (
+            /* Show ReimbursabilityActions for confirmed/rejected or no prediction */
+            <ReimbursabilityActions
+              transactionId={transaction.id}
+              prediction={transaction.prediction}
+              onMarkReimbursable={onMarkReimbursable}
+              onMarkNotReimbursable={onMarkNotReimbursable}
+              onClearOverride={onClearReimbursabilityOverride}
+              isProcessing={isPredictionProcessing}
             />
           )}
       </TableCell>

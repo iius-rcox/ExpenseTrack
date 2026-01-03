@@ -13,17 +13,20 @@ public class TransactionsController : ApiControllerBase
 {
     private readonly ITransactionRepository _transactionRepository;
     private readonly IStatementImportRepository _importRepository;
+    private readonly IExpensePredictionService _predictionService;
     private readonly IUserService _userService;
     private readonly ILogger<TransactionsController> _logger;
 
     public TransactionsController(
         ITransactionRepository transactionRepository,
         IStatementImportRepository importRepository,
+        IExpensePredictionService predictionService,
         IUserService userService,
         ILogger<TransactionsController> logger)
     {
         _transactionRepository = transactionRepository;
         _importRepository = importRepository;
+        _predictionService = predictionService;
         _userService = userService;
         _logger = logger;
     }
@@ -179,4 +182,107 @@ public class TransactionsController : ApiControllerBase
 
         return NoContent();
     }
+
+    #region Reimbursability Management
+
+    /// <summary>
+    /// Marks a transaction as reimbursable (business expense).
+    /// Creates or updates a manual override prediction.
+    /// </summary>
+    /// <param name="id">Transaction ID.</param>
+    /// <returns>Prediction action result.</returns>
+    [HttpPost("{id:guid}/reimbursable")]
+    [ProducesResponseType(typeof(PredictionActionResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PredictionActionResponseDto>> MarkAsReimbursable(Guid id)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        try
+        {
+            var result = await _predictionService.MarkTransactionReimbursableAsync(user.Id, id);
+
+            _logger.LogInformation(
+                "Marked transaction {TransactionId} as reimbursable for user {UserId}",
+                id, user.Id);
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Transaction not found",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Marks a transaction as not reimbursable (personal expense).
+    /// Creates or updates a manual override prediction.
+    /// </summary>
+    /// <param name="id">Transaction ID.</param>
+    /// <returns>Prediction action result.</returns>
+    [HttpPost("{id:guid}/not-reimbursable")]
+    [ProducesResponseType(typeof(PredictionActionResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PredictionActionResponseDto>> MarkAsNotReimbursable(Guid id)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        try
+        {
+            var result = await _predictionService.MarkTransactionNotReimbursableAsync(user.Id, id);
+
+            _logger.LogInformation(
+                "Marked transaction {TransactionId} as not reimbursable for user {UserId}",
+                id, user.Id);
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Transaction not found",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Clears a manual reimbursability override, allowing automatic re-prediction.
+    /// Only works on transactions with manual overrides.
+    /// </summary>
+    /// <param name="id">Transaction ID.</param>
+    /// <returns>Prediction action result.</returns>
+    [HttpDelete("{id:guid}/reimbursability-override")]
+    [ProducesResponseType(typeof(PredictionActionResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PredictionActionResponseDto>> ClearReimbursabilityOverride(Guid id)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        try
+        {
+            var result = await _predictionService.ClearManualOverrideAsync(user.Id, id);
+
+            _logger.LogInformation(
+                "Cleared reimbursability override for transaction {TransactionId} for user {UserId}",
+                id, user.Id);
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found") || ex.Message.Contains("No manual override"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Override not found",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    #endregion
 }

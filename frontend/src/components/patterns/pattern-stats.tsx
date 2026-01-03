@@ -7,7 +7,7 @@
  * @see specs/023-expense-prediction/plan.md for pattern management requirements
  */
 
-import { Activity, EyeOff, TrendingUp, RefreshCw } from 'lucide-react'
+import { Activity, EyeOff, TrendingUp, RefreshCw, Sparkles } from 'lucide-react'
 import { StatCard } from '@/components/design-system/stat-card'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,6 +30,10 @@ export interface PatternStatsProps {
   isRebuilding?: boolean
   /** Callback to trigger pattern rebuild */
   onRebuild?: () => void
+  /** Whether prediction generation is in progress */
+  isGenerating?: boolean
+  /** Callback to trigger prediction generation */
+  onGenerate?: () => void
   /** Additional CSS classes */
   className?: string
 }
@@ -63,6 +67,8 @@ export function PatternStats({
   isLoading = false,
   isRebuilding = false,
   onRebuild,
+  isGenerating = false,
+  onGenerate,
   className,
 }: PatternStatsProps) {
   const totalCount = activeCount + suppressedCount
@@ -101,7 +107,7 @@ export function PatternStats({
       </div>
 
       {/* Actions Row */}
-      {onRebuild && (
+      {(onRebuild || onGenerate) && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             {totalCount === 0
@@ -109,29 +115,59 @@ export function PatternStats({
               : `${totalCount} total pattern${totalCount !== 1 ? 's' : ''} learned from your expense reports.`}
           </p>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onRebuild}
-                disabled={isRebuilding || totalCount === 0}
-                className="gap-2"
-              >
-                <RefreshCw
-                  className={cn('h-4 w-4', isRebuilding && 'animate-spin')}
-                />
-                {isRebuilding ? 'Rebuilding...' : 'Rebuild Patterns'}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>
-                Recalculate all patterns from your expense reports.
-                <br />
-                Use this if predictions seem inaccurate.
-              </p>
-            </TooltipContent>
-          </Tooltip>
+          <div className="flex items-center gap-2">
+            {onGenerate && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={onGenerate}
+                    disabled={isGenerating || totalCount === 0}
+                    className="gap-2"
+                  >
+                    <Sparkles
+                      className={cn('h-4 w-4', isGenerating && 'animate-pulse')}
+                    />
+                    {isGenerating ? 'Generating...' : 'Generate Predictions'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    Scan your transactions and flag likely business expenses.
+                    <br />
+                    Uses patterns to identify reimbursable transactions.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {onRebuild && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onRebuild}
+                    disabled={isRebuilding || totalCount === 0}
+                    className="gap-2"
+                  >
+                    <RefreshCw
+                      className={cn('h-4 w-4', isRebuilding && 'animate-spin')}
+                    />
+                    {isRebuilding ? 'Rebuilding...' : 'Rebuild Patterns'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    Recalculate all patterns from your expense reports.
+                    <br />
+                    Use this if predictions seem inaccurate.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </div>
       )}
     </div>

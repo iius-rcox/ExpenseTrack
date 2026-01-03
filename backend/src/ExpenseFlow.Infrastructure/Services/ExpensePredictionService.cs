@@ -519,6 +519,146 @@ public class ExpensePredictionService : IExpensePredictionService
 
     #endregion
 
+    #region Manual Transaction Marking
+
+    /// <inheritdoc />
+    public async Task<PredictionActionResponseDto> MarkTransactionReimbursableAsync(Guid userId, Guid transactionId)
+    {
+        return await MarkTransactionAsync(userId, transactionId, PredictionStatus.Confirmed, "reimbursable");
+    }
+
+    /// <inheritdoc />
+    public async Task<PredictionActionResponseDto> MarkTransactionNotReimbursableAsync(Guid userId, Guid transactionId)
+    {
+        return await MarkTransactionAsync(userId, transactionId, PredictionStatus.Rejected, "not reimbursable");
+    }
+
+    /// <summary>
+    /// Internal helper to mark a transaction with the specified status.
+    /// </summary>
+    private async Task<PredictionActionResponseDto> MarkTransactionAsync(
+        Guid userId,
+        Guid transactionId,
+        PredictionStatus status,
+        string statusDescription)
+    {
+        // Validate transaction exists and belongs to user
+        var transaction = await _dbContext.Transactions
+            .FirstOrDefaultAsync(t => t.Id == transactionId && t.UserId == userId);
+
+        if (transaction == null)
+        {
+            _logger.LogWarning(
+                "Attempted to mark non-existent transaction {TransactionId} for user {UserId}",
+                transactionId, userId);
+
+            return new PredictionActionResponseDto
+            {
+                Success = false,
+                Message = "Transaction not found"
+            };
+        }
+
+        // Check for existing prediction
+        var existingPrediction = await _dbContext.TransactionPredictions
+            .FirstOrDefaultAsync(p => p.TransactionId == transactionId && p.UserId == userId);
+
+        if (existingPrediction != null)
+        {
+            // Update existing prediction
+            existingPrediction.Status = status;
+            existingPrediction.IsManualOverride = true;
+            existingPrediction.ResolvedAt = DateTime.UtcNow;
+
+            _logger.LogInformation(
+                "Updated existing prediction {PredictionId} to {Status} (manual override) for transaction {TransactionId}",
+                existingPrediction.Id, status, transactionId);
+        }
+        else
+        {
+            // Create new manual override prediction
+            var newPrediction = new TransactionPrediction
+            {
+                TransactionId = transactionId,
+                UserId = userId,
+                PatternId = null, // No pattern for manual overrides
+                Status = status,
+                ConfidenceScore = 1.0m, // User is 100% confident
+                ConfidenceLevel = PredictionConfidence.High,
+                IsManualOverride = true,
+                ResolvedAt = DateTime.UtcNow
+            };
+
+            _dbContext.TransactionPredictions.Add(newPrediction);
+
+            _logger.LogInformation(
+                "Created manual override prediction for transaction {TransactionId} with status {Status}",
+                transactionId, status);
+        }
+
+        // Record feedback for audit trail
+        var feedbackType = status == PredictionStatus.Confirmed
+            ? FeedbackType.Confirmed
+            : FeedbackType.Rejected;
+
+        var feedback = new PredictionFeedback
+        {
+            PredictionId = existingPrediction?.Id ?? Guid.NewGuid(),
+            UserId = userId,
+            FeedbackType = feedbackType
+        };
+        _dbContext.PredictionFeedback.Add(feedback);
+
+        await _dbContext.SaveChangesAsync();
+
+        return new PredictionActionResponseDto
+        {
+            Success = true,
+            NewStatus = status,
+            Message = $"Transaction marked as {statusDescription}"
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<PredictionActionResponseDto> ClearManualOverrideAsync(Guid userId, Guid transactionId)
+    {
+        // Find manual override prediction for this transaction
+        var prediction = await _dbContext.TransactionPredictions
+            .FirstOrDefaultAsync(p =>
+                p.TransactionId == transactionId &&
+                p.UserId == userId &&
+                p.IsManualOverride);
+
+        if (prediction == null)
+        {
+            _logger.LogDebug(
+                "No manual override found for transaction {TransactionId}",
+                transactionId);
+
+            return new PredictionActionResponseDto
+            {
+                Success = false,
+                Message = "No manual override exists for this transaction"
+            };
+        }
+
+        // Remove the manual prediction
+        _dbContext.TransactionPredictions.Remove(prediction);
+        await _dbContext.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Cleared manual override for transaction {TransactionId}",
+            transactionId);
+
+        return new PredictionActionResponseDto
+        {
+            Success = true,
+            Message = "Manual override cleared. Transaction may be re-predicted on next generation cycle."
+        };
+    }
+
+    #endregion
+
     #region Pattern Management
 
     /// <inheritdoc />

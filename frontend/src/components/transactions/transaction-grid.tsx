@@ -69,6 +69,18 @@ interface TransactionGridProps {
   savingIds?: Set<string>;
   /** Height of the scrollable container */
   containerHeight?: number;
+  /** Handler for confirming expense prediction (Feature 023) */
+  onPredictionConfirm?: (predictionId: string) => void;
+  /** Handler for rejecting expense prediction (Feature 023) */
+  onPredictionReject?: (predictionId: string) => void;
+  /** Handler for marking transaction as reimbursable */
+  onMarkReimbursable?: (transactionId: string) => void;
+  /** Handler for marking transaction as not reimbursable */
+  onMarkNotReimbursable?: (transactionId: string) => void;
+  /** Handler for clearing manual reimbursability override */
+  onClearReimbursabilityOverride?: (transactionId: string) => void;
+  /** Whether a prediction/reimbursability action is processing */
+  isPredictionProcessing?: boolean;
 }
 
 /**
@@ -246,6 +258,12 @@ export function TransactionGrid({
   onTransactionClick,
   savingIds = new Set(),
   containerHeight = 600,
+  onPredictionConfirm,
+  onPredictionReject,
+  onMarkReimbursable,
+  onMarkNotReimbursable,
+  onClearReimbursabilityOverride,
+  isPredictionProcessing = false,
 }: TransactionGridProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -497,6 +515,9 @@ export function TransactionGrid({
                 </Button>
               </TableHead>
 
+              {/* Expense/Reimbursability Column */}
+              <TableHead className="w-[180px]">Expense</TableHead>
+
               {/* Amount Column */}
               <TableHead className="w-[100px] text-right">
                 <Button
@@ -576,6 +597,12 @@ export function TransactionGrid({
                         onEdit={handleRowEdit(transaction.id)}
                         onClick={handleRowClick(transaction)}
                         isSaving={savingIds.has(transaction.id)}
+                        onPredictionConfirm={onPredictionConfirm}
+                        onPredictionReject={onPredictionReject}
+                        onMarkReimbursable={onMarkReimbursable}
+                        onMarkNotReimbursable={onMarkNotReimbursable}
+                        onClearReimbursabilityOverride={onClearReimbursabilityOverride}
+                        isPredictionProcessing={isPredictionProcessing}
                       />
                     );
                   })}

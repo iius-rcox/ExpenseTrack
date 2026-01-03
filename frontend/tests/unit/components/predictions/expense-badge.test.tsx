@@ -31,6 +31,7 @@ describe('ExpenseBadge', () => {
     status: 'Pending',
     suggestedCategory: 'Food & Beverage',
     suggestedGLCode: '6100',
+    isManualOverride: false,
     ...overrides,
   });
 

@@ -22,7 +22,7 @@ public class TransactionPredictionConfiguration : IEntityTypeConfiguration<Trans
 
         builder.Property(e => e.PatternId)
             .HasColumnName("pattern_id")
-            .IsRequired();
+            .IsRequired(false); // Nullable for manual overrides
 
         builder.Property(e => e.TransactionId)
             .HasColumnName("transaction_id")
@@ -58,6 +58,10 @@ public class TransactionPredictionConfiguration : IEntityTypeConfiguration<Trans
         builder.Property(e => e.ResolvedAt)
             .HasColumnName("resolved_at");
 
+        builder.Property(e => e.IsManualOverride)
+            .HasColumnName("is_manual_override")
+            .HasDefaultValue(false);
+
         // Unique: one prediction per transaction
         builder.HasIndex(e => e.TransactionId)
             .IsUnique()
@@ -75,7 +79,8 @@ public class TransactionPredictionConfiguration : IEntityTypeConfiguration<Trans
         builder.HasOne(e => e.Pattern)
             .WithMany(p => p.Predictions)
             .HasForeignKey(e => e.PatternId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .IsRequired(false) // Nullable for manual overrides
+            .OnDelete(DeleteBehavior.SetNull); // If pattern deleted, keep prediction as manual
 
         builder.HasOne(e => e.Transaction)
             .WithMany()

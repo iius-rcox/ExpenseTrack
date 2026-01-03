@@ -1,0 +1,309 @@
+/**
+ * ReimbursabilityActions Component
+ *
+ * Shows transaction reimbursability status and provides actions for manual overrides.
+ * Integrates with the prediction system to display confirmed/rejected status
+ * and allows users to manually mark transactions as reimbursable or not.
+ *
+ * Features:
+ * - Visual status indicator (reimbursable, not reimbursable, pending, none)
+ * - Dropdown menu for manual override actions
+ * - Clear override option for manually marked transactions
+ *
+ * @see specs/023-expense-prediction/spec.md for prediction system
+ */
+
+import { memo, useCallback } from 'react';
+import {
+  Check,
+  X,
+  HelpCircle,
+  MoreHorizontal,
+  CircleCheck,
+  CircleX,
+  Undo2,
+  Sparkles,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import type { PredictionSummary } from '@/types/prediction';
+
+/**
+ * Reimbursability status derived from prediction
+ */
+export type ReimbursabilityStatus =
+  | 'reimbursable'      // Confirmed prediction = business expense
+  | 'not-reimbursable'  // Rejected prediction = personal expense
+  | 'pending'           // Pending prediction awaiting action
+  | 'none';             // No prediction exists
+
+/**
+ * Props for ReimbursabilityActions component
+ */
+export interface ReimbursabilityActionsProps {
+  /** Transaction ID */
+  transactionId: string;
+  /** Prediction summary if one exists */
+  prediction?: PredictionSummary | null;
+  /** Handler for marking as reimbursable */
+  onMarkReimbursable?: (transactionId: string) => void;
+  /** Handler for marking as not reimbursable */
+  onMarkNotReimbursable?: (transactionId: string) => void;
+  /** Handler for clearing manual override */
+  onClearOverride?: (transactionId: string) => void;
+  /** Whether an action is processing */
+  isProcessing?: boolean;
+  /** Additional CSS classes */
+  className?: string;
+}
+
+/**
+ * Status configuration for visual display
+ */
+const STATUS_CONFIG: Record<
+  ReimbursabilityStatus,
+  { icon: React.ElementType; color: string; label: string; tooltip: string }
+> = {
+  reimbursable: {
+    icon: CircleCheck,
+    color: 'text-green-600 bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700',
+    label: 'Reimbursable',
+    tooltip: 'This transaction is marked as a business expense',
+  },
+  'not-reimbursable': {
+    icon: CircleX,
+    color: 'text-red-600 bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700',
+    label: 'Not Reimbursable',
+    tooltip: 'This transaction is marked as a personal expense',
+  },
+  pending: {
+    icon: Sparkles,
+    color: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700',
+    label: 'Pending',
+    tooltip: 'This transaction has a pending expense prediction',
+  },
+  none: {
+    icon: HelpCircle,
+    color: 'text-muted-foreground bg-muted border-border',
+    label: 'Unknown',
+    tooltip: 'No reimbursability status set',
+  },
+};
+
+/**
+ * Derive reimbursability status from prediction
+ */
+function getReimbursabilityStatus(prediction?: PredictionSummary | null): ReimbursabilityStatus {
+  if (!prediction) return 'none';
+
+  switch (prediction.status) {
+    case 'Confirmed':
+      return 'reimbursable';
+    case 'Rejected':
+      return 'not-reimbursable';
+    case 'Pending':
+      return 'pending';
+    case 'Ignored':
+      return 'none';
+    default:
+      return 'none';
+  }
+}
+
+/**
+ * ReimbursabilityActions - Shows status badge with action dropdown
+ */
+export const ReimbursabilityActions = memo(function ReimbursabilityActions({
+  transactionId,
+  prediction,
+  onMarkReimbursable,
+  onMarkNotReimbursable,
+  onClearOverride,
+  isProcessing = false,
+  className,
+}: ReimbursabilityActionsProps) {
+  const status = getReimbursabilityStatus(prediction);
+  const config = STATUS_CONFIG[status];
+  const StatusIcon = config.icon;
+  const isManualOverride = prediction?.isManualOverride ?? false;
+
+  // Handlers
+  const handleMarkReimbursable = useCallback(
+    (e: Event) => {
+      e.stopPropagation();
+      onMarkReimbursable?.(transactionId);
+    },
+    [onMarkReimbursable, transactionId]
+  );
+
+  const handleMarkNotReimbursable = useCallback(
+    (e: Event) => {
+      e.stopPropagation();
+      onMarkNotReimbursable?.(transactionId);
+    },
+    [onMarkNotReimbursable, transactionId]
+  );
+
+  const handleClearOverride = useCallback(
+    (e: Event) => {
+      e.stopPropagation();
+      onClearOverride?.(transactionId);
+    },
+    [onClearOverride, transactionId]
+  );
+
+  // For "none" status, just show the action button
+  if (status === 'none') {
+    return (
+      <div className={cn('flex items-center', className)} onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              disabled={isProcessing}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onSelect={handleMarkReimbursable}>
+              <Check className="mr-2 h-4 w-4 text-green-600" />
+              Mark as Reimbursable
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={handleMarkNotReimbursable}>
+              <X className="mr-2 h-4 w-4 text-red-600" />
+              Mark as Not Reimbursable
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  }
+
+  // For pending status, don't show the actions here (ExpenseBadge handles it)
+  if (status === 'pending') {
+    return null;
+  }
+
+  // For confirmed/rejected status, show badge with dropdown
+  return (
+    <div className={cn('flex items-center gap-1', className)} onClick={(e) => e.stopPropagation()}>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge
+              variant="outline"
+              className={cn(
+                'gap-1 cursor-default text-xs',
+                config.color,
+                isManualOverride && 'ring-1 ring-offset-1 ring-blue-400'
+              )}
+            >
+              <StatusIcon className="h-3 w-3" />
+              <span>{status === 'reimbursable' ? 'Business' : 'Personal'}</span>
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <p>{config.tooltip}</p>
+            {isManualOverride && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Manually set by user
+              </p>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            disabled={isProcessing}
+          >
+            <MoreHorizontal className="h-3 w-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          {status === 'not-reimbursable' && (
+            <DropdownMenuItem onSelect={handleMarkReimbursable}>
+              <Check className="mr-2 h-4 w-4 text-green-600" />
+              Change to Reimbursable
+            </DropdownMenuItem>
+          )}
+          {status === 'reimbursable' && (
+            <DropdownMenuItem onSelect={handleMarkNotReimbursable}>
+              <X className="mr-2 h-4 w-4 text-red-600" />
+              Change to Not Reimbursable
+            </DropdownMenuItem>
+          )}
+          {isManualOverride && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={handleClearOverride}>
+                <Undo2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                Clear Manual Override
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+});
+
+/**
+ * Compact variant showing just the status icon
+ */
+export const ReimbursabilityStatusBadge = memo(function ReimbursabilityStatusBadge({
+  prediction,
+  className,
+}: {
+  prediction?: PredictionSummary | null;
+  className?: string;
+}) {
+  const status = getReimbursabilityStatus(prediction);
+
+  // Don't show anything for none or pending
+  if (status === 'none' || status === 'pending') {
+    return null;
+  }
+
+  const config = STATUS_CONFIG[status];
+  const StatusIcon = config.icon;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            variant="outline"
+            className={cn('gap-1 cursor-default', config.color, className)}
+          >
+            <StatusIcon className="h-3 w-3" />
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>{config.tooltip}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+});
+
+export default ReimbursabilityActions;
