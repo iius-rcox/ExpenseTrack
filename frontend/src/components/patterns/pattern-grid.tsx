@@ -1,18 +1,20 @@
 /**
  * PatternGrid Component
  *
- * Virtualized pattern grid with:
- * - @tanstack/react-virtual for efficient rendering of large lists
+ * Pattern grid with:
  * - Sortable column headers
  * - Multi-selection support with shift-click range selection
  * - Expandable rows for pattern details
  * - Empty and loading states
  *
+ * Note: Virtualization was removed because HTML tables don't support
+ * the absolute positioning required for virtual scrolling.
+ * For typical pattern counts (<100), direct rendering performs well.
+ *
  * @see specs/023-expense-prediction/plan.md for pattern management requirements
  */
 
-import { useRef, useCallback, useState, useEffect } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { useCallback, useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowUpDown,
@@ -77,13 +79,6 @@ interface PatternGridProps {
   /** Whether there are active filters */
   hasFilters?: boolean
 }
-
-/**
- * Row height constant for virtualization
- * Base row is 56px, expanded adds variable height
- */
-const ROW_HEIGHT = 56
-const EXPANDED_ROW_HEIGHT = 280 // Approximate expanded height
 
 /**
  * Empty state component
@@ -248,7 +243,6 @@ export function PatternGrid({
   containerHeight = 600,
   hasFilters = false,
 }: PatternGridProps) {
-  const parentRef = useRef<HTMLDivElement>(null)
   const [isMobile, setIsMobile] = useState(false)
 
   // Detect mobile viewport
@@ -258,27 +252,6 @@ export function PatternGrid({
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
-
-  // Calculate row heights (accounting for expanded rows)
-  const getRowHeight = useCallback(
-    (index: number) => {
-      const pattern = patterns[index]
-      if (!pattern) return ROW_HEIGHT
-      return expandedIds.has(pattern.id) ? EXPANDED_ROW_HEIGHT : ROW_HEIGHT
-    },
-    [patterns, expandedIds]
-  )
-
-  // Setup virtualizer
-  const virtualizer = useVirtualizer({
-    count: patterns.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: (index) => getRowHeight(index),
-    overscan: 5,
-  })
-
-  // Get visible rows
-  const virtualRows = virtualizer.getVirtualItems()
 
   // Handle sort column click
   const handleSortClick = useCallback(
@@ -361,10 +334,8 @@ export function PatternGrid({
         newExpanded.add(patternId)
       }
       onExpandedChange(newExpanded)
-      // Force virtualizer to recalculate
-      virtualizer.measure()
     },
-    [expandedIds, onExpandedChange, virtualizer]
+    [expandedIds, onExpandedChange]
   )
 
   // Render sort indicator
@@ -448,13 +419,12 @@ export function PatternGrid({
     )
   }
 
-  // Desktop View with Virtualization
+  // Desktop View - render all patterns directly (no virtualization needed for typical counts)
   return (
     <div className="space-y-0">
       <div
-        ref={parentRef}
         className="overflow-auto rounded-md border"
-        style={{ height: containerHeight }}
+        style={{ maxHeight: containerHeight }}
       >
         <Table>
           <TableHeader className="sticky top-0 bg-background z-10">
@@ -525,24 +495,19 @@ export function PatternGrid({
             {isLoading ? (
               <LoadingSkeleton count={8} />
             ) : (
-              virtualRows.map((virtualRow) => {
-                const pattern = patterns[virtualRow.index]
-                if (!pattern) return null
-
-                return (
-                  <PatternRow
-                    key={pattern.id}
-                    pattern={pattern}
-                    isSelected={selection.selectedIds.has(pattern.id)}
-                    isExpanded={expandedIds.has(pattern.id)}
-                    onSelect={handleRowSelect}
-                    onToggleExpand={handleToggleExpand}
-                    onToggleSuppression={onToggleSuppression}
-                    onDelete={onDelete}
-                    isProcessing={isProcessing}
-                  />
-                )
-              })
+              patterns.map((pattern) => (
+                <PatternRow
+                  key={pattern.id}
+                  pattern={pattern}
+                  isSelected={selection.selectedIds.has(pattern.id)}
+                  isExpanded={expandedIds.has(pattern.id)}
+                  onSelect={handleRowSelect}
+                  onToggleExpand={handleToggleExpand}
+                  onToggleSuppression={onToggleSuppression}
+                  onDelete={onDelete}
+                  isProcessing={isProcessing}
+                />
+              ))
             )}
           </TableBody>
         </Table>
