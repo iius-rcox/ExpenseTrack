@@ -226,6 +226,47 @@ docker buildx build --platform linux/amd64 -t iiusacr.azurecr.io/expenseflow-fro
 git add . && git commit -m "chore(deploy): Update staging frontend to vX.Y.Z" && git push origin main
 ```
 
+## Database Migrations (EF Core)
+
+**CRITICAL**: EF Core migrations are NOT automatically applied on deployment. You must manually apply them after deploying code that adds new columns/tables.
+
+### Applying Migrations to Staging
+
+```bash
+# 1. Connect to the Supabase PostgreSQL pod
+kubectl exec -it $(kubectl get pods -n expenseflow-dev -l app.kubernetes.io/name=supabase-db -o jsonpath='{.items[0].metadata.name}') -n expenseflow-dev -- psql -U postgres -d expenseflow_staging
+
+# 2. Run your migration SQL (example: adding a column)
+ALTER TABLE table_name ADD COLUMN IF NOT EXISTS column_name boolean NOT NULL DEFAULT false;
+
+# 3. Record migration in EF history (required for EF Core to recognize it)
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20260104000000_MigrationName', '8.0.0')
+ON CONFLICT ("MigrationId") DO NOTHING;
+
+# 4. Exit psql
+\q
+
+# 5. Restart the API to pick up schema changes
+kubectl rollout restart deployment/expenseflow-api -n expenseflow-staging
+```
+
+### Database Connection Details
+
+| Environment | Database Name | Namespace |
+|-------------|---------------|-----------|
+| Staging | `expenseflow_staging` | `expenseflow-dev` (shared Supabase) |
+| Dev | `postgres` | `expenseflow-dev` |
+
+**Common Error**: `42703: column X does not exist` means migration wasn't applied before deployment.
+
+### Migration Best Practices
+
+1. **Use `IF NOT EXISTS`**: Makes migrations idempotent (safe to re-run)
+2. **Add columns as nullable first**: Or with `DEFAULT` to avoid locking large tables
+3. **Deploy migration before code**: When possible, deploy backward-compatible schema changes first
+4. **Check `__EFMigrationsHistory`**: Verify migration was recorded: `SELECT * FROM "__EFMigrationsHistory" ORDER BY "MigrationId" DESC LIMIT 5;`
+
 ## React Component Type Detection
 
 **CRITICAL**: When checking if a prop is a React component vs a ReactNode, `typeof === 'function'` is NOT sufficient.
