@@ -24,7 +24,7 @@ import {
   useBulkDeleteTransactions,
   useExportTransactions,
 } from '@/hooks/queries/use-transactions'
-import { usePatternWorkspace } from '@/hooks/queries/use-predictions'
+import { usePatternWorkspace, useGeneratePredictions } from '@/hooks/queries/use-predictions'
 import { Link } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -170,6 +170,9 @@ function TransactionsPage() {
     pageSize: search.pageSize,
     enabled: search.view === 'patterns',
   })
+
+  // Prediction generation mutation
+  const generatePredictions = useGeneratePredictions()
 
   // Extract unique categories from patterns for filter dropdown
   const patternCategories = useMemo(() => {
@@ -398,6 +401,25 @@ function TransactionsPage() {
     }
   }, [patternWorkspace])
 
+  const handleGeneratePredictions = useCallback(async () => {
+    try {
+      const count = await generatePredictions.mutateAsync()
+      if (count === 0) {
+        toast.info('No new transactions to process', {
+          description: 'All transactions already have predictions.',
+        })
+      } else {
+        toast.success(`Generated ${count} prediction${count !== 1 ? 's' : ''}`, {
+          description: 'View the Transactions tab and use the Reimbursable filter to see flagged expenses.',
+        })
+      }
+    } catch (error) {
+      toast.error('Failed to generate predictions', {
+        description: 'Please try again or contact support if the issue persists.',
+      })
+    }
+  }, [generatePredictions])
+
   // Transform transaction list for grid
   const transactions = useMemo(
     () => transactionData?.transactions || [],
@@ -540,6 +562,8 @@ function TransactionsPage() {
             isLoading={patternWorkspace.isLoading}
             isRebuilding={patternWorkspace.isRebuilding}
             onRebuild={handlePatternRebuild}
+            isGenerating={generatePredictions.isPending}
+            onGenerate={handleGeneratePredictions}
           />
 
           {/* Pattern Filters */}
@@ -571,7 +595,9 @@ function TransactionsPage() {
             onSelectionChange={setPatternSelection}
             onExpandedChange={setPatternExpandedIds}
             onToggleSuppression={patternWorkspace.toggleSuppression}
+            onToggleReceiptMatch={patternWorkspace.toggleReceiptMatch}
             onDelete={patternWorkspace.deletePattern}
+            isProcessing={patternWorkspace.isProcessing}
             containerHeight={Math.min(600, Math.max(400, patternWorkspace.patterns.length * 56))}
           />
 

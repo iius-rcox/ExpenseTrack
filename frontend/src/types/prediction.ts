@@ -52,6 +52,8 @@ export interface PatternSummary {
   lastSeenAt: Date;
   /** True if user suppressed predictions for this vendor */
   isSuppressed: boolean;
+  /** When true, predictions only generated for transactions with confirmed receipt matches */
+  requiresReceiptMatch: boolean;
   /** Calculated accuracy from confirm/reject ratio */
   accuracyRate: number;
 }
@@ -238,6 +240,16 @@ export interface UpdatePatternSuppressionRequest {
   patternId: string;
   /** Whether to suppress predictions for this pattern */
   isSuppressed: boolean;
+}
+
+/**
+ * Request to update pattern receipt match requirement.
+ */
+export interface UpdatePatternReceiptMatchRequest {
+  /** Pattern ID to update */
+  patternId: string;
+  /** Whether to require receipt matches for predictions from this pattern */
+  requiresReceiptMatch: boolean;
 }
 
 // =============================================================================

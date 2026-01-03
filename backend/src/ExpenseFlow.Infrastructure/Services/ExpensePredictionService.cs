@@ -635,6 +635,25 @@ public class ExpensePredictionService : IExpensePredictionService
     }
 
     /// <inheritdoc />
+    public async Task<bool> UpdatePatternReceiptMatchAsync(Guid userId, UpdatePatternReceiptMatchRequestDto request)
+    {
+        var pattern = await _patternRepository.GetByIdAsync(userId, request.PatternId);
+
+        if (pattern == null)
+            return false;
+
+        pattern.RequiresReceiptMatch = request.RequiresReceiptMatch;
+        pattern.UpdatedAt = DateTime.UtcNow;
+        await _patternRepository.UpdateAsync(pattern);
+        await _patternRepository.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Pattern {PatternId} RequiresReceiptMatch set to {RequiresReceiptMatch}",
+            request.PatternId, request.RequiresReceiptMatch);
+        return true;
+    }
+
+    /// <inheritdoc />
     public async Task<bool> DeletePatternAsync(Guid userId, Guid patternId)
     {
         var pattern = await _patternRepository.GetByIdAsync(userId, patternId);
@@ -980,6 +999,23 @@ public class ExpensePredictionService : IExpensePredictionService
         if (matchingPattern == null || matchingPattern.OccurrenceCount < MinOccurrencesForPrediction)
             return null;
 
+        // Check if pattern requires a confirmed receipt match before generating prediction
+        if (matchingPattern.RequiresReceiptMatch)
+        {
+            var hasConfirmedReceiptMatch = await _dbContext.ReceiptTransactionMatches
+                .AnyAsync(m => m.TransactionId == transaction.Id
+                            && m.Status == MatchProposalStatus.Confirmed);
+
+            if (!hasConfirmedReceiptMatch)
+            {
+                _logger.LogDebug(
+                    "Pattern {PatternId} ({VendorName}) requires receipt match but " +
+                    "transaction {TransactionId} has no confirmed match - skipping prediction",
+                    matchingPattern.Id, matchingPattern.DisplayName, transaction.Id);
+                return null;
+            }
+        }
+
         var confidenceScore = CalculateConfidenceScore(matchingPattern, transaction.Amount);
         var confidenceLevel = GetConfidenceLevel(confidenceScore);
 
@@ -1080,6 +1116,7 @@ public class ExpensePredictionService : IExpensePredictionService
             OccurrenceCount = pattern.OccurrenceCount,
             LastSeenAt = pattern.LastSeenAt,
             IsSuppressed = pattern.IsSuppressed,
+            RequiresReceiptMatch = pattern.RequiresReceiptMatch,
             AccuracyRate = accuracyRate
         };
     }
@@ -1107,6 +1144,7 @@ public class ExpensePredictionService : IExpensePredictionService
             ConfirmCount = pattern.ConfirmCount,
             RejectCount = pattern.RejectCount,
             IsSuppressed = pattern.IsSuppressed,
+            RequiresReceiptMatch = pattern.RequiresReceiptMatch,
             AccuracyRate = accuracyRate,
             CreatedAt = pattern.CreatedAt,
             UpdatedAt = pattern.UpdatedAt

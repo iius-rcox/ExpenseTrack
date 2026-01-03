@@ -70,6 +70,8 @@ interface PatternGridProps {
   onExpandedChange: (expandedIds: Set<string>) => void
   /** Callback when suppression is toggled */
   onToggleSuppression: (id: string, isSuppressed: boolean) => void
+  /** Callback when receipt match requirement is toggled */
+  onToggleReceiptMatch: (id: string, requiresReceiptMatch: boolean) => void
   /** Callback when delete is confirmed */
   onDelete: (id: string) => void
   /** Whether any mutations are in progress */
@@ -146,6 +148,7 @@ interface MobilePatternCardProps {
   isSelected: boolean
   onSelect: () => void
   onToggleSuppression: (isSuppressed: boolean) => void
+  onToggleReceiptMatch: (requiresReceiptMatch: boolean) => void
   isProcessing?: boolean
 }
 
@@ -154,6 +157,7 @@ function MobilePatternCard({
   isSelected,
   onSelect,
   onToggleSuppression,
+  onToggleReceiptMatch,
   isProcessing = false,
 }: MobilePatternCardProps) {
   const formattedAmount = new Intl.NumberFormat('en-US', {
@@ -214,6 +218,22 @@ function MobilePatternCard({
               </div>
             </div>
 
+            {/* Receipt Match Requirement */}
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
+              <span className="text-xs text-muted-foreground">Receipt required</span>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={pattern.requiresReceiptMatch}
+                  onCheckedChange={onToggleReceiptMatch}
+                  disabled={isProcessing}
+                  className="scale-90"
+                />
+                <span className="text-xs text-muted-foreground">
+                  {pattern.requiresReceiptMatch ? 'Yes' : 'No'}
+                </span>
+              </div>
+            </div>
+
             <div className="text-xs text-muted-foreground mt-2">
               {pattern.occurrenceCount} occurrence
               {pattern.occurrenceCount !== 1 ? 's' : ''}
@@ -238,6 +258,7 @@ export function PatternGrid({
   onSelectionChange,
   onExpandedChange,
   onToggleSuppression,
+  onToggleReceiptMatch,
   onDelete,
   isProcessing = false,
   containerHeight = 600,
@@ -410,6 +431,9 @@ export function PatternGrid({
                 onToggleSuppression={(isSuppressed) =>
                   onToggleSuppression(pattern.id, isSuppressed)
                 }
+                onToggleReceiptMatch={(requiresReceiptMatch) =>
+                  onToggleReceiptMatch(pattern.id, requiresReceiptMatch)
+                }
                 isProcessing={isProcessing}
               />
             ))}
@@ -504,6 +528,7 @@ export function PatternGrid({
                   onSelect={handleRowSelect}
                   onToggleExpand={handleToggleExpand}
                   onToggleSuppression={onToggleSuppression}
+                  onToggleReceiptMatch={onToggleReceiptMatch}
                   onDelete={onDelete}
                   isProcessing={isProcessing}
                 />

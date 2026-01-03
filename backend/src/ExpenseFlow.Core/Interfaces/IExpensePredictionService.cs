@@ -155,6 +155,16 @@ public interface IExpensePredictionService
     Task<bool> UpdatePatternSuppressionAsync(Guid userId, UpdatePatternSuppressionRequestDto request);
 
     /// <summary>
+    /// Updates whether a pattern requires a receipt match for predictions.
+    /// When enabled, predictions are only generated for transactions with confirmed receipt matches.
+    /// Useful for mixed-use vendors like Amazon where most purchases are personal.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="request">Receipt match requirement update request.</param>
+    /// <returns>True if updated successfully, false if pattern not found.</returns>
+    Task<bool> UpdatePatternReceiptMatchAsync(Guid userId, UpdatePatternReceiptMatchRequestDto request);
+
+    /// <summary>
     /// Deletes a pattern and all associated predictions.
     /// </summary>
     /// <param name="userId">User ID.</param>

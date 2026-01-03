@@ -48,6 +48,12 @@ public class ExpensePattern : BaseEntity
     /// <summary>True if user explicitly excluded this vendor from predictions</summary>
     public bool IsSuppressed { get; set; }
 
+    /// <summary>
+    /// When true, predictions only generated for transactions with confirmed receipt matches.
+    /// Useful for vendors like Amazon where most purchases are personal.
+    /// </summary>
+    public bool RequiresReceiptMatch { get; set; }
+
     /// <summary>Last update timestamp</summary>
     public DateTime UpdatedAt { get; set; }
 
