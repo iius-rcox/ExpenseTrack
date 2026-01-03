@@ -369,8 +369,12 @@ public class ExpensePredictionService : IExpensePredictionService
         prediction.ResolvedAt = DateTime.UtcNow;
         await _predictionRepository.UpdateAsync(prediction);
 
-        // Update pattern confirm count
-        var pattern = await _patternRepository.GetByIdAsync(userId, prediction.PatternId);
+        // Update pattern confirm count (if pattern exists - manual overrides have no pattern)
+        ExpensePattern? pattern = null;
+        if (prediction.PatternId.HasValue)
+        {
+            pattern = await _patternRepository.GetByIdAsync(userId, prediction.PatternId.Value);
+        }
         if (pattern != null)
         {
             pattern.ConfirmCount++;
@@ -423,8 +427,12 @@ public class ExpensePredictionService : IExpensePredictionService
         prediction.ResolvedAt = DateTime.UtcNow;
         await _predictionRepository.UpdateAsync(prediction);
 
-        // Update pattern reject count
-        var pattern = await _patternRepository.GetByIdAsync(userId, prediction.PatternId);
+        // Update pattern reject count (if pattern exists - manual overrides have no pattern)
+        ExpensePattern? pattern = null;
+        if (prediction.PatternId.HasValue)
+        {
+            pattern = await _patternRepository.GetByIdAsync(userId, prediction.PatternId.Value);
+        }
         var patternSuppressed = false;
         if (pattern != null)
         {
@@ -1195,15 +1203,17 @@ public class ExpensePredictionService : IExpensePredictionService
 
         // Query transactions with high-confidence pending predictions in the date range
         // Only include High confidence for auto-selection (Medium shows badge but isn't auto-selected)
+        // Filter to only pattern-based predictions (manual overrides have no pattern and aren't auto-suggested)
         var predictedTransactions = await _dbContext.TransactionPredictions
             .Include(p => p.Transaction)
             .Include(p => p.Pattern)
             .Where(p => p.UserId == userId
                 && p.Status == PredictionStatus.Pending
                 && p.ConfidenceLevel == PredictionConfidence.High
+                && p.PatternId.HasValue
                 && p.Transaction.TransactionDate >= startDate
                 && p.Transaction.TransactionDate <= endDate
-                && !p.Pattern.IsSuppressed)
+                && !p.Pattern!.IsSuppressed)
             .OrderByDescending(p => p.ConfidenceScore)
             .ToListAsync();
 
@@ -1225,8 +1235,8 @@ public class ExpensePredictionService : IExpensePredictionService
             Description = p.Transaction.OriginalDescription,
             Amount = p.Transaction.Amount,
             PredictionId = p.Id,
-            PatternId = p.PatternId,
-            VendorName = p.Pattern.DisplayName,
+            PatternId = p.PatternId!.Value,  // Safe: filtered by PatternId.HasValue above
+            VendorName = p.Pattern!.DisplayName,
             ConfidenceScore = p.ConfidenceScore,
             ConfidenceLevel = p.ConfidenceLevel,
             SuggestedCategory = p.Pattern.Category,
