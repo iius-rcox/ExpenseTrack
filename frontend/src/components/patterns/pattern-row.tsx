@@ -8,7 +8,7 @@
  */
 
 import { memo, useState, useCallback } from 'react'
-import { ChevronRight, ChevronDown, Trash2, ExternalLink, Calendar, Hash, Building2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, Trash2, ExternalLink, Calendar, Hash } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { TableRow, TableCell } from '@/components/ui/table'
@@ -135,7 +135,6 @@ export const PatternRow = memo(function PatternRow({
 
   // Calculate confirm/reject stats for expanded view
   const confirmRate = pattern.accuracyRate
-  const totalFeedback = pattern.occurrenceCount
 
   return (
     <>
@@ -245,77 +244,45 @@ export const PatternRow = memo(function PatternRow({
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2, ease: 'easeInOut' }}
+                transition={{ duration: 0.15, ease: 'easeInOut' }}
                 className="overflow-hidden"
               >
-                <div className="px-10 py-4 space-y-4">
-                  {/* Stats Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {/* Amount Range */}
-                    <div className="space-y-1">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wide">
-                        Amount Range
-                      </span>
-                      <p className="font-mono text-sm">
-                        {formatAmount(pattern.averageAmount * 0.7)} – {formatAmount(pattern.averageAmount * 1.3)}
-                      </p>
-                    </div>
-
-                    {/* Occurrences */}
-                    <div className="space-y-1">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                        <Hash className="h-3 w-3" />
-                        Occurrences
-                      </span>
-                      <p className="font-medium text-sm">
-                        {pattern.occurrenceCount} times
-                      </p>
-                    </div>
-
-                    {/* Last Seen */}
-                    <div className="space-y-1">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Last Seen
-                      </span>
-                      <p className="text-sm">
-                        {formatRelativeDate(pattern.lastSeenAt)}
-                      </p>
-                    </div>
-
-                    {/* Category */}
-                    <div className="space-y-1">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                        <Building2 className="h-3 w-3" />
-                        Default Category
-                      </span>
-                      <p className="text-sm">
-                        {pattern.category || 'None set'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Feedback Stats */}
-                  <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground uppercase tracking-wide">
-                      Prediction Feedback
+                <div className="px-10 py-2.5 flex items-center gap-6">
+                  {/* Compact Stats - inline */}
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-muted-foreground">
+                      <span className="font-mono">{formatAmount(pattern.averageAmount * 0.7)}</span>
+                      <span className="mx-1">–</span>
+                      <span className="font-mono">{formatAmount(pattern.averageAmount * 1.3)}</span>
                     </span>
-                    <div className="flex items-center gap-4">
-                      <Progress
-                        value={confirmRate * 100}
-                        className="flex-1 h-2"
-                      />
-                      <span className="text-sm text-muted-foreground min-w-[120px]">
-                        {Math.round(confirmRate * 100)}% confirmed
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Based on {totalFeedback} occurrence{totalFeedback !== 1 ? 's' : ''}
-                    </p>
+                    <span className="text-muted-foreground">•</span>
+                    <span className="flex items-center gap-1">
+                      <Hash className="h-3 w-3 text-muted-foreground" />
+                      <span>{pattern.occurrenceCount}×</span>
+                    </span>
+                    <span className="text-muted-foreground">•</span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3 text-muted-foreground" />
+                      <span>{formatRelativeDate(pattern.lastSeenAt)}</span>
+                    </span>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 pt-2 border-t">
+                  {/* Compact Feedback */}
+                  <div className="flex items-center gap-2">
+                    <Progress
+                      value={confirmRate * 100}
+                      className="w-24 h-1.5"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {Math.round(confirmRate * 100)}%
+                    </span>
+                  </div>
+
+                  {/* Spacer */}
+                  <div className="flex-1" />
+
+                  {/* Compact Actions */}
+                  <div className="flex items-center gap-1.5">
                     <Button
                       variant="outline"
                       size="sm"
