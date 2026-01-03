@@ -324,6 +324,26 @@ public class PredictionsController : ApiControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Performs bulk actions on patterns (suppress, enable, delete).
+    /// </summary>
+    /// <param name="request">Bulk action request with pattern IDs and action type.</param>
+    /// <returns>Bulk action result with success/failure counts.</returns>
+    [HttpPost("patterns/bulk")]
+    [ProducesResponseType(typeof(BulkPatternActionResponseDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<BulkPatternActionResponseDto>> BulkPatternAction(
+        [FromBody] BulkPatternActionRequestDto request)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+        var result = await _predictionService.BulkPatternActionAsync(user.Id, request);
+
+        _logger.LogInformation(
+            "Bulk pattern action '{Action}' completed for user {UserId}: {SuccessCount} succeeded, {FailedCount} failed",
+            request.Action, user.Id, result.SuccessCount, result.FailedCount);
+
+        return Ok(result);
+    }
+
     #endregion
 
     #region Pattern Learning

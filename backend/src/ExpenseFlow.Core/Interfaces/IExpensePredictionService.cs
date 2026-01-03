@@ -148,6 +148,14 @@ public interface IExpensePredictionService
     /// <returns>True if deleted, false if not found.</returns>
     Task<bool> DeletePatternAsync(Guid userId, Guid patternId);
 
+    /// <summary>
+    /// Performs bulk actions on patterns (suppress, enable, delete).
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="request">Bulk action request with pattern IDs and action type.</param>
+    /// <returns>Result with success/failure counts.</returns>
+    Task<BulkPatternActionResponseDto> BulkPatternActionAsync(Guid userId, BulkPatternActionRequestDto request);
+
     #endregion
 
     #region Prediction Queries

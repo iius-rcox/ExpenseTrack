@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Expense Patterns</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eaeaea;
+        }
+        h1 { color: #00d9ff; }
+        .card {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            background: #0f0f1a;
+            color: #eaeaea;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            background: #0f0f1a;
+            color: #eaeaea;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+        button {
+            background: #00d9ff;
+            color: #1a1a2e;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover { background: #00b8d4; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .success { background: #1e4620; }
+        .error { background: #4a1c1c; }
+        .stats { display: flex; gap: 20px; margin-top: 15px; }
+        .stat {
+            background: #0f0f1a;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat-value { font-size: 24px; color: #00d9ff; }
+        .stat-label { color: #888; font-size: 14px; }
+        #vendorList { margin-top: 10px; padding-left: 20px; }
+        #vendorList li { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>📊 Import Expense Patterns</h1>
+
+    <div class="card">
+        <h3>Step 1: Paste your Bearer Token</h3>
+        <p>Get your token from the browser DevTools → Network → any API request → Headers → Authorization</p>
+        <input type="text" id="token" placeholder="Bearer eyJ...">
+    </div>
+
+    <div class="card">
+        <h3>Step 2: Paste CSV Data</h3>
+        <p>Format: Date,Description,Vendor,Amount,GL Code,Department</p>
+        <textarea id="csvData"></textarea>
+    </div>
+
+    <div class="card">
+        <h3>Step 3: Preview & Import</h3>
+        <button id="parseBtn">Parse CSV</button>
+        <button id="importBtn" disabled>Import Patterns</button>
+
+        <div id="preview">
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="entryCount">0</div>
+                    <div class="stat-label">Total Entries</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="vendorCount">0</div>
+                    <div class="stat-label">Unique Vendors</div>
+                </div>
+            </div>
+            <h4>Sample Vendors:</h4>
+            <ul id="vendorList"></ul>
+        </div>
+        <div id="result" class="result" style="display: none;">
+            <h4 id="resultTitle"></h4>
+            <p id="resultCreated"></p>
+            <p id="resultUpdated"></p>
+            <p id="resultTotal"></p>
+            <p id="resultMessage"></p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://staging.expense.ii-us.com';
+        let parsedEntries = [];
+
+        function parseCSV(content) {
+            const lines = content.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+
+            return lines.slice(1).map(line => {
+                const values = [];
+                let current = '';
+                let inQuotes = false;
+
+                for (const char of line) {
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                values.push(current.trim());
+
+                const obj = {};
+                headers.forEach((header, i) => {
+                    obj[header] = values[i] || '';
+                });
+                return obj;
+            }).filter(row => row.Vendor && row.Amount);
+        }
+
+        function toImportDto(row) {
+            return {
+                vendor: row.Vendor,
+                displayName: row.Vendor,
+                category: row.Description,
+                amount: parseFloat(row.Amount) || 0,
+                glCode: row['GL Code'],
+                department: row.Department,
+                date: new Date(row.Date).toISOString()
+            };
+        }
+
+        document.getElementById('parseBtn').addEventListener('click', function() {
+            const csv = document.getElementById('csvData').value;
+            const rows = parseCSV(csv);
+            parsedEntries = rows.map(toImportDto);
+
+            const vendors = [...new Set(parsedEntries.map(e => e.vendor))];
+
+            document.getElementById('entryCount').textContent = parsedEntries.length;
+            document.getElementById('vendorCount').textContent = vendors.length;
+
+            const vendorList = document.getElementById('vendorList');
+            vendorList.replaceChildren();
+            vendors.slice(0, 10).forEach(function(v) {
+                const li = document.createElement('li');
+                li.textContent = v;
+                vendorList.appendChild(li);
+            });
+            if (vendors.length > 10) {
+                const li = document.createElement('li');
+                li.textContent = '...and ' + (vendors.length - 10) + ' more';
+                vendorList.appendChild(li);
+            }
+
+            document.getElementById('importBtn').disabled = false;
+        });
+
+        document.getElementById('importBtn').addEventListener('click', async function() {
+            const token = document.getElementById('token').value;
+            const btn = document.getElementById('importBtn');
+            const result = document.getElementById('result');
+
+            if (!token) {
+                result.style.display = 'block';
+                result.className = 'result error';
+                document.getElementById('resultTitle').textContent = '❌ Error';
+                document.getElementById('resultMessage').textContent = 'Please enter a Bearer token';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Importing...';
+
+            try {
+                const response = await fetch(API_BASE + '/api/predictions/patterns/import', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': token.startsWith('Bearer ') ? token : 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ entries: parsedEntries })
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error('HTTP ' + response.status + ': ' + text);
+                }
+
+                const data = await response.json();
+                result.style.display = 'block';
+                result.className = 'result success';
+                document.getElementById('resultTitle').textContent = '✅ Import Successful!';
+                document.getElementById('resultCreated').textContent = 'Created: ' + data.createdCount + ' patterns';
+                document.getElementById('resultUpdated').textContent = 'Updated: ' + data.updatedCount + ' patterns';
+                document.getElementById('resultTotal').textContent = 'Total processed: ' + data.totalProcessed + ' entries';
+                document.getElementById('resultMessage').textContent = data.message;
+            } catch (error) {
+                result.style.display = 'block';
+                result.className = 'result error';
+                document.getElementById('resultTitle').textContent = '❌ Import Failed';
+                document.getElementById('resultMessage').textContent = error.message;
+                document.getElementById('resultCreated').textContent = '';
+                document.getElementById('resultUpdated').textContent = '';
+                document.getElementById('resultTotal').textContent = '';
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Import Patterns';
+        });
+    </script>
+</body>
+</html>

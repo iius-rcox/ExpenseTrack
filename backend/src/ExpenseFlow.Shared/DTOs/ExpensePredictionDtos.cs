@@ -243,6 +243,36 @@ public class UpdatePatternSuppressionRequestDto
 }
 
 /// <summary>
+/// Request DTO for bulk pattern actions (suppress, enable, delete).
+/// </summary>
+public class BulkPatternActionRequestDto
+{
+    /// <summary>List of pattern IDs to act on.</summary>
+    public List<Guid> PatternIds { get; set; } = new();
+
+    /// <summary>Action to perform: suppress, enable, or delete.</summary>
+    public string Action { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response DTO for bulk pattern actions.
+/// </summary>
+public class BulkPatternActionResponseDto
+{
+    /// <summary>Number of patterns successfully updated.</summary>
+    public int SuccessCount { get; set; }
+
+    /// <summary>Number of patterns that failed to update.</summary>
+    public int FailedCount { get; set; }
+
+    /// <summary>IDs of patterns that failed (if any).</summary>
+    public List<Guid> FailedIds { get; set; } = new();
+
+    /// <summary>Summary message.</summary>
+    public string Message { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Paginated response for predictions list.
 /// </summary>
 public class PredictionListResponseDto

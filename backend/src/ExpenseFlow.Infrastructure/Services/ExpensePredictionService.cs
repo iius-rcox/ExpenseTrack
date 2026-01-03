@@ -577,6 +577,83 @@ public class ExpensePredictionService : IExpensePredictionService
         return true;
     }
 
+    /// <inheritdoc />
+    public async Task<BulkPatternActionResponseDto> BulkPatternActionAsync(Guid userId, BulkPatternActionRequestDto request)
+    {
+        var response = new BulkPatternActionResponseDto();
+        var failedIds = new List<Guid>();
+        var successCount = 0;
+
+        foreach (var patternId in request.PatternIds)
+        {
+            try
+            {
+                var pattern = await _patternRepository.GetByIdAsync(userId, patternId);
+                if (pattern == null)
+                {
+                    failedIds.Add(patternId);
+                    continue;
+                }
+
+                switch (request.Action.ToLowerInvariant())
+                {
+                    case "suppress":
+                        pattern.IsSuppressed = true;
+                        pattern.UpdatedAt = DateTime.UtcNow;
+                        await _patternRepository.UpdateAsync(pattern);
+                        successCount++;
+                        break;
+
+                    case "enable":
+                        pattern.IsSuppressed = false;
+                        pattern.UpdatedAt = DateTime.UtcNow;
+                        await _patternRepository.UpdateAsync(pattern);
+                        successCount++;
+                        break;
+
+                    case "delete":
+                        await _patternRepository.DeleteAsync(pattern);
+                        successCount++;
+                        break;
+
+                    default:
+                        failedIds.Add(patternId);
+                        _logger.LogWarning("Unknown bulk action '{Action}' for pattern {PatternId}", request.Action, patternId);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                failedIds.Add(patternId);
+                _logger.LogError(ex, "Failed to process bulk action '{Action}' for pattern {PatternId}", request.Action, patternId);
+            }
+        }
+
+        await _patternRepository.SaveChangesAsync();
+
+        response.SuccessCount = successCount;
+        response.FailedCount = failedIds.Count;
+        response.FailedIds = failedIds;
+
+        var actionPastTense = request.Action.ToLowerInvariant() switch
+        {
+            "suppress" => "suppressed",
+            "enable" => "enabled",
+            "delete" => "deleted",
+            _ => "processed"
+        };
+
+        response.Message = failedIds.Count == 0
+            ? $"{successCount} pattern(s) {actionPastTense} successfully."
+            : $"{successCount} pattern(s) {actionPastTense}, {failedIds.Count} failed.";
+
+        _logger.LogInformation(
+            "Bulk pattern action '{Action}' completed for user {UserId}: {SuccessCount} succeeded, {FailedCount} failed",
+            request.Action, userId, successCount, failedIds.Count);
+
+        return response;
+    }
+
     #endregion
 
     #region Prediction Queries
