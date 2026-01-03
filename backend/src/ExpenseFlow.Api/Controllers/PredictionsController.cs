@@ -224,13 +224,23 @@ public class PredictionsController : ApiControllerBase
     /// <param name="page">Page number (1-based, default 1).</param>
     /// <param name="pageSize">Page size (default 20, max 100).</param>
     /// <param name="includeSuppressed">Include suppressed patterns (default false).</param>
+    /// <param name="suppressedOnly">Show only suppressed patterns (default false).</param>
+    /// <param name="category">Filter by category name.</param>
+    /// <param name="search">Search patterns by vendor name.</param>
+    /// <param name="sortBy">Sort field: displayName, averageAmount, accuracyRate, occurrenceCount (default: accuracyRate).</param>
+    /// <param name="sortOrder">Sort direction: asc or desc (default: desc).</param>
     /// <returns>Paginated list of patterns.</returns>
     [HttpGet("patterns")]
     [ProducesResponseType(typeof(PatternListResponseDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<PatternListResponseDto>> GetPatterns(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
-        [FromQuery] bool includeSuppressed = false)
+        [FromQuery] bool includeSuppressed = false,
+        [FromQuery] bool suppressedOnly = false,
+        [FromQuery] string? category = null,
+        [FromQuery] string? search = null,
+        [FromQuery] string sortBy = "accuracyRate",
+        [FromQuery] string sortOrder = "desc")
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
@@ -239,7 +249,7 @@ public class PredictionsController : ApiControllerBase
         var user = await _userService.GetOrCreateUserAsync(User);
 
         var response = await _predictionService.GetPatternsAsync(
-            user.Id, page, pageSize, includeSuppressed);
+            user.Id, page, pageSize, includeSuppressed, suppressedOnly, category, search, sortBy, sortOrder);
 
         return Ok(response);
     }

@@ -118,13 +118,27 @@ public interface IExpensePredictionService
     #region Pattern Management
 
     /// <summary>
-    /// Gets paginated list of patterns for a user.
+    /// Gets paginated list of patterns for a user with optional filtering and sorting.
     /// </summary>
+    /// <param name="userId">User ID for row-level security.</param>
+    /// <param name="page">Page number (1-based).</param>
+    /// <param name="pageSize">Number of patterns per page.</param>
+    /// <param name="includeSuppressed">Whether to include suppressed patterns.</param>
+    /// <param name="suppressedOnly">Whether to show only suppressed patterns.</param>
+    /// <param name="category">Optional category filter.</param>
+    /// <param name="search">Optional search term for vendor name.</param>
+    /// <param name="sortBy">Sort field: displayName, averageAmount, accuracyRate, occurrenceCount.</param>
+    /// <param name="sortOrder">Sort direction: asc or desc.</param>
     Task<PatternListResponseDto> GetPatternsAsync(
         Guid userId,
         int page,
         int pageSize,
-        bool includeSuppressed = false);
+        bool includeSuppressed = false,
+        bool suppressedOnly = false,
+        string? category = null,
+        string? search = null,
+        string sortBy = "accuracyRate",
+        string sortOrder = "desc");
 
     /// <summary>
     /// Gets pattern details by ID.

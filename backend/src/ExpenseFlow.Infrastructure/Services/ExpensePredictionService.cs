@@ -522,14 +522,86 @@ public class ExpensePredictionService : IExpensePredictionService
     #region Pattern Management
 
     /// <inheritdoc />
-    public async Task<PatternListResponseDto> GetPatternsAsync(Guid userId, int page, int pageSize, bool includeSuppressed = false)
+    public async Task<PatternListResponseDto> GetPatternsAsync(
+        Guid userId,
+        int page,
+        int pageSize,
+        bool includeSuppressed = false,
+        bool suppressedOnly = false,
+        string? category = null,
+        string? search = null,
+        string sortBy = "accuracyRate",
+        string sortOrder = "desc")
     {
-        var (patterns, totalCount) = await _patternRepository.GetPagedAsync(userId, page, pageSize, includeSuppressed);
+        // Get all patterns for this user (includeSuppressed=true to filter in memory)
+        var (allPatterns, _) = await _patternRepository.GetPagedAsync(userId, 1, 10000, true);
         var (activeCount, suppressedCount) = await _patternRepository.GetCountsAsync(userId);
+
+        // Apply filters
+        IEnumerable<ExpensePattern> filtered = allPatterns;
+
+        // Status filter
+        if (suppressedOnly)
+        {
+            filtered = filtered.Where(p => p.IsSuppressed);
+        }
+        else if (!includeSuppressed)
+        {
+            filtered = filtered.Where(p => !p.IsSuppressed);
+        }
+
+        // Category filter
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            filtered = filtered.Where(p =>
+                p.Category != null &&
+                p.Category.Equals(category, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Search filter (vendor name)
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchLower = search.ToLowerInvariant();
+            filtered = filtered.Where(p =>
+                p.DisplayName.ToLowerInvariant().Contains(searchLower) ||
+                p.NormalizedVendor.ToLowerInvariant().Contains(searchLower));
+        }
+
+        // Apply sorting
+        var ascending = sortOrder.Equals("asc", StringComparison.OrdinalIgnoreCase);
+        filtered = sortBy.ToLowerInvariant() switch
+        {
+            "displayname" => ascending
+                ? filtered.OrderBy(p => p.DisplayName)
+                : filtered.OrderByDescending(p => p.DisplayName),
+            "averageamount" => ascending
+                ? filtered.OrderBy(p => p.AverageAmount)
+                : filtered.OrderByDescending(p => p.AverageAmount),
+            "occurrencecount" => ascending
+                ? filtered.OrderBy(p => p.OccurrenceCount)
+                : filtered.OrderByDescending(p => p.OccurrenceCount),
+            _ => ascending // accuracyRate (default)
+                ? filtered.OrderBy(p => p.ConfirmCount + p.RejectCount > 0
+                    ? (decimal)p.ConfirmCount / (p.ConfirmCount + p.RejectCount)
+                    : 0m)
+                : filtered.OrderByDescending(p => p.ConfirmCount + p.RejectCount > 0
+                    ? (decimal)p.ConfirmCount / (p.ConfirmCount + p.RejectCount)
+                    : 0m),
+        };
+
+        // Get total count after filtering (for pagination)
+        var filteredList = filtered.ToList();
+        var totalCount = filteredList.Count;
+
+        // Apply pagination
+        var pagedPatterns = filteredList
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
 
         return new PatternListResponseDto
         {
-            Patterns = patterns.Select(MapToPatternSummaryDto).ToList(),
+            Patterns = pagedPatterns.Select(MapToPatternSummaryDto).ToList(),
             TotalCount = totalCount,
             Page = page,
             PageSize = pageSize,
