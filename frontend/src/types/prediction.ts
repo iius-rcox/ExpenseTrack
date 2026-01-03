@@ -408,3 +408,68 @@ export function getConfidenceBadgeVariant(confidence: PredictionConfidence): Pre
 export function formatConfidenceScore(score: number): string {
   return `${Math.round(score * 100)}%`;
 }
+
+// =============================================================================
+// Pattern Grid UI Types
+// =============================================================================
+
+/**
+ * Selection state for pattern grid.
+ */
+export interface PatternSelectionState {
+  /** Selected pattern IDs */
+  selectedIds: Set<string>;
+  /** Last selected ID for range selection */
+  lastSelectedId: string | null;
+  /** Whether all patterns are selected */
+  isSelectAll: boolean;
+}
+
+/**
+ * Default pattern selection state.
+ */
+export const DEFAULT_PATTERN_SELECTION: PatternSelectionState = {
+  selectedIds: new Set(),
+  lastSelectedId: null,
+  isSelectAll: false,
+};
+
+/**
+ * Status filter for patterns.
+ */
+export type PatternStatusFilter = 'all' | 'active' | 'suppressed';
+
+/**
+ * Extended pattern filters for grid UI.
+ */
+export interface PatternGridFilters extends PatternFilters {
+  /** Status filter */
+  status: PatternStatusFilter;
+  /** Category filter */
+  category: string | null;
+}
+
+/**
+ * Default pattern grid filters.
+ */
+export const DEFAULT_PATTERN_GRID_FILTERS: PatternGridFilters = {
+  includeSuppressed: true, // Show all by default, use status filter
+  search: '',
+  status: 'all',
+  category: null,
+};
+
+/**
+ * Bulk action types for patterns.
+ */
+export type PatternBulkAction = 'suppress' | 'enable' | 'delete';
+
+/**
+ * Request for bulk pattern actions.
+ */
+export interface BulkPatternActionRequest {
+  /** Pattern IDs to act on */
+  patternIds: string[];
+  /** Action to perform */
+  action: PatternBulkAction;
+}

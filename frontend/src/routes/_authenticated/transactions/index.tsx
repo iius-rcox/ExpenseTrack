@@ -4,6 +4,7 @@
  * Transactions Page (T058)
  *
  * Main transaction explorer with:
+ * - Tab toggle between Transactions and Patterns views
  * - Advanced filtering and search
  * - Virtualized grid for large datasets
  * - Inline editing with optimistic updates
@@ -23,27 +24,46 @@ import {
   useBulkDeleteTransactions,
   useExportTransactions,
 } from '@/hooks/queries/use-transactions'
+import { usePatternWorkspace } from '@/hooks/queries/use-predictions'
 import { Link } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Upload } from 'lucide-react'
+import { Upload, Sparkles, ListFilter } from 'lucide-react'
 import { TransactionFilterPanel } from '@/components/transactions/transaction-filter-panel'
 import { TransactionGrid } from '@/components/transactions/transaction-grid'
 import { BulkActionsBar } from '@/components/transactions/bulk-actions-bar'
 import {
+  PatternGrid,
+  PatternStats,
+  PatternFilterPanel,
+  BulkPatternActions,
+} from '@/components/patterns'
+import {
   DEFAULT_TRANSACTION_FILTERS,
   DEFAULT_TRANSACTION_SELECTION,
 } from '@/types/transaction'
+import {
+  DEFAULT_PATTERN_GRID_FILTERS,
+  DEFAULT_PATTERN_SELECTION,
+  DEFAULT_PATTERN_SORT,
+} from '@/types/prediction'
 import type {
   TransactionView,
   TransactionFilters,
   TransactionSortConfig,
   TransactionSelectionState,
 } from '@/types/transaction'
+import type {
+  PatternGridFilters,
+  PatternSortConfig,
+  PatternSelectionState,
+} from '@/types/prediction'
 
 // Search params schema for URL state
 const transactionSearchSchema = z.object({
+  view: z.enum(['transactions', 'patterns']).optional().default('transactions'),
   page: z.coerce.number().optional().default(1),
   pageSize: z.coerce.number().optional().default(50),
   search: z.string().optional(),
@@ -86,6 +106,42 @@ function TransactionsPage() {
   // Track which transactions are currently being saved
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
 
+  // =========================================================================
+  // Pattern State
+  // =========================================================================
+
+  // Pattern filter state
+  const [patternFilters, setPatternFilters] = useState<PatternGridFilters>(
+    DEFAULT_PATTERN_GRID_FILTERS
+  )
+
+  // Pattern sort state
+  const [patternSort, setPatternSort] = useState<PatternSortConfig>(
+    DEFAULT_PATTERN_SORT
+  )
+
+  // Pattern selection state
+  const [patternSelection, setPatternSelection] = useState<PatternSelectionState>(
+    DEFAULT_PATTERN_SELECTION
+  )
+
+  // Pattern expanded rows
+  const [patternExpandedIds, setPatternExpandedIds] = useState<Set<string>>(new Set())
+
+  // Handle view tab change
+  const handleViewChange = useCallback(
+    (newView: string) => {
+      navigate({
+        search: {
+          ...search,
+          view: newView as 'transactions' | 'patterns',
+          page: 1, // Reset pagination when switching views
+        },
+      })
+    },
+    [search, navigate]
+  )
+
   // Data fetching
   const {
     data: transactionData,
@@ -101,6 +157,28 @@ function TransactionsPage() {
   // Reference data
   const { data: categories = [] } = useTransactionCategories()
   const { data: tags = [] } = useTransactionTags()
+
+  // Pattern data (only fetch when on patterns tab)
+  const patternWorkspace = usePatternWorkspace({
+    includeSuppressed: patternFilters.includeSuppressed,
+    search: patternFilters.search,
+    status: patternFilters.status,
+    category: patternFilters.category ?? undefined, // Convert null to undefined
+    sortBy: patternSort.field,
+    sortOrder: patternSort.direction,
+    page: search.view === 'patterns' ? search.page : 1,
+    pageSize: search.pageSize,
+    enabled: search.view === 'patterns',
+  })
+
+  // Extract unique categories from patterns for filter dropdown
+  const patternCategories = useMemo(() => {
+    const cats = new Set<string>()
+    patternWorkspace.patterns.forEach((p) => {
+      if (p.category) cats.add(p.category)
+    })
+    return Array.from(cats).sort()
+  }, [patternWorkspace.patterns])
 
   // Mutations
   const updateTransaction = useUpdateTransaction()
@@ -271,6 +349,55 @@ function TransactionsPage() {
   const isProcessing =
     bulkUpdate.isPending || bulkDelete.isPending || exportTransactions.isPending
 
+  // =========================================================================
+  // Pattern Handlers
+  // =========================================================================
+
+  const handlePatternFilterChange = useCallback(
+    (newFilters: PatternGridFilters) => {
+      setPatternFilters(newFilters)
+    },
+    []
+  )
+
+  const handlePatternSortChange = useCallback(
+    (newSort: PatternSortConfig) => {
+      setPatternSort(newSort)
+    },
+    []
+  )
+
+  const handlePatternClearSelection = useCallback(() => {
+    setPatternSelection(DEFAULT_PATTERN_SELECTION)
+  }, [])
+
+  const handlePatternBulkSuppress = useCallback(() => {
+    const ids = Array.from(patternSelection.selectedIds)
+    patternWorkspace.bulkSuppress(ids)
+    setPatternSelection(DEFAULT_PATTERN_SELECTION)
+  }, [patternSelection.selectedIds, patternWorkspace])
+
+  const handlePatternBulkEnable = useCallback(() => {
+    const ids = Array.from(patternSelection.selectedIds)
+    patternWorkspace.bulkEnable(ids)
+    setPatternSelection(DEFAULT_PATTERN_SELECTION)
+  }, [patternSelection.selectedIds, patternWorkspace])
+
+  const handlePatternBulkDelete = useCallback(() => {
+    const ids = Array.from(patternSelection.selectedIds)
+    patternWorkspace.bulkDelete(ids)
+    setPatternSelection(DEFAULT_PATTERN_SELECTION)
+  }, [patternSelection.selectedIds, patternWorkspace])
+
+  const handlePatternRebuild = useCallback(async () => {
+    try {
+      await patternWorkspace.rebuild()
+      toast.success('Pattern rebuild started')
+    } catch (error) {
+      toast.error('Failed to rebuild patterns')
+    }
+  }, [patternWorkspace])
+
   // Transform transaction list for grid
   const transactions = useMemo(
     () => transactionData?.transactions || [],
@@ -295,92 +422,209 @@ function TransactionsPage() {
         </Button>
       </div>
 
-      {/* Filter Panel */}
-      <TransactionFilterPanel
-        filters={filters}
-        categories={categories}
-        tags={tags}
-        onChange={handleFilterChange}
-        onReset={handleFilterReset}
-      />
+      {/* View Toggle Tabs */}
+      <Tabs value={search.view} onValueChange={handleViewChange} className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="transactions" className="gap-2">
+            <ListFilter className="h-4 w-4" />
+            Transactions
+          </TabsTrigger>
+          <TabsTrigger value="patterns" className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            Patterns
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Error State */}
-      {error && (
-        <Card className="border-destructive">
-          <CardContent className="pt-6">
-            <p className="text-destructive">
-              Failed to load transactions. Please try again.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+        {/* Transactions View */}
+        <TabsContent value="transactions" className="space-y-6 mt-0">
+          {/* Filter Panel */}
+          <TransactionFilterPanel
+            filters={filters}
+            categories={categories}
+            tags={tags}
+            onChange={handleFilterChange}
+            onReset={handleFilterReset}
+          />
 
-      {/* Transaction Grid */}
-      <TransactionGrid
-        transactions={transactions}
-        isLoading={isLoading}
-        sort={sort}
-        selection={selection}
-        categories={categories}
-        onSortChange={handleSortChange}
-        onSelectionChange={setSelection}
-        onTransactionEdit={handleTransactionEdit}
-        onTransactionClick={handleTransactionClick}
-        savingIds={savingIds}
-        containerHeight={Math.min(600, Math.max(400, transactions.length * 56))}
-      />
+          {/* Error State */}
+          {error && (
+            <Card className="border-destructive">
+              <CardContent className="pt-6">
+                <p className="text-destructive">
+                  Failed to load transactions. Please try again.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Pagination Info */}
-      {transactionData && transactionData.totalCount > 0 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <p>
-            Showing {((search.page - 1) * search.pageSize) + 1} to{' '}
-            {Math.min(search.page * search.pageSize, transactionData.totalCount)} of{' '}
-            {transactionData.totalCount} transactions
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={search.page <= 1}
-              onClick={() =>
-                navigate({
-                  search: { ...search, page: search.page - 1 },
-                })
-              }
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={
-                search.page >= Math.ceil(transactionData.totalCount / search.pageSize)
-              }
-              onClick={() =>
-                navigate({
-                  search: { ...search, page: search.page + 1 },
-                })
-              }
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
+          {/* Transaction Grid */}
+          <TransactionGrid
+            transactions={transactions}
+            isLoading={isLoading}
+            sort={sort}
+            selection={selection}
+            categories={categories}
+            onSortChange={handleSortChange}
+            onSelectionChange={setSelection}
+            onTransactionEdit={handleTransactionEdit}
+            onTransactionClick={handleTransactionClick}
+            savingIds={savingIds}
+            containerHeight={Math.min(600, Math.max(400, transactions.length * 56))}
+          />
 
-      {/* Bulk Actions Bar */}
-      <BulkActionsBar
-        selectedCount={selection.selectedIds.size}
-        categories={categories}
-        availableTags={tags}
-        onCategorize={handleBulkCategorize}
-        onTag={handleBulkTag}
-        onExport={handleBulkExport}
-        onDelete={handleBulkDelete}
-        onClearSelection={handleClearSelection}
-        isProcessing={isProcessing}
-      />
+          {/* Pagination Info */}
+          {transactionData && transactionData.totalCount > 0 && (
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <p>
+                Showing {((search.page - 1) * search.pageSize) + 1} to{' '}
+                {Math.min(search.page * search.pageSize, transactionData.totalCount)} of{' '}
+                {transactionData.totalCount} transactions
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={search.page <= 1}
+                  onClick={() =>
+                    navigate({
+                      search: { ...search, page: search.page - 1 },
+                    })
+                  }
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    search.page >= Math.ceil(transactionData.totalCount / search.pageSize)
+                  }
+                  onClick={() =>
+                    navigate({
+                      search: { ...search, page: search.page + 1 },
+                    })
+                  }
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Bulk Actions Bar */}
+          <BulkActionsBar
+            selectedCount={selection.selectedIds.size}
+            categories={categories}
+            availableTags={tags}
+            onCategorize={handleBulkCategorize}
+            onTag={handleBulkTag}
+            onExport={handleBulkExport}
+            onDelete={handleBulkDelete}
+            onClearSelection={handleClearSelection}
+            isProcessing={isProcessing}
+          />
+        </TabsContent>
+
+        {/* Patterns View */}
+        <TabsContent value="patterns" className="space-y-6 mt-0">
+          {/* Pattern Stats */}
+          <PatternStats
+            activeCount={patternWorkspace.patterns.filter(p => !p.isSuppressed).length}
+            suppressedCount={patternWorkspace.patterns.filter(p => p.isSuppressed).length}
+            overallAccuracyRate={
+              patternWorkspace.patterns.length > 0
+                ? patternWorkspace.patterns.reduce((sum, p) => sum + p.accuracyRate, 0) /
+                  patternWorkspace.patterns.length
+                : 0
+            }
+            isLoading={patternWorkspace.isLoading}
+            isRebuilding={patternWorkspace.isRebuilding}
+            onRebuild={handlePatternRebuild}
+          />
+
+          {/* Pattern Filters */}
+          <PatternFilterPanel
+            filters={patternFilters}
+            categories={patternCategories}
+            onFiltersChange={handlePatternFilterChange}
+          />
+
+          {/* Pattern Error State */}
+          {patternWorkspace.error && (
+            <Card className="border-destructive">
+              <CardContent className="pt-6">
+                <p className="text-destructive">
+                  Failed to load patterns. Please try again.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Pattern Grid */}
+          <PatternGrid
+            patterns={patternWorkspace.patterns}
+            isLoading={patternWorkspace.isLoading}
+            sort={patternSort}
+            selection={patternSelection}
+            expandedIds={patternExpandedIds}
+            onSortChange={handlePatternSortChange}
+            onSelectionChange={setPatternSelection}
+            onExpandedChange={setPatternExpandedIds}
+            onToggleSuppression={patternWorkspace.toggleSuppression}
+            onDelete={patternWorkspace.deletePattern}
+            containerHeight={Math.min(600, Math.max(400, patternWorkspace.patterns.length * 56))}
+          />
+
+          {/* Pattern Pagination */}
+          {patternWorkspace.totalCount > 0 && (
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <p>
+                Showing {((search.page - 1) * search.pageSize) + 1} to{' '}
+                {Math.min(search.page * search.pageSize, patternWorkspace.totalCount)} of{' '}
+                {patternWorkspace.totalCount} patterns
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={search.page <= 1}
+                  onClick={() =>
+                    navigate({
+                      search: { ...search, page: search.page - 1 },
+                    })
+                  }
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    search.page >= Math.ceil(patternWorkspace.totalCount / search.pageSize)
+                  }
+                  onClick={() =>
+                    navigate({
+                      search: { ...search, page: search.page + 1 },
+                    })
+                  }
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Bulk Pattern Actions */}
+          <BulkPatternActions
+            selectedCount={patternSelection.selectedIds.size}
+            onSuppress={handlePatternBulkSuppress}
+            onEnable={handlePatternBulkEnable}
+            onDelete={handlePatternBulkDelete}
+            onClearSelection={handlePatternClearSelection}
+            isProcessing={patternWorkspace.isProcessing}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
