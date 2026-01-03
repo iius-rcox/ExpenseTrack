@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiFetch } from '@/services/api'
 import { DEFAULT_PATTERN_SORT } from '@/types/prediction'
@@ -334,6 +334,7 @@ export function usePatterns(params: PatternListParams = {}) {
 
       return apiFetch<PatternListResponse>(`/predictions/patterns?${searchParams}`)
     },
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   })
 }
