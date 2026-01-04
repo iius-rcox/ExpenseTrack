@@ -4,6 +4,7 @@ using ExpenseFlow.Shared.DTOs;
 using ExpenseFlow.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace ExpenseFlow.Api.Controllers;
 
@@ -391,6 +392,7 @@ public class ReceiptsController : ApiControllerBase
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(ReceiptDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ReceiptDetailDto>> UpdateReceipt(Guid id, [FromBody] ReceiptUpdateRequestDto request)
     {
         var user = await _userService.GetOrCreateUserAsync(User);
@@ -405,13 +407,27 @@ public class ReceiptsController : ApiControllerBase
             });
         }
 
-        var updated = await _receiptService.UpdateReceiptAsync(id, user.Id, request);
+        Receipt? updated;
+        try
+        {
+            updated = await _receiptService.UpdateReceiptAsync(id, user.Id, request);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex, "Concurrency conflict updating receipt {ReceiptId}", id);
+            return Conflict(new ProblemDetailsResponse
+            {
+                Title = "Concurrency conflict",
+                Detail = "The receipt has been modified by another user. Please refresh and try again."
+            });
+        }
+
         if (updated == null)
         {
             return NotFound(new ProblemDetailsResponse
             {
                 Title = "Update failed",
-                Detail = "Unable to update receipt"
+                Detail = "Unable to update receipt. It may be currently processing."
             });
         }
 

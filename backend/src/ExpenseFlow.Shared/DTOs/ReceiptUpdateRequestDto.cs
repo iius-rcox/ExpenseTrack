@@ -2,6 +2,7 @@ namespace ExpenseFlow.Shared.DTOs;
 
 /// <summary>
 /// Request DTO for updating receipt data (manual corrections).
+/// Supports optimistic concurrency via RowVersion and training feedback via Corrections.
 /// </summary>
 public class ReceiptUpdateRequestDto
 {
@@ -34,4 +35,16 @@ public class ReceiptUpdateRequestDto
     /// Line items on the receipt.
     /// </summary>
     public List<LineItemDto>? LineItems { get; set; }
+
+    /// <summary>
+    /// Concurrency token for optimistic locking.
+    /// Required for concurrent edit detection.
+    /// </summary>
+    public uint? RowVersion { get; set; }
+
+    /// <summary>
+    /// Optional training feedback for each corrected field.
+    /// When provided, creates ExtractionCorrection records for model improvement.
+    /// </summary>
+    public List<CorrectionMetadataDto>? Corrections { get; set; }
 }

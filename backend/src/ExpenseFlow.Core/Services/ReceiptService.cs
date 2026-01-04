@@ -1,7 +1,9 @@
 using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Core.Interfaces;
+using ExpenseFlow.Shared.DTOs;
 using ExpenseFlow.Shared.Enums;
 using Hangfire;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -16,6 +18,7 @@ public class ReceiptService : IReceiptService
     private readonly IBlobStorageService _blobStorageService;
     private readonly IHeicConversionService _heicConversionService;
     private readonly IBackgroundJobClient _backgroundJobClient;
+    private readonly IExtractionCorrectionService _correctionService;
     private readonly ILogger<ReceiptService> _logger;
     private readonly int _maxFileSizeBytes;
     private readonly HashSet<string> _allowedContentTypes;
@@ -25,6 +28,7 @@ public class ReceiptService : IReceiptService
         IBlobStorageService blobStorageService,
         IHeicConversionService heicConversionService,
         IBackgroundJobClient backgroundJobClient,
+        IExtractionCorrectionService correctionService,
         IConfiguration configuration,
         ILogger<ReceiptService> logger)
     {
@@ -32,6 +36,7 @@ public class ReceiptService : IReceiptService
         _blobStorageService = blobStorageService;
         _heicConversionService = heicConversionService;
         _backgroundJobClient = backgroundJobClient;
+        _correctionService = correctionService;
         _logger = logger;
 
         var maxSizeMb = configuration.GetValue<int>("ReceiptProcessing:MaxFileSizeMB", 25);
@@ -207,12 +212,31 @@ public class ReceiptService : IReceiptService
         return receipt;
     }
 
-    public async Task<Receipt?> UpdateReceiptAsync(Guid id, Guid userId, Shared.DTOs.ReceiptUpdateRequestDto request)
+    public async Task<Receipt?> UpdateReceiptAsync(Guid id, Guid userId, ReceiptUpdateRequestDto request)
     {
         var receipt = await _receiptRepository.GetByIdAsync(id, userId);
         if (receipt == null)
         {
             return null;
+        }
+
+        // Prevent editing while receipt is being processed
+        if (receipt.Status == ReceiptStatus.Processing)
+        {
+            _logger.LogWarning(
+                "Attempted to update receipt {ReceiptId} while processing",
+                id);
+            return null;
+        }
+
+        // Check for optimistic concurrency conflict
+        if (request.RowVersion.HasValue && request.RowVersion.Value != receipt.RowVersion)
+        {
+            _logger.LogWarning(
+                "Concurrency conflict on receipt {ReceiptId}: client version {ClientVersion}, server version {ServerVersion}",
+                id, request.RowVersion.Value, receipt.RowVersion);
+            throw new DbUpdateConcurrencyException(
+                $"Receipt {id} has been modified by another user. Please refresh and try again.");
         }
 
         // Update fields if provided
@@ -241,6 +265,25 @@ public class ReceiptService : IReceiptService
         }
 
         await _receiptRepository.UpdateAsync(receipt);
+
+        // Record corrections for training feedback if provided
+        if (request.Corrections is { Count: > 0 })
+        {
+            var currentValues = new Dictionary<string, string?>
+            {
+                ["vendor"] = receipt.VendorExtracted,
+                ["amount"] = receipt.AmountExtracted?.ToString(),
+                ["date"] = receipt.DateExtracted?.ToString("yyyy-MM-dd"),
+                ["tax"] = receipt.TaxExtracted?.ToString(),
+                ["currency"] = receipt.Currency
+            };
+
+            await _correctionService.RecordCorrectionsAsync(
+                id,
+                userId,
+                request.Corrections,
+                currentValues);
+        }
 
         _logger.LogInformation("Receipt {ReceiptId} updated by user {UserId}", id, userId);
 

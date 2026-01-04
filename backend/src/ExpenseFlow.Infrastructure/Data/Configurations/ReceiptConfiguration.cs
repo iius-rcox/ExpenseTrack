@@ -77,5 +77,12 @@ public class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
             .WithOne(t => t.MatchedReceipt)
             .HasForeignKey<Receipt>(r => r.MatchedTransactionId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Feature 024: Optimistic concurrency using PostgreSQL system column xmin
+        builder.Property(r => r.RowVersion)
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
     }
 }
