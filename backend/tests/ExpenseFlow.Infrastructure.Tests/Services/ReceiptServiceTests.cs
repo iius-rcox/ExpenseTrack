@@ -257,7 +257,7 @@ public class ReceiptServiceTests
             OriginalFilename = "test.jpg",
             ContentType = "image/jpeg",
             FileSize = 1024,
-            Status = ReceiptStatus.Processed,
+            Status = ReceiptStatus.Ready,
             VendorExtracted = "Test Vendor",
             AmountExtracted = 100.00m,
             DateExtracted = DateOnly.FromDateTime(DateTime.Today),

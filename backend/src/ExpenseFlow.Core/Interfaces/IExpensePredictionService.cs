@@ -146,6 +146,18 @@ public interface IExpensePredictionService
     /// <returns>Action result.</returns>
     Task<PredictionActionResponseDto> ClearManualOverrideAsync(Guid userId, Guid transactionId);
 
+    /// <summary>
+    /// Bulk marks multiple transactions as reimbursable or not reimbursable.
+    /// Creates manual override predictions for transactions without predictions,
+    /// or updates existing predictions.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="request">Bulk reimbursability request with transaction IDs and action.</param>
+    /// <returns>Bulk action result with success/failure counts.</returns>
+    Task<BulkTransactionReimbursabilityResponseDto> BulkMarkTransactionsAsync(
+        Guid userId,
+        BulkTransactionReimbursabilityRequestDto request);
+
     #endregion
 
     #region Pattern Management

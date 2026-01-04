@@ -20,6 +20,8 @@ import {
   X,
   Check,
   AlertTriangle,
+  CircleCheck,
+  CircleX,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -73,6 +75,8 @@ export function BulkActionsBar({
   onExport,
   onDelete,
   onClearSelection,
+  onMarkReimbursable,
+  onMarkNotReimbursable,
   isProcessing = false,
 }: BulkActionsBarComponentProps) {
   // State for dialogs
@@ -155,6 +159,33 @@ export function BulkActionsBar({
               ))}
             </SelectContent>
           </Select>
+
+          {/* Reimbursability Actions */}
+          {onMarkReimbursable && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
+              onClick={onMarkReimbursable}
+              disabled={isProcessing}
+            >
+              <CircleCheck className="h-4 w-4" />
+              Business
+            </Button>
+          )}
+
+          {onMarkNotReimbursable && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+              onClick={onMarkNotReimbursable}
+              disabled={isProcessing}
+            >
+              <CircleX className="h-4 w-4" />
+              Personal
+            </Button>
+          )}
 
           {/* Tag Action */}
           <DropdownMenu

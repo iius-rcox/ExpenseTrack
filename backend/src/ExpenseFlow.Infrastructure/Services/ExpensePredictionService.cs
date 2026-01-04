@@ -665,6 +665,61 @@ public class ExpensePredictionService : IExpensePredictionService
         };
     }
 
+    /// <inheritdoc />
+    public async Task<BulkTransactionReimbursabilityResponseDto> BulkMarkTransactionsAsync(
+        Guid userId,
+        BulkTransactionReimbursabilityRequestDto request)
+    {
+        var successCount = 0;
+        var failedIds = new List<Guid>();
+
+        var status = request.IsReimbursable ? PredictionStatus.Confirmed : PredictionStatus.Rejected;
+        var statusDescription = request.IsReimbursable ? "reimbursable" : "not reimbursable";
+
+        _logger.LogInformation(
+            "Starting bulk mark {Status} for {Count} transactions for user {UserId}",
+            statusDescription, request.TransactionIds.Count, userId);
+
+        foreach (var transactionId in request.TransactionIds)
+        {
+            try
+            {
+                var result = await MarkTransactionAsync(userId, transactionId, status, statusDescription);
+                if (result.Success)
+                {
+                    successCount++;
+                }
+                else
+                {
+                    failedIds.Add(transactionId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to mark transaction {TransactionId} as {Status}",
+                    transactionId, statusDescription);
+                failedIds.Add(transactionId);
+            }
+        }
+
+        _logger.LogInformation(
+            "Bulk mark {Status} completed for user {UserId}: {SuccessCount}/{TotalCount} succeeded",
+            statusDescription, userId, successCount, request.TransactionIds.Count);
+
+        var message = failedIds.Count == 0
+            ? $"Successfully marked {successCount} transaction(s) as {statusDescription}"
+            : $"Marked {successCount} transaction(s) as {statusDescription}. {failedIds.Count} failed.";
+
+        return new BulkTransactionReimbursabilityResponseDto
+        {
+            SuccessCount = successCount,
+            FailedCount = failedIds.Count,
+            FailedTransactionIds = failedIds,
+            Message = message
+        };
+    }
+
     #endregion
 
     #region Pattern Management

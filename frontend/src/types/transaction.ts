@@ -237,6 +237,10 @@ export interface BulkActionsBarProps {
   onDelete: () => void;
   /** Callback to clear selection */
   onClearSelection: () => void;
+  /** Callback to mark transactions as reimbursable (business expense) */
+  onMarkReimbursable?: () => void;
+  /** Callback to mark transactions as not reimbursable (personal expense) */
+  onMarkNotReimbursable?: () => void;
 }
 
 /**

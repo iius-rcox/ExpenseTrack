@@ -26,6 +26,7 @@ import {
   useMarkTransactionReimbursable,
   useMarkTransactionNotReimbursable,
   useClearReimbursabilityOverride,
+  useBulkMarkReimbursability,
 } from '@/hooks/queries/use-transactions'
 import { usePatternWorkspace, useGeneratePredictions } from '@/hooks/queries/use-predictions'
 import { Link } from '@tanstack/react-router'
@@ -196,6 +197,7 @@ function TransactionsPage() {
   const markReimbursable = useMarkTransactionReimbursable()
   const markNotReimbursable = useMarkTransactionNotReimbursable()
   const clearReimbursabilityOverride = useClearReimbursabilityOverride()
+  const bulkMarkReimbursability = useBulkMarkReimbursability()
 
   // Handle filter changes
   const handleFilterChange = useCallback(
@@ -395,13 +397,48 @@ function TransactionsPage() {
     })
   }, [selection.selectedIds, bulkDelete])
 
+  const handleBulkMarkReimbursable = useCallback(() => {
+    const ids = Array.from(selection.selectedIds)
+    bulkMarkReimbursability.mutate(
+      { transactionIds: ids, isReimbursable: true },
+      {
+        onSuccess: (data) => {
+          toast.success(data.message)
+          setSelection(DEFAULT_TRANSACTION_SELECTION)
+        },
+        onError: (error) => {
+          toast.error(`Failed to mark as reimbursable: ${error.message}`)
+        },
+      }
+    )
+  }, [selection.selectedIds, bulkMarkReimbursability])
+
+  const handleBulkMarkNotReimbursable = useCallback(() => {
+    const ids = Array.from(selection.selectedIds)
+    bulkMarkReimbursability.mutate(
+      { transactionIds: ids, isReimbursable: false },
+      {
+        onSuccess: (data) => {
+          toast.success(data.message)
+          setSelection(DEFAULT_TRANSACTION_SELECTION)
+        },
+        onError: (error) => {
+          toast.error(`Failed to mark as not reimbursable: ${error.message}`)
+        },
+      }
+    )
+  }, [selection.selectedIds, bulkMarkReimbursability])
+
   const handleClearSelection = useCallback(() => {
     setSelection(DEFAULT_TRANSACTION_SELECTION)
   }, [])
 
   // Processing state for bulk actions
   const isProcessing =
-    bulkUpdate.isPending || bulkDelete.isPending || exportTransactions.isPending
+    bulkUpdate.isPending ||
+    bulkDelete.isPending ||
+    exportTransactions.isPending ||
+    bulkMarkReimbursability.isPending
 
   // =========================================================================
   // Pattern Handlers
@@ -447,7 +484,7 @@ function TransactionsPage() {
     try {
       await patternWorkspace.rebuild()
       toast.success('Pattern rebuild started')
-    } catch (error) {
+    } catch {
       toast.error('Failed to rebuild patterns')
     }
   }, [patternWorkspace])
@@ -464,7 +501,7 @@ function TransactionsPage() {
           description: 'View the Transactions tab and use the Reimbursable filter to see flagged expenses.',
         })
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to generate predictions', {
         description: 'Please try again or contact support if the issue persists.',
       })
@@ -602,6 +639,8 @@ function TransactionsPage() {
             onExport={handleBulkExport}
             onDelete={handleBulkDelete}
             onClearSelection={handleClearSelection}
+            onMarkReimbursable={handleBulkMarkReimbursable}
+            onMarkNotReimbursable={handleBulkMarkNotReimbursable}
             isProcessing={isProcessing}
           />
         </TabsContent>

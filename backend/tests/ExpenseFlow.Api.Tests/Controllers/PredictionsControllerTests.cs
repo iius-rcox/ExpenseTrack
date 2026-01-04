@@ -397,7 +397,10 @@ public class PredictionsControllerTests
         };
 
         _predictionServiceMock
-            .Setup(s => s.GetPatternsAsync(_testUserId, 1, 20, false))
+            .Setup(s => s.GetPatternsAsync(
+                _testUserId, 1, 20, false, false,
+                It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(expectedResponse);
 
         // Act
@@ -501,7 +504,10 @@ public class PredictionsControllerTests
         };
 
         _predictionServiceMock
-            .Setup(s => s.GetPatternsAsync(_testUserId, 1, 20, true))
+            .Setup(s => s.GetPatternsAsync(
+                _testUserId, 1, 20, true, false,
+                It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(expectedResponse);
 
         // Act
@@ -514,7 +520,10 @@ public class PredictionsControllerTests
         response.SuppressedCount.Should().Be(1);
 
         _predictionServiceMock.Verify(
-            s => s.GetPatternsAsync(_testUserId, 1, 20, true),
+            s => s.GetPatternsAsync(
+                _testUserId, 1, 20, true, false,
+                It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<string>(), It.IsAny<string>()),
             Times.Once);
     }
 
@@ -595,22 +604,30 @@ public class PredictionsControllerTests
     }
 
     [Fact]
-    public async Task UpdatePatternSuppression_MismatchedId_ReturnsBadRequest()
+    public async Task UpdatePatternSuppression_MismatchedId_UsesRouteId()
     {
-        // Arrange
+        // Arrange - the controller always uses the route ID, overwriting request body ID
         var patternId = Guid.NewGuid();
         var differentId = Guid.NewGuid();
         var request = new UpdatePatternSuppressionRequestDto
         {
-            PatternId = differentId, // Different from route parameter
+            PatternId = differentId, // Different from route parameter - will be overwritten
             IsSuppressed = true
         };
+
+        // Setup mock to expect the ROUTE ID (patternId), not the request body ID
+        _predictionServiceMock
+            .Setup(s => s.UpdatePatternSuppressionAsync(_testUserId, It.Is<UpdatePatternSuppressionRequestDto>(r => r.PatternId == patternId && r.IsSuppressed == true)))
+            .ReturnsAsync(true);
 
         // Act
         var result = await _controller.UpdatePatternSuppression(patternId, request);
 
-        // Assert
-        result.Should().BeOfType<BadRequestObjectResult>();
+        // Assert - controller uses route ID and succeeds
+        result.Should().BeOfType<NoContentResult>();
+        _predictionServiceMock.Verify(
+            s => s.UpdatePatternSuppressionAsync(_testUserId, It.Is<UpdatePatternSuppressionRequestDto>(r => r.PatternId == patternId)),
+            Times.Once);
     }
 
     #endregion
