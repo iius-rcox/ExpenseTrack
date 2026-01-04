@@ -61,6 +61,8 @@ export interface ReceiptPreview {
   matchedTransactionId?: string | null;
   /** Original filename for display */
   filename?: string;
+  /** MIME type for document rendering (e.g., 'application/pdf', 'image/jpeg') */
+  contentType?: string;
   /** AI-suggested category */
   suggestedCategory?: string;
   /** Overall extraction confidence */
@@ -183,6 +185,7 @@ export function toReceiptPreview(detail: ReceiptDetail): ReceiptPreview {
     extractedFields,
     matchedTransactionId: null, // Would come from matching data
     filename: detail.originalFilename,
+    contentType: detail.contentType,
     overallConfidence,
     rowVersion: detail.rowVersion,
   };
