@@ -284,5 +284,37 @@ public class TransactionsController : ApiControllerBase
         }
     }
 
+    /// <summary>
+    /// Bulk marks multiple transactions as reimbursable or not reimbursable.
+    /// Creates or updates manual override predictions for all specified transactions.
+    /// </summary>
+    /// <param name="request">Bulk reimbursability request.</param>
+    /// <returns>Bulk action result with success/failure counts.</returns>
+    [HttpPost("bulk/reimbursability")]
+    [ProducesResponseType(typeof(BulkTransactionReimbursabilityResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<BulkTransactionReimbursabilityResponseDto>> BulkMarkReimbursability(
+        [FromBody] BulkTransactionReimbursabilityRequestDto request)
+    {
+        if (request.TransactionIds == null || request.TransactionIds.Count == 0)
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Invalid request",
+                Detail = "At least one transaction ID is required"
+            });
+        }
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+        var result = await _predictionService.BulkMarkTransactionsAsync(user.Id, request);
+
+        var action = request.IsReimbursable ? "reimbursable" : "not reimbursable";
+        _logger.LogInformation(
+            "Bulk marked {Count} transactions as {Action} for user {UserId}: {SuccessCount} succeeded, {FailedCount} failed",
+            request.TransactionIds.Count, action, user.Id, result.SuccessCount, result.FailedCount);
+
+        return Ok(result);
+    }
+
     #endregion
 }

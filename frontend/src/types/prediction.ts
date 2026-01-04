@@ -290,6 +290,31 @@ export interface BulkPredictionActionResponse {
 }
 
 /**
+ * Request for bulk transaction reimbursability actions.
+ * Works with transaction IDs (creates predictions if needed).
+ */
+export interface BulkTransactionReimbursabilityRequest {
+  /** List of transaction IDs to mark */
+  transactionIds: string[];
+  /** Whether to mark as reimbursable (true) or not reimbursable (false) */
+  isReimbursable: boolean;
+}
+
+/**
+ * Response for bulk transaction reimbursability actions.
+ */
+export interface BulkTransactionReimbursabilityResponse {
+  /** Number of transactions successfully marked */
+  successCount: number;
+  /** Number of transactions that failed to update */
+  failedCount: number;
+  /** IDs of transactions that failed (if any) */
+  failedTransactionIds: string[];
+  /** Summary message */
+  message: string;
+}
+
+/**
  * Paginated response for predictions list.
  */
 export interface PredictionListResponse {

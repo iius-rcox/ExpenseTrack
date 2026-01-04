@@ -384,6 +384,37 @@ public class BulkPredictionActionResponseDto
 }
 
 /// <summary>
+/// Request DTO for bulk transaction reimbursability actions.
+/// Works with transaction IDs (creates predictions if needed).
+/// </summary>
+public class BulkTransactionReimbursabilityRequestDto
+{
+    /// <summary>List of transaction IDs to mark.</summary>
+    public List<Guid> TransactionIds { get; set; } = new();
+
+    /// <summary>Whether to mark as reimbursable (true) or not reimbursable (false).</summary>
+    public bool IsReimbursable { get; set; }
+}
+
+/// <summary>
+/// Response DTO for bulk transaction reimbursability actions.
+/// </summary>
+public class BulkTransactionReimbursabilityResponseDto
+{
+    /// <summary>Number of transactions successfully marked.</summary>
+    public int SuccessCount { get; set; }
+
+    /// <summary>Number of transactions that failed to update.</summary>
+    public int FailedCount { get; set; }
+
+    /// <summary>IDs of transactions that failed (if any).</summary>
+    public List<Guid> FailedTransactionIds { get; set; } = new();
+
+    /// <summary>Summary message.</summary>
+    public string Message { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Dashboard summary for expense predictions.
 /// </summary>
 public class PredictionDashboardDto

@@ -737,7 +737,11 @@ export function useExportTransactions() {
 // Reimbursability Mutation Hooks
 // =============================================================================
 
-import type { PredictionActionResponse } from '@/types/prediction'
+import type {
+  PredictionActionResponse,
+  BulkTransactionReimbursabilityRequest,
+  BulkTransactionReimbursabilityResponse,
+} from '@/types/prediction'
 
 // Also import predictionKeys for cache invalidation
 import { predictionKeys } from './use-predictions'
@@ -831,6 +835,56 @@ export function useClearReimbursabilityOverride() {
       // Invalidate both transaction and prediction caches
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() })
       queryClient.invalidateQueries({ queryKey: predictionKeys.all })
+    },
+  })
+}
+
+/**
+ * Hook for bulk marking multiple transactions as reimbursable or not reimbursable.
+ *
+ * Creates or updates manual override predictions for all specified transactions.
+ * Useful for quickly categorizing multiple transactions from the transaction list.
+ *
+ * @example
+ * ```tsx
+ * const bulkMark = useBulkMarkReimbursability();
+ *
+ * // Mark selected as not reimbursable (personal)
+ * bulkMark.mutate({
+ *   transactionIds: ['tx-1', 'tx-2', 'tx-3'],
+ *   isReimbursable: false
+ * });
+ *
+ * // Mark selected as reimbursable (business)
+ * bulkMark.mutate({
+ *   transactionIds: selectedIds,
+ *   isReimbursable: true
+ * });
+ * ```
+ */
+export function useBulkMarkReimbursability() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (request: BulkTransactionReimbursabilityRequest) => {
+      return apiFetch<BulkTransactionReimbursabilityResponse>(
+        '/transactions/bulk/reimbursability',
+        {
+          method: 'POST',
+          body: JSON.stringify(request),
+        }
+      )
+    },
+
+    onSuccess: (_data, variables) => {
+      // Invalidate both transaction and prediction caches
+      queryClient.invalidateQueries({ queryKey: transactionKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: predictionKeys.all })
+
+      // Optionally invalidate specific transaction details
+      variables.transactionIds.forEach((id) => {
+        queryClient.invalidateQueries({ queryKey: transactionKeys.detail(id) })
+      })
     },
   })
 }
