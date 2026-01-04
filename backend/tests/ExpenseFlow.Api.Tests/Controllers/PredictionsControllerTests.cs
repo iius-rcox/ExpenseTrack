@@ -397,7 +397,10 @@ public class PredictionsControllerTests
         };
 
         _predictionServiceMock
-            .Setup(s => s.GetPatternsAsync(_testUserId, 1, 20, false))
+            .Setup(s => s.GetPatternsAsync(
+                _testUserId, 1, 20, false, false,
+                It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(expectedResponse);
 
         // Act
@@ -501,7 +504,10 @@ public class PredictionsControllerTests
         };
 
         _predictionServiceMock
-            .Setup(s => s.GetPatternsAsync(_testUserId, 1, 20, true))
+            .Setup(s => s.GetPatternsAsync(
+                _testUserId, 1, 20, true, false,
+                It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(expectedResponse);
 
         // Act
@@ -514,7 +520,10 @@ public class PredictionsControllerTests
         response.SuppressedCount.Should().Be(1);
 
         _predictionServiceMock.Verify(
-            s => s.GetPatternsAsync(_testUserId, 1, 20, true),
+            s => s.GetPatternsAsync(
+                _testUserId, 1, 20, true, false,
+                It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<string>(), It.IsAny<string>()),
             Times.Once);
     }
 
