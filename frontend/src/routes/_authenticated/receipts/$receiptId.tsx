@@ -1,13 +1,15 @@
 "use client"
 
+import { useCallback, useMemo } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useReceiptDetail, useDeleteReceipt, useRetryReceipt, useProcessReceipt } from '@/hooks/queries/use-receipts'
+import { useReceiptDetail, useDeleteReceipt, useRetryReceipt, useProcessReceipt, useUpdateReceipt } from '@/hooks/queries/use-receipts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { formatCurrency, formatDate, formatDateTime, getStatusVariant } from '@/lib/utils'
+import { formatCurrency, formatDateTime, getStatusVariant } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   ArrowLeft,
@@ -28,12 +30,16 @@ import {
   Trash2,
   AlertCircle,
   ExternalLink,
-  Calendar,
-  DollarSign,
-  Store,
   Loader2,
+  Save,
+  RotateCcw,
+  X,
 } from 'lucide-react'
 import { DocumentViewer } from '@/components/ui/document-viewer'
+import { ExtractedField } from '@/components/receipts/extracted-field'
+import { toReceiptPreview, type ExtractedFieldKey, type CorrectionMetadata, type ReceiptUpdateRequest } from '@/types/receipt'
+import { useUndo } from '@/hooks/ui/use-undo'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export const Route = createFileRoute('/_authenticated/receipts/$receiptId')({
   component: ReceiptDetailPage,
@@ -41,6 +47,12 @@ export const Route = createFileRoute('/_authenticated/receipts/$receiptId')({
     receiptId: params.receiptId,
   }),
 })
+
+interface FieldEditState {
+  field: ExtractedFieldKey
+  originalValue: string | number | null
+  currentValue: string | number | null
+}
 
 function ReceiptDetailPage() {
   const params = Route.useParams()
@@ -50,6 +62,154 @@ function ReceiptDetailPage() {
   const { mutate: deleteReceipt, isPending: isDeleting } = useDeleteReceipt()
   const { mutate: retryReceipt, isPending: isRetrying } = useRetryReceipt()
   const { mutate: processReceipt, isPending: isProcessing } = useProcessReceipt()
+  const { mutate: updateReceipt, isPending: isSaving } = useUpdateReceipt()
+
+  // Track field edits with undo support (Feature 024)
+  const {
+    current: editedFields,
+    push: setEditedFields,
+    undo,
+    canUndo,
+    reset: clearEdits,
+  } = useUndo<Map<ExtractedFieldKey, FieldEditState>>(new Map())
+
+  // Convert receipt to preview format for ExtractedField components
+  const receiptPreview = useMemo(() => {
+    if (!receipt) return null
+    return toReceiptPreview(receipt)
+  }, [receipt])
+
+  // Check if receipt is processing (cannot edit)
+  const isReceiptProcessing = receipt?.status === 'Processing'
+
+  // Get field with any pending edits applied
+  const getFieldWithEdits = useCallback(
+    (field: { key: ExtractedFieldKey; value: string | number | null; confidence: number; isEdited: boolean }) => {
+      const edit = editedFields.get(field.key)
+      if (edit) {
+        return { ...field, value: edit.currentValue, isEdited: true }
+      }
+      return field
+    },
+    [editedFields]
+  )
+
+  // Handle field update
+  const handleFieldUpdate = useCallback(
+    (fieldKey: ExtractedFieldKey, newValue: string | number | null) => {
+      const field = receiptPreview?.extractedFields.find((f) => f.key === fieldKey)
+      const originalValue = field?.value ?? null
+
+      // Don't track no-op edits
+      if (originalValue === newValue) {
+        const newEdits = new Map(editedFields)
+        newEdits.delete(fieldKey)
+        setEditedFields(newEdits)
+        return
+      }
+
+      const newEdits = new Map(editedFields)
+      newEdits.set(fieldKey, {
+        field: fieldKey,
+        originalValue,
+        currentValue: newValue,
+      })
+      setEditedFields(newEdits)
+    },
+    [editedFields, setEditedFields, receiptPreview]
+  )
+
+  // Handle field undo
+  const handleFieldUndo = useCallback(
+    (fieldKey: ExtractedFieldKey) => {
+      const newEdits = new Map(editedFields)
+      newEdits.delete(fieldKey)
+      setEditedFields(newEdits)
+    },
+    [editedFields, setEditedFields]
+  )
+
+  // Check if there are unsaved changes
+  const hasChanges = editedFields.size > 0
+
+  // Map UI field keys to API field names for training feedback
+  const mapFieldToApiName = (field: ExtractedFieldKey): CorrectionMetadata['fieldName'] | null => {
+    switch (field) {
+      case 'merchant':
+        return 'vendor'
+      case 'amount':
+        return 'amount'
+      case 'date':
+        return 'date'
+      case 'taxAmount':
+        return 'tax'
+      case 'currency':
+        return 'currency'
+      default:
+        // Fields like 'category', 'tip', 'subtotal', 'paymentMethod' are not tracked for corrections
+        return null
+    }
+  }
+
+  // Save all changes
+  const handleSaveAll = () => {
+    if (!receipt || !receiptPreview || editedFields.size === 0) return
+
+    // Build corrections metadata for training feedback (only for trackable fields)
+    const corrections: CorrectionMetadata[] = Array.from(editedFields.values())
+      .map((edit) => {
+        const apiFieldName = mapFieldToApiName(edit.field)
+        if (!apiFieldName) return null
+        return {
+          fieldName: apiFieldName,
+          originalValue: String(edit.originalValue ?? ''),
+        }
+      })
+      .filter((c): c is CorrectionMetadata => c !== null)
+
+    // Build update request
+    const request: ReceiptUpdateRequest = {
+      rowVersion: receiptPreview.rowVersion,
+      corrections: corrections.length > 0 ? corrections : undefined,
+    }
+
+    // Map field edits to receipt properties
+    editedFields.forEach((edit) => {
+      switch (edit.field) {
+        case 'merchant':
+          request.vendor = edit.currentValue as string | null
+          break
+        case 'amount':
+          request.amount = edit.currentValue as number | null
+          break
+        case 'date':
+          request.date = edit.currentValue as string | null
+          break
+        case 'taxAmount':
+          request.tax = edit.currentValue as number | null
+          break
+        case 'currency':
+          request.currency = edit.currentValue as string | null
+          break
+      }
+    })
+
+    updateReceipt(
+      { receiptId, request },
+      {
+        onSuccess: () => {
+          clearEdits(new Map())
+        },
+        // Note: useUpdateReceipt already handles error toasts
+      }
+    )
+  }
+
+  // Discard all changes
+  const handleDiscard = () => {
+    clearEdits(new Map())
+    toast.info('Changes discarded')
+  }
 
   const handleDelete = () => {
     deleteReceipt(receiptId, {
@@ -240,74 +400,133 @@ function ReceiptDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Extracted Data */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Extracted Information</CardTitle>
-              <CardDescription>Data extracted from the receipt</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 grid-cols-2">
+          {/* Extracted Data with Inline Editing (Feature 024) */}
+          <Card className="flex flex-col">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Store className="h-4 w-4" /> Vendor
-                  </p>
-                  <p className="font-medium">{receipt.vendor || 'Not detected'}</p>
+                  <CardTitle>Extracted Information</CardTitle>
+                  <CardDescription>
+                    {receiptPreview && receiptPreview.extractedFields.length > 0 ? (
+                      <>
+                        Click the pencil icon to edit fields •{' '}
+                        <span className="text-muted-foreground">
+                          {Math.round(
+                            (receiptPreview.extractedFields.reduce((sum, f) => sum + f.confidence, 0) /
+                              receiptPreview.extractedFields.length) *
+                              100
+                          )}
+                          % avg confidence
+                        </span>
+                      </>
+                    ) : (
+                      'Data extracted from the receipt'
+                    )}
+                  </CardDescription>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Calendar className="h-4 w-4" /> Date
-                  </p>
-                  <p className="font-medium">
-                    {receipt.date ? formatDate(receipt.date) : 'Not detected'}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <DollarSign className="h-4 w-4" /> Total
-                  </p>
-                  <p className="font-medium text-lg">
-                    {receipt.amount != null
-                      ? formatCurrency(receipt.amount, receipt.currency)
-                      : 'Not detected'}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <DollarSign className="h-4 w-4" /> Tax
-                  </p>
-                  <p className="font-medium">
-                    {receipt.tax != null
-                      ? formatCurrency(receipt.tax, receipt.currency)
-                      : 'Not detected'}
-                  </p>
-                </div>
+                {isReceiptProcessing && (
+                  <Badge variant="outline" className="text-blue-600 border-blue-600/30">
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Processing
+                  </Badge>
+                )}
               </div>
+            </CardHeader>
+            <Separator />
+            <ScrollArea className="flex-1 max-h-[400px]">
+              <CardContent className="p-4 space-y-3">
+                {receiptPreview?.extractedFields.map((field) => (
+                  <ExtractedField
+                    key={field.key}
+                    field={getFieldWithEdits(field)}
+                    onUpdate={(key, value) => handleFieldUpdate(key, value)}
+                    onUndo={() => handleFieldUndo(field.key)}
+                    canUndo={editedFields.has(field.key)}
+                    isSaving={isSaving}
+                    readOnly={isReceiptProcessing}
+                    showConfidence
+                    size="md"
+                  />
+                ))}
 
-              {receipt.lineItems.length > 0 && (
-                <>
-                  <Separator />
-                  <div>
-                    <h4 className="font-medium mb-2">Line Items</h4>
-                    <div className="space-y-2">
-                      {receipt.lineItems.map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between text-sm p-2 rounded bg-muted/50"
-                        >
-                          <span className="flex-1 truncate">{item.description}</span>
-                          <span className="font-medium">
-                            {item.totalPrice != null
-                              ? formatCurrency(item.totalPrice, receipt.currency)
-                              : '--'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                {(!receiptPreview || receiptPreview.extractedFields.length === 0) && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No fields extracted yet</p>
                   </div>
-                </>
+                )}
+
+                {receipt.lineItems.length > 0 && (
+                  <>
+                    <Separator className="my-4" />
+                    <div>
+                      <h4 className="font-medium mb-2 text-sm text-muted-foreground">Line Items</h4>
+                      <div className="space-y-2">
+                        {receipt.lineItems.map((item, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between text-sm p-2 rounded bg-muted/50"
+                          >
+                            <span className="flex-1 truncate">{item.description}</span>
+                            <span className="font-medium">
+                              {item.totalPrice != null
+                                ? formatCurrency(item.totalPrice, receipt.currency)
+                                : '--'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </ScrollArea>
+
+            {/* Save/Discard buttons appear when there are changes */}
+            <AnimatePresence>
+              {hasChanges && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="border-t p-4 bg-muted/30"
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={undo}
+                      disabled={!canUndo || isSaving}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Undo
+                    </Button>
+                    <div className="flex-1" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDiscard}
+                      disabled={isSaving}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Discard
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveAll}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-1" />
+                      )}
+                      Save All ({editedFields.size})
+                    </Button>
+                  </div>
+                </motion.div>
               )}
-            </CardContent>
+            </AnimatePresence>
           </Card>
 
           {/* Metadata */}
