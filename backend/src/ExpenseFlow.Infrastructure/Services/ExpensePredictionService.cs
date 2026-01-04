@@ -571,12 +571,15 @@ public class ExpensePredictionService : IExpensePredictionService
         var existingPrediction = await _dbContext.TransactionPredictions
             .FirstOrDefaultAsync(p => p.TransactionId == transactionId && p.UserId == userId);
 
+        TransactionPrediction prediction;
+
         if (existingPrediction != null)
         {
             // Update existing prediction
             existingPrediction.Status = status;
             existingPrediction.IsManualOverride = true;
             existingPrediction.ResolvedAt = DateTime.UtcNow;
+            prediction = existingPrediction;
 
             _logger.LogInformation(
                 "Updated existing prediction {PredictionId} to {Status} (manual override) for transaction {TransactionId}",
@@ -585,7 +588,7 @@ public class ExpensePredictionService : IExpensePredictionService
         else
         {
             // Create new manual override prediction
-            var newPrediction = new TransactionPrediction
+            prediction = new TransactionPrediction
             {
                 TransactionId = transactionId,
                 UserId = userId,
@@ -597,7 +600,7 @@ public class ExpensePredictionService : IExpensePredictionService
                 ResolvedAt = DateTime.UtcNow
             };
 
-            _dbContext.TransactionPredictions.Add(newPrediction);
+            _dbContext.TransactionPredictions.Add(prediction);
 
             _logger.LogInformation(
                 "Created manual override prediction for transaction {TransactionId} with status {Status}",
@@ -611,7 +614,7 @@ public class ExpensePredictionService : IExpensePredictionService
 
         var feedback = new PredictionFeedback
         {
-            PredictionId = existingPrediction?.Id ?? Guid.NewGuid(),
+            PredictionId = prediction.Id,
             UserId = userId,
             FeedbackType = feedbackType
         };
