@@ -91,6 +91,7 @@ jobs:
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/**/coverage.cobertura.xml
           flags: backend
           fail_ci_if_error: false
@@ -145,6 +146,7 @@ jobs:
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: frontend/coverage/coverage-final.json
           flags: frontend
           fail_ci_if_error: false
@@ -240,8 +242,8 @@ jobs:
       - name: Check Coverage Threshold
         uses: codecov/codecov-action@v4
         with:
-          # Note: Set fail_ci_if_error to false until CODECOV_TOKEN is configured
-          # Coverage is still uploaded by test jobs; this just won't block PRs
+          token: ${{ secrets.CODECOV_TOKEN }}
+          # Coverage is uploaded by test jobs; this step validates thresholds
           fail_ci_if_error: false
           verbose: true
 
