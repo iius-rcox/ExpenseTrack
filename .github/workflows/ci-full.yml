@@ -56,12 +56,37 @@ jobs:
         env:
           ConnectionStrings__DefaultConnection: "Host=localhost;Database=expenseflow_test;Username=test;Password=test"
         run: |
-          dotnet test backend/ExpenseFlow.sln \
+          # Run tests excluding Scenarios.Tests (which only has Chaos/Resilience tests)
+          # and excluding quarantined/load/chaos/resilience categories
+          dotnet test backend/tests/ExpenseFlow.Core.Tests \
+            --no-build -c Release \
+            --filter "Category!=Quarantined" \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage \
+            --logger "trx;LogFileName=core-results.trx"
+
+          dotnet test backend/tests/ExpenseFlow.Infrastructure.Tests \
             --no-build -c Release \
             --filter "Category!=Quarantined&Category!=Load&Category!=Chaos&Category!=Resilience" \
             --collect:"XPlat Code Coverage" \
             --results-directory ./coverage \
-            --logger "trx;LogFileName=backend-results.trx"
+            --logger "trx;LogFileName=infrastructure-results.trx"
+
+          dotnet test backend/tests/ExpenseFlow.Api.Tests \
+            --no-build -c Release \
+            --filter "Category!=Quarantined" \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage \
+            --logger "trx;LogFileName=api-results.trx"
+
+          dotnet test backend/tests/ExpenseFlow.Contracts.Tests \
+            --no-build -c Release \
+            --filter "Category!=Quarantined" \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage \
+            --logger "trx;LogFileName=contracts-results.trx"
+
+          # Note: Scenarios.Tests excluded - all tests are Chaos/Resilience (run in nightly)
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
