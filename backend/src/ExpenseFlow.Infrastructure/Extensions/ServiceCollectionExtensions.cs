@@ -149,6 +149,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITransactionPredictionRepository, TransactionPredictionRepository>();
         services.AddScoped<IExpensePredictionService, ExpensePredictionService>();
 
+        // Feature 024: Extraction Editor Training
+        services.AddScoped<IExtractionCorrectionService, ExtractionCorrectionService>();
+
         return services;
     }
 }

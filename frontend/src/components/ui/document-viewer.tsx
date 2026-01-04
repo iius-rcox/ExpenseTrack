@@ -13,7 +13,7 @@
  * - Fallback state for unsupported formats
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import {
   ZoomIn,
@@ -23,6 +23,7 @@ import {
   FileText,
   AlertTriangle,
   ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from './button';
 import { Separator } from './separator';
@@ -84,6 +85,10 @@ export function DocumentViewer({
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
 
+  // Error state with retry key
+  const [loadError, setLoadError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+
   const documentType = useMemo(
     () => getDocumentType(contentType, filename),
     [contentType, filename]
@@ -97,6 +102,16 @@ export function DocumentViewer({
     setZoom(1);
     setRotation(0);
   };
+
+  // Error handling with retry
+  const handleLoadError = useCallback(() => {
+    setLoadError(true);
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setLoadError(false);
+    setRetryKey((k) => k + 1);
+  }, []);
 
   // No source provided
   if (!src) {
@@ -142,6 +157,36 @@ export function DocumentViewer({
 
   // Image rendering
   if (documentType === 'image') {
+    // Show error state with retry option
+    if (loadError) {
+      return (
+        <div className={cn('flex flex-col items-center justify-center h-full text-muted-foreground', className)}>
+          <AlertTriangle className="h-12 w-12 mb-3 text-amber-500" />
+          <span className="text-sm font-medium mb-1">Failed to load document</span>
+          <span className="text-xs text-muted-foreground mb-4">
+            The image could not be loaded. Please check your connection and try again.
+          </span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleRetry}>
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Retry
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                window.open(src, '_blank', 'noopener,noreferrer');
+                onOpenExternal?.();
+              }}
+            >
+              <ExternalLink className="h-4 w-4 mr-1" />
+              Open in Browser
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className={cn('flex flex-col h-full', className)}>
         {showControls && (
@@ -196,10 +241,12 @@ export function DocumentViewer({
             }}
           >
             <img
+              key={retryKey}
               src={src}
               alt={alt}
               className={cn('max-w-full max-h-full object-contain shadow-lg rounded', documentClassName)}
               draggable={false}
+              onError={handleLoadError}
             />
           </div>
         </div>

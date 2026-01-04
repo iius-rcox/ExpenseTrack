@@ -70,6 +70,9 @@ public class Receipt : BaseEntity
     /// <summary>Match status: Unmatched=0, Proposed=1, Matched=2</summary>
     public MatchStatus MatchStatus { get; set; } = MatchStatus.Unmatched;
 
+    /// <summary>Concurrency token for optimistic locking (maps to PostgreSQL xmin)</summary>
+    public uint RowVersion { get; set; }
+
     // Navigation properties
     public User User { get; set; } = null!;
     public Transaction? MatchedTransaction { get; set; }

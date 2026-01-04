@@ -60,6 +60,9 @@ public class ExpenseFlowDbContext : DbContext
     public DbSet<TransactionPrediction> TransactionPredictions => Set<TransactionPrediction>();
     public DbSet<PredictionFeedback> PredictionFeedback => Set<PredictionFeedback>();
 
+    // Feature 024: Extraction Editor Training
+    public DbSet<ExtractionCorrection> ExtractionCorrections => Set<ExtractionCorrection>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

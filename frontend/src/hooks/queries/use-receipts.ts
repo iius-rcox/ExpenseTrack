@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { apiFetch, apiUpload } from '@/services/api'
+import { ApiError } from '@/types/api'
 import type {
   ReceiptSummary,
   ReceiptDetail,
@@ -7,7 +9,7 @@ import type {
   ReceiptStatusCounts,
   UploadResponse
 } from '@/types/api'
-import type { ExtractedFieldKey } from '@/types/receipt'
+import type { ExtractedFieldKey, ReceiptUpdateRequest } from '@/types/receipt'
 import { dashboardKeys } from './use-dashboard'
 
 export const receiptKeys = {
@@ -315,6 +317,118 @@ export function useReceiptProcessingStatus(
         return false
       }
       return refetchInterval
+    },
+  })
+}
+
+/**
+ * Update receipt params combining ID with request body.
+ * Feature 024: Extraction Editor Training
+ */
+interface UpdateReceiptParams {
+  receiptId: string
+  request: ReceiptUpdateRequest
+}
+
+/**
+ * Hook for updating receipt data with optimistic concurrency and training feedback.
+ * Handles 409 Conflict errors with user-friendly toast notifications.
+ * Feature 024: Extraction Editor Training
+ *
+ * @example
+ * const { mutate: updateReceipt, isPending } = useUpdateReceipt()
+ *
+ * updateReceipt({
+ *   receiptId: '123',
+ *   request: {
+ *     vendor: 'Acme Corp',
+ *     amount: 42.50,
+ *     rowVersion: receipt.rowVersion,
+ *     corrections: [{ fieldName: 'vendor', originalValue: 'ACM CORP' }]
+ *   }
+ * })
+ */
+export function useUpdateReceipt() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ receiptId, request }: UpdateReceiptParams) => {
+      return apiFetch<ReceiptDetail>(`/receipts/${receiptId}`, {
+        method: 'PUT',
+        body: JSON.stringify(request),
+      })
+    },
+
+    // Optimistic update: immediately show the change in the UI
+    onMutate: async ({ receiptId, request }) => {
+      // Cancel any outgoing refetches to prevent overwriting optimistic update
+      await queryClient.cancelQueries({ queryKey: receiptKeys.detail(receiptId) })
+
+      // Snapshot the previous value for rollback
+      const previousDetail = queryClient.getQueryData<ReceiptDetail>(
+        receiptKeys.detail(receiptId)
+      )
+
+      // Optimistically update the cache with primary receipt fields
+      // Note: lineItems are not updated optimistically as they require type transformation
+      if (previousDetail) {
+        const updatedDetail: ReceiptDetail = {
+          ...previousDetail,
+          vendor: request.vendor ?? previousDetail.vendor,
+          amount: request.amount ?? previousDetail.amount,
+          date: request.date ?? previousDetail.date,
+          tax: request.tax ?? previousDetail.tax,
+          currency: request.currency ?? previousDetail.currency,
+        }
+
+        queryClient.setQueryData(receiptKeys.detail(receiptId), updatedDetail)
+      }
+
+      return { previousDetail }
+    },
+
+    // Handle errors, especially 409 Conflict
+    onError: (error, { receiptId }, context) => {
+      // Rollback on error
+      if (context?.previousDetail) {
+        queryClient.setQueryData(
+          receiptKeys.detail(receiptId),
+          context.previousDetail
+        )
+      }
+
+      // Show appropriate toast based on error type
+      if (error instanceof ApiError && error.isConflict) {
+        toast.error('Concurrency conflict', {
+          description: 'This receipt was modified by another user. Please refresh and try again.',
+          action: {
+            label: 'Refresh',
+            onClick: () => {
+              queryClient.invalidateQueries({ queryKey: receiptKeys.detail(receiptId) })
+            }
+          }
+        })
+      } else {
+        toast.error('Failed to update receipt', {
+          description: error instanceof Error ? error.message : 'An unknown error occurred'
+        })
+      }
+    },
+
+    // On success, show toast and update the cache with server response
+    onSuccess: (updatedReceipt, { receiptId }) => {
+      // Replace optimistic data with actual server response
+      queryClient.setQueryData(receiptKeys.detail(receiptId), updatedReceipt)
+
+      toast.success('Receipt updated', {
+        description: 'Your changes have been saved.'
+      })
+    },
+
+    // Always refetch list after mutation to ensure consistency
+    onSettled: () => {
+      // Invalidate list in case summary fields changed
+      queryClient.invalidateQueries({ queryKey: receiptKeys.lists() })
     },
   })
 }

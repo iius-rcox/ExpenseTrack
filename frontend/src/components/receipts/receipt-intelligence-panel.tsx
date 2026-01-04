@@ -12,6 +12,8 @@
  * - Field highlighting on image (when coordinates available)
  * - Overall confidence display
  * - Save/discard all changes
+ * - Training feedback collection (Feature 024)
+ * - Optimistic concurrency with rowVersion
  */
 
 import { useState, useCallback, useMemo } from 'react';
@@ -23,6 +25,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
+  Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -33,27 +36,27 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { DocumentViewer } from '@/components/ui/document-viewer';
 import { ExtractedField, ExtractedFieldSkeleton } from './extracted-field';
 import { useUndo } from '@/hooks/ui/use-undo';
+import { useUpdateReceipt } from '@/hooks/queries/use-receipts';
 import type {
   ReceiptPreview,
   ExtractedField as ExtractedFieldType,
   ExtractedFieldKey,
+  CorrectionMetadata,
 } from '@/types/receipt';
 
 interface ReceiptIntelligencePanelProps {
   /** Receipt data with extracted fields */
   receipt: ReceiptPreview;
-  /** Callback when a field is updated */
+  /** Callback when a field is updated (for external tracking) */
   onFieldUpdate?: (
     field: ExtractedFieldKey,
     value: string | number | null,
     previousValue: string | number | null
   ) => void;
-  /** Callback when all changes are saved */
-  onSaveAll?: () => void;
+  /** Callback after all changes are saved */
+  onSaveComplete?: () => void;
   /** Callback when changes are discarded */
   onDiscard?: () => void;
-  /** Whether any save operation is in progress */
-  isSaving?: boolean;
   /** Loading state */
   isLoading?: boolean;
   /** Custom class name */
@@ -69,14 +72,16 @@ interface FieldEditState {
 export function ReceiptIntelligencePanel({
   receipt,
   onFieldUpdate,
-  onSaveAll,
+  onSaveComplete,
   onDiscard,
-  isSaving = false,
   isLoading = false,
   className,
 }: ReceiptIntelligencePanelProps) {
   // Field highlight state (for future bounding box feature)
   const [highlightedField] = useState<ExtractedFieldKey | null>(null);
+
+  // Use the update receipt mutation hook (Feature 024)
+  const { mutate: updateReceipt, isPending: isSaving } = useUpdateReceipt();
 
   // Track field edits with undo support
   const {
@@ -86,6 +91,9 @@ export function ReceiptIntelligencePanel({
     canUndo,
     reset: clearEdits,
   } = useUndo<Map<ExtractedFieldKey, FieldEditState>>(new Map());
+
+  // Check if receipt is still processing (cannot edit)
+  const isProcessing = receipt.status === 'processing';
 
   // Calculate overall confidence
   const overallConfidence = useMemo(() => {
@@ -146,10 +154,85 @@ export function ReceiptIntelligencePanel({
     onFieldUpdate?.(key, edit.originalValue, edit.currentValue);
   };
 
-  // Handle save all
+  // Map ExtractedFieldKey to CorrectionMetadata fieldName
+  const mapFieldKeyToCorrectionField = (
+    key: ExtractedFieldKey
+  ): CorrectionMetadata['fieldName'] | null => {
+    switch (key) {
+      case 'merchant':
+        return 'vendor';
+      case 'amount':
+        return 'amount';
+      case 'date':
+        return 'date';
+      case 'taxAmount':
+        return 'tax';
+      case 'currency':
+        return 'currency';
+      default:
+        return null; // Fields like tip, subtotal, etc. don't have correction mapping yet
+    }
+  };
+
+  // Handle save all - sends update with corrections for training feedback
   const handleSaveAll = () => {
-    onSaveAll?.();
-    clearEdits(new Map());
+    if (editedFields.size === 0) return;
+
+    // Build the request with all edited fields
+    const request: {
+      vendor?: string | null;
+      amount?: number | null;
+      date?: string | null;
+      tax?: number | null;
+      currency?: string | null;
+      rowVersion: number;
+      corrections: CorrectionMetadata[];
+    } = {
+      rowVersion: receipt.rowVersion,
+      corrections: [],
+    };
+
+    // Collect all edits and build corrections array
+    editedFields.forEach((edit: FieldEditState) => {
+      // Map the edit to the request field
+      switch (edit.field) {
+        case 'merchant':
+          request.vendor = edit.currentValue as string | null;
+          break;
+        case 'amount':
+          request.amount = edit.currentValue as number | null;
+          break;
+        case 'date':
+          request.date = edit.currentValue as string | null;
+          break;
+        case 'taxAmount':
+          request.tax = edit.currentValue as number | null;
+          break;
+        case 'currency':
+          request.currency = edit.currentValue as string | null;
+          break;
+      }
+
+      // Create correction metadata for training feedback
+      const correctionField = mapFieldKeyToCorrectionField(edit.field);
+      if (correctionField && edit.originalValue !== edit.currentValue) {
+        request.corrections.push({
+          fieldName: correctionField,
+          originalValue: String(edit.originalValue ?? ''),
+        });
+      }
+    });
+
+    // Submit the update
+    updateReceipt(
+      { receiptId: receipt.id, request },
+      {
+        onSuccess: () => {
+          clearEdits(new Map());
+          onSaveComplete?.();
+        },
+      }
+    );
   };
 
   // Handle discard
@@ -177,9 +260,9 @@ export function ReceiptIntelligencePanel({
   }
 
   return (
-    <div className={cn('flex gap-4 h-full', className)}>
+    <div className={cn('flex flex-col lg:flex-row gap-4 h-full', className)}>
       {/* Left: Document Viewer */}
-      <Card className="flex-1 flex flex-col min-w-0">
+      <Card className="flex-1 flex flex-col min-w-0 min-h-[300px] lg:min-h-0">
         <CardHeader className="pb-2 shrink-0">
           <CardTitle className="text-base">Receipt Document</CardTitle>
         </CardHeader>
@@ -220,7 +303,7 @@ export function ReceiptIntelligencePanel({
       </Card>
 
       {/* Right: Extracted Fields */}
-      <Card className="w-96 flex flex-col shrink-0">
+      <Card className="w-full lg:w-96 flex flex-col shrink-0">
         <CardHeader className="pb-2 shrink-0">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
@@ -241,7 +324,13 @@ export function ReceiptIntelligencePanel({
                 </span>
               </p>
             </div>
-            {receipt.status === 'complete' && (
+            {isProcessing && (
+              <Badge variant="outline" className="text-blue-600 border-blue-600/30">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Processing
+              </Badge>
+            )}
+            {receipt.status === 'complete' && !isProcessing && (
               <Badge variant="outline" className="text-green-600 border-green-600/30">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 Complete
@@ -260,6 +349,14 @@ export function ReceiptIntelligencePanel({
 
         <ScrollArea className="flex-1">
           <CardContent className="p-4 space-y-3">
+            {/* Processing lock message */}
+            {isProcessing && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-sm mb-4">
+                <Lock className="h-4 w-4 flex-shrink-0" />
+                <span>Fields are locked while the receipt is being processed.</span>
+              </div>
+            )}
+
             {receipt.extractedFields.map((field) => (
               <ExtractedField
                 key={field.key}
@@ -268,6 +365,7 @@ export function ReceiptIntelligencePanel({
                 onUndo={() => handleFieldUndo(field.key)}
                 canUndo={editedFields.has(field.key)}
                 isSaving={isSaving}
+                readOnly={isProcessing}
                 showConfidence
                 size="md"
               />
@@ -347,9 +445,9 @@ export function ReceiptIntelligencePanel({
  */
 export function ReceiptIntelligencePanelSkeleton() {
   return (
-    <div className="flex gap-4 h-full">
+    <div className="flex flex-col lg:flex-row gap-4 h-full">
       {/* Image skeleton */}
-      <Card className="flex-1">
+      <Card className="flex-1 min-h-[300px] lg:min-h-0">
         <CardHeader className="pb-2">
           <div className="h-5 w-24 rounded bg-muted animate-pulse" />
         </CardHeader>
@@ -359,7 +457,7 @@ export function ReceiptIntelligencePanelSkeleton() {
       </Card>
 
       {/* Fields skeleton */}
-      <Card className="w-96">
+      <Card className="w-full lg:w-96">
         <CardHeader className="pb-2">
           <div className="h-5 w-32 rounded bg-muted animate-pulse" />
         </CardHeader>

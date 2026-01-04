@@ -65,6 +65,8 @@ export interface ReceiptPreview {
   suggestedCategory?: string;
   /** Overall extraction confidence */
   overallConfidence?: number;
+  /** Concurrency token for optimistic locking (Feature 024) */
+  rowVersion: number;
 }
 
 /**
@@ -182,6 +184,7 @@ export function toReceiptPreview(detail: ReceiptDetail): ReceiptPreview {
     matchedTransactionId: null, // Would come from matching data
     filename: detail.originalFilename,
     overallConfidence,
+    rowVersion: detail.rowVersion,
   };
 }
 
@@ -348,4 +351,65 @@ export interface ReceiptFilters {
 export interface ReceiptSortConfig {
   field: 'uploadedAt' | 'amount' | 'merchant' | 'date';
   direction: 'asc' | 'desc';
+}
+
+/**
+ * Training feedback metadata for a single field correction.
+ * Captures original AI-extracted value for model improvement.
+ * Feature 024: Extraction Editor Training
+ */
+export interface CorrectionMetadata {
+  /** Name of the corrected field (vendor, amount, date, tax, currency, line_item) */
+  fieldName: 'vendor' | 'amount' | 'date' | 'tax' | 'currency' | 'line_item';
+  /** Original AI-extracted value before user correction */
+  originalValue: string;
+  /** For line_item corrections, the index of the item */
+  lineItemIndex?: number;
+  /** For line_item corrections, which field was corrected */
+  lineItemField?: 'description' | 'quantity' | 'unitPrice' | 'totalPrice';
+}
+
+/**
+ * Request DTO for updating receipt data with training feedback.
+ * Feature 024: Extraction Editor Training
+ */
+export interface ReceiptUpdateRequest {
+  /** Vendor/merchant name */
+  vendor?: string | null;
+  /** Transaction date (ISO format) */
+  date?: string | null;
+  /** Total amount */
+  amount?: number | null;
+  /** Tax amount */
+  tax?: number | null;
+  /** Currency code (e.g., USD, EUR) */
+  currency?: string | null;
+  /** Line items on the receipt */
+  lineItems?: Array<{
+    description: string;
+    quantity?: number | null;
+    unitPrice?: number | null;
+    totalPrice?: number | null;
+    confidence?: number | null;
+  }>;
+  /** Concurrency token for optimistic locking */
+  rowVersion?: number;
+  /** Training feedback for corrected fields */
+  corrections?: CorrectionMetadata[];
+}
+
+/**
+ * Pending correction state for tracking unsaved edits.
+ * Used in ReceiptIntelligencePanel for batch submission.
+ */
+export interface PendingCorrection {
+  /** Field being corrected */
+  fieldName: CorrectionMetadata['fieldName'];
+  /** Original value (for training feedback) */
+  originalValue: string;
+  /** New value entered by user */
+  newValue: string | number | null;
+  /** For line item fields */
+  lineItemIndex?: number;
+  lineItemField?: CorrectionMetadata['lineItemField'];
 }

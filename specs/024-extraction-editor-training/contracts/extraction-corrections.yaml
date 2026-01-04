@@ -1,0 +1,470 @@
+# OpenAPI 3.0 Specification: Extraction Corrections API
+# Feature: 024-extraction-editor-training
+# Date: 2026-01-03
+
+openapi: 3.0.3
+info:
+  title: Extraction Corrections API
+  description: |
+    API endpoints for managing extraction corrections (training feedback)
+    in the ExpenseFlow receipt processing system.
+  version: 1.0.0
+
+paths:
+  /api/receipts/{id}:
+    put:
+      summary: Update receipt with optional correction tracking
+      description: |
+        Updates receipt fields and optionally records training feedback
+        for each correction. When corrections array is provided, creates
+        ExtractionCorrection records linking the original AI extraction
+        to the user's corrected value.
+      operationId: updateReceipt
+      tags:
+        - Receipts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Receipt ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReceiptUpdateWithCorrectionsRequest'
+            examples:
+              withCorrections:
+                summary: Update with training feedback
+                value:
+                  vendor: "Amazon Marketplace"
+                  amount: 49.99
+                  date: "2026-01-02"
+                  tax: 4.50
+                  currency: "USD"
+                  rowVersion: 12345
+                  corrections:
+                    - fieldName: "vendor"
+                      originalValue: "AMZN*Marketplace"
+                    - fieldName: "amount"
+                      originalValue: "49.00"
+              withoutCorrections:
+                summary: Update without training feedback
+                value:
+                  vendor: "Amazon Marketplace"
+                  amount: 49.99
+                  rowVersion: 12345
+      responses:
+        '200':
+          description: Receipt updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptDetailDto'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Receipt not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Concurrency conflict - receipt was modified by another user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: "https://tools.ietf.org/html/rfc7231#section-6.5.8"
+                title: "Conflict"
+                status: 409
+                detail: "Receipt was modified by another user. Please refresh and try again."
+                instance: "/api/receipts/b4e7fe3e-001d-4a57-8494-75a5840714d1"
+        '422':
+          description: Receipt is currently being processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /api/extraction-corrections:
+    get:
+      summary: Get training feedback history
+      description: |
+        Returns paginated list of extraction corrections (training feedback)
+        with optional filtering by field name, date range, user, or receipt.
+        Available to administrators and power users for quality review.
+      operationId: getExtractionCorrections
+      tags:
+        - Extraction Corrections
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number (1-based)
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Items per page
+        - name: fieldName
+          in: query
+          schema:
+            type: string
+            enum: [vendor, amount, date, tax, currency, line_item]
+          description: Filter by field type
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter corrections from this date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter corrections until this date
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by user who made the correction
+        - name: receiptId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by receipt ID
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, fieldName]
+            default: createdAt
+          description: Sort field
+        - name: sortDirection
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort direction
+      responses:
+        '200':
+          description: Paginated list of corrections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractionCorrectionPagedResult'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /api/extraction-corrections/{id}:
+    get:
+      summary: Get single correction detail
+      description: |
+        Returns detailed information about a specific extraction correction,
+        including the receipt context and user information.
+      operationId: getExtractionCorrectionById
+      tags:
+        - Extraction Corrections
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Correction ID
+      responses:
+        '200':
+          description: Correction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractionCorrectionDetailDto'
+        '404':
+          description: Correction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Azure AD / Entra ID JWT token
+
+  schemas:
+    ReceiptUpdateWithCorrectionsRequest:
+      type: object
+      description: Request body for updating a receipt with optional training feedback
+      properties:
+        vendor:
+          type: string
+          maxLength: 255
+          description: Corrected vendor/merchant name
+          example: "Amazon Marketplace"
+        amount:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Corrected total amount
+          example: 49.99
+        date:
+          type: string
+          format: date
+          description: Corrected transaction date
+          example: "2026-01-02"
+        tax:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Corrected tax amount
+          example: 4.50
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: ISO 4217 currency code
+          example: "USD"
+        lineItems:
+          type: array
+          description: Corrected line items (edit existing only)
+          items:
+            $ref: '#/components/schemas/LineItemUpdateDto'
+        rowVersion:
+          type: integer
+          format: int64
+          description: Concurrency token for optimistic locking
+        corrections:
+          type: array
+          description: Optional training feedback for each corrected field
+          items:
+            $ref: '#/components/schemas/CorrectionMetadataDto'
+
+    CorrectionMetadataDto:
+      type: object
+      description: Training feedback for a single field correction
+      required:
+        - fieldName
+        - originalValue
+      properties:
+        fieldName:
+          type: string
+          enum: [vendor, amount, date, tax, currency, line_item]
+          description: Name of the corrected field
+          example: "vendor"
+        originalValue:
+          type: string
+          description: Original AI-extracted value (JSON-serialized)
+          example: "AMZN*Marketplace"
+        lineItemIndex:
+          type: integer
+          minimum: 0
+          description: For line_item corrections, the index of the item
+          example: 0
+        lineItemField:
+          type: string
+          enum: [description, quantity, unitPrice, totalPrice]
+          description: For line_item corrections, which field was corrected
+
+    LineItemUpdateDto:
+      type: object
+      description: Update to an existing line item
+      properties:
+        index:
+          type: integer
+          minimum: 0
+          description: Index of the line item to update
+        description:
+          type: string
+          maxLength: 500
+          description: Item description
+        quantity:
+          type: number
+          format: decimal
+          minimum: 0
+        unitPrice:
+          type: number
+          format: decimal
+          minimum: 0
+        totalPrice:
+          type: number
+          format: decimal
+          minimum: 0
+
+    ExtractionCorrectionDto:
+      type: object
+      description: Summary of an extraction correction
+      properties:
+        id:
+          type: string
+          format: uuid
+        receiptId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        userName:
+          type: string
+          description: Display name of user who made correction
+        fieldName:
+          type: string
+          enum: [vendor, amount, date, tax, currency, line_item]
+        originalValue:
+          type: string
+          description: JSON-serialized original AI extraction
+        correctedValue:
+          type: string
+          description: JSON-serialized user correction
+        createdAt:
+          type: string
+          format: date-time
+
+    ExtractionCorrectionDetailDto:
+      allOf:
+        - $ref: '#/components/schemas/ExtractionCorrectionDto'
+        - type: object
+          properties:
+            receiptVendor:
+              type: string
+              description: Current vendor name on receipt
+            receiptDate:
+              type: string
+              format: date
+              description: Current date on receipt
+            receiptAmount:
+              type: number
+              format: decimal
+              description: Current amount on receipt
+
+    ExtractionCorrectionPagedResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExtractionCorrectionDto'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalCount:
+          type: integer
+        totalPages:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+
+    ReceiptDetailDto:
+      type: object
+      description: Detailed receipt information after update
+      properties:
+        id:
+          type: string
+          format: uuid
+        vendor:
+          type: string
+        amount:
+          type: number
+          format: decimal
+        date:
+          type: string
+          format: date
+        tax:
+          type: number
+          format: decimal
+        currency:
+          type: string
+        lineItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItemDto'
+        confidenceScores:
+          type: object
+          additionalProperties:
+            type: number
+            format: float
+            minimum: 0
+            maximum: 1
+          description: Confidence scores by field name
+        rowVersion:
+          type: integer
+          format: int64
+          description: Updated concurrency token
+        status:
+          type: string
+          enum: [Uploaded, Processing, Processed, Failed]
+        isManuallyEdited:
+          type: boolean
+          description: Whether any field has been manually edited
+
+    LineItemDto:
+      type: object
+      properties:
+        description:
+          type: string
+        quantity:
+          type: number
+          format: decimal
+        unitPrice:
+          type: number
+          format: decimal
+        totalPrice:
+          type: number
+          format: decimal
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807 Problem Details
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string

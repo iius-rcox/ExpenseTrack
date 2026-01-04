@@ -33,6 +33,8 @@ export interface ReceiptDetail extends ReceiptSummary {
   retryCount: number
   pageCount: number
   processedAt: string | null
+  /** Concurrency token for optimistic locking (Feature 024) */
+  rowVersion: number
 }
 
 export interface LineItem {

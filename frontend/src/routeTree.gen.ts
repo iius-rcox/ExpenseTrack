@@ -24,6 +24,7 @@ import { Route as AuthenticatedTransactionsTransactionIdRouteImport } from './ro
 import { Route as AuthenticatedReportsReportIdRouteImport } from './routes/_authenticated/reports/$reportId'
 import { Route as AuthenticatedReceiptsReceiptIdRouteImport } from './routes/_authenticated/receipts/$receiptId'
 import { Route as AuthenticatedPredictionsPatternsRouteImport } from './routes/_authenticated/predictions/patterns'
+import { Route as AuthenticatedAdminExtractionCorrectionsRouteImport } from './routes/_authenticated/admin/extraction-corrections'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -110,11 +111,18 @@ const AuthenticatedPredictionsPatternsRoute =
     path: '/predictions/patterns',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminExtractionCorrectionsRoute =
+  AuthenticatedAdminExtractionCorrectionsRouteImport.update({
+    id: '/admin/extraction-corrections',
+    path: '/admin/extraction-corrections',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/admin/extraction-corrections': typeof AuthenticatedAdminExtractionCorrectionsRoute
   '/predictions/patterns': typeof AuthenticatedPredictionsPatternsRoute
   '/receipts/$receiptId': typeof AuthenticatedReceiptsReceiptIdRoute
   '/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
@@ -131,6 +139,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/admin/extraction-corrections': typeof AuthenticatedAdminExtractionCorrectionsRoute
   '/predictions/patterns': typeof AuthenticatedPredictionsPatternsRoute
   '/receipts/$receiptId': typeof AuthenticatedReceiptsReceiptIdRoute
   '/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
@@ -149,6 +158,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/admin/extraction-corrections': typeof AuthenticatedAdminExtractionCorrectionsRoute
   '/_authenticated/predictions/patterns': typeof AuthenticatedPredictionsPatternsRoute
   '/_authenticated/receipts/$receiptId': typeof AuthenticatedReceiptsReceiptIdRoute
   '/_authenticated/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/admin/extraction-corrections'
     | '/predictions/patterns'
     | '/receipts/$receiptId'
     | '/reports/$reportId'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/admin/extraction-corrections'
     | '/predictions/patterns'
     | '/receipts/$receiptId'
     | '/reports/$reportId'
@@ -200,6 +212,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/_authenticated/dashboard'
+    | '/_authenticated/admin/extraction-corrections'
     | '/_authenticated/predictions/patterns'
     | '/_authenticated/receipts/$receiptId'
     | '/_authenticated/reports/$reportId'
@@ -326,11 +339,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPredictionsPatternsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/extraction-corrections': {
+      id: '/_authenticated/admin/extraction-corrections'
+      path: '/admin/extraction-corrections'
+      fullPath: '/admin/extraction-corrections'
+      preLoaderRoute: typeof AuthenticatedAdminExtractionCorrectionsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedAdminExtractionCorrectionsRoute: typeof AuthenticatedAdminExtractionCorrectionsRoute
   AuthenticatedPredictionsPatternsRoute: typeof AuthenticatedPredictionsPatternsRoute
   AuthenticatedReceiptsReceiptIdRoute: typeof AuthenticatedReceiptsReceiptIdRoute
   AuthenticatedReportsReportIdRoute: typeof AuthenticatedReportsReportIdRoute
@@ -346,6 +367,8 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedAdminExtractionCorrectionsRoute:
+    AuthenticatedAdminExtractionCorrectionsRoute,
   AuthenticatedPredictionsPatternsRoute: AuthenticatedPredictionsPatternsRoute,
   AuthenticatedReceiptsReceiptIdRoute: AuthenticatedReceiptsReceiptIdRoute,
   AuthenticatedReportsReportIdRoute: AuthenticatedReportsReportIdRoute,
