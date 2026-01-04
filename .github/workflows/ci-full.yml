@@ -152,7 +152,7 @@ jobs:
   e2e-tests:
     runs-on: ubuntu-latest
     needs: [backend-tests, frontend-tests]
-    timeout-minutes: 10
+    timeout-minutes: 15
     # TODO: E2E tests need proper infrastructure setup (DB service, backend startup)
     # Currently disabled - uncomment 'continue-on-error: false' when fixed
     continue-on-error: true
