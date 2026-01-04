@@ -207,7 +207,9 @@ jobs:
       - name: Check Coverage Threshold
         uses: codecov/codecov-action@v4
         with:
-          fail_ci_if_error: true
+          # Note: Set fail_ci_if_error to false until CODECOV_TOKEN is configured
+          # Coverage is still uploaded by test jobs; this just won't block PRs
+          fail_ci_if_error: false
           verbose: true
 
   merge-gate:
