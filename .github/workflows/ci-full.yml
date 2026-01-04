@@ -198,10 +198,6 @@ jobs:
       - name: Build Backend
         run: dotnet build backend/src/ExpenseFlow.Api -c Release
 
-      - name: Build Frontend
-        run: npm run build
-        working-directory: frontend
-
       - name: Start Backend API
         run: |
           dotnet run --project backend/src/ExpenseFlow.Api -c Release &
@@ -215,7 +211,8 @@ jobs:
             sleep 1
           done
         env:
-          ConnectionStrings__DefaultConnection: "Host=localhost;Database=expenseflow_test;Username=test;Password=test"
+          # Use PostgreSQL key (matches appsettings.json)
+          ConnectionStrings__PostgreSQL: "Host=localhost;Database=expenseflow_test;Username=test;Password=test"
           ASPNETCORE_ENVIRONMENT: Development
           ASPNETCORE_URLS: http://localhost:5000
 
@@ -223,7 +220,8 @@ jobs:
         run: npm run test:e2e
         working-directory: frontend
         env:
-          API_URL: http://localhost:5000
+          # Proxy /api to local backend
+          VITE_API_PROXY_TARGET: http://localhost:5000
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4

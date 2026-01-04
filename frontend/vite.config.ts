@@ -30,9 +30,9 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'https://staging.expense.ii-us.com',
+        target: process.env.VITE_API_PROXY_TARGET || 'https://staging.expense.ii-us.com',
         changeOrigin: true,
-        secure: true,
+        secure: !process.env.VITE_API_PROXY_TARGET, // Disable for local HTTP
       },
     },
   },
