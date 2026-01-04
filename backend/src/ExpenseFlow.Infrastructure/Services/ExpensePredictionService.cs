@@ -602,9 +602,12 @@ public class ExpensePredictionService : IExpensePredictionService
 
             _dbContext.TransactionPredictions.Add(prediction);
 
+            // Save new prediction first to get the database-generated ID
+            await _dbContext.SaveChangesAsync();
+
             _logger.LogInformation(
-                "Created manual override prediction for transaction {TransactionId} with status {Status}",
-                transactionId, status);
+                "Created manual override prediction {PredictionId} for transaction {TransactionId} with status {Status}",
+                prediction.Id, transactionId, status);
         }
 
         // Record feedback for audit trail
