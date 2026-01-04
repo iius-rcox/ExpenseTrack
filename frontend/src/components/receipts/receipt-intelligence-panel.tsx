@@ -270,6 +270,7 @@ export function ReceiptIntelligencePanel({
           <div className="relative h-full w-full rounded-lg bg-muted/50">
             <DocumentViewer
               src={receipt.imageUrl}
+              contentType={receipt.contentType}
               filename={receipt.filename}
               alt="Receipt"
               showControls={true}

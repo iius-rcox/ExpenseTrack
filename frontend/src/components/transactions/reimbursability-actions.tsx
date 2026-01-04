@@ -18,7 +18,6 @@ import {
   Check,
   X,
   HelpCircle,
-  MoreHorizontal,
   CircleCheck,
   CircleX,
   Undo2,
@@ -26,7 +25,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -166,21 +164,34 @@ export const ReimbursabilityActions = memo(function ReimbursabilityActions({
     [onClearOverride, transactionId]
   );
 
-  // For "none" status, just show the action button
+  // For "none" status, show clickable badge that opens dropdown
   if (status === 'none') {
     return (
       <div className={cn('flex items-center', className)} onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              disabled={isProcessing}
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'gap-1 cursor-pointer text-xs hover:bg-muted/80 transition-colors',
+                      config.color,
+                      isProcessing && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    <StatusIcon className="h-3 w-3" />
+                    <span>{config.label}</span>
+                  </Badge>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>{config.tooltip}</p>
+                <p className="text-xs text-muted-foreground mt-1">Click to set status</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onSelect={handleMarkReimbursable}>
               <Check className="mr-2 h-4 w-4 text-green-600" />
@@ -201,46 +212,39 @@ export const ReimbursabilityActions = memo(function ReimbursabilityActions({
     return null;
   }
 
-  // For confirmed/rejected status, show badge with dropdown
+  // For confirmed/rejected status, show clickable badge with dropdown
   return (
-    <div className={cn('flex items-center gap-1', className)} onClick={(e) => e.stopPropagation()}>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Badge
-              variant="outline"
-              className={cn(
-                'gap-1 cursor-default text-xs',
-                config.color,
-                isManualOverride && 'ring-1 ring-offset-1 ring-blue-400'
-              )}
-            >
-              <StatusIcon className="h-3 w-3" />
-              <span>{status === 'reimbursable' ? 'Business' : 'Personal'}</span>
-            </Badge>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            <p>{config.tooltip}</p>
-            {isManualOverride && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Manually set by user
-              </p>
-            )}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
+    <div className={cn('flex items-center', className)} onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground"
-            disabled={isProcessing}
-          >
-            <MoreHorizontal className="h-3 w-3" />
-          </Button>
-        </DropdownMenuTrigger>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'gap-1 cursor-pointer text-xs hover:opacity-80 transition-opacity',
+                    config.color,
+                    isManualOverride && 'ring-1 ring-offset-1 ring-blue-400',
+                    isProcessing && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <StatusIcon className="h-3 w-3" />
+                  <span>{status === 'reimbursable' ? 'Business' : 'Personal'}</span>
+                </Badge>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+              <p>{config.tooltip}</p>
+              {isManualOverride && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Manually set by user
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">Click to change</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <DropdownMenuContent align="end" className="w-52">
           {status === 'not-reimbursable' && (
             <DropdownMenuItem onSelect={handleMarkReimbursable}>
