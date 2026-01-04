@@ -484,7 +484,7 @@ function TransactionsPage() {
     try {
       await patternWorkspace.rebuild()
       toast.success('Pattern rebuild started')
-    } catch (error) {
+    } catch {
       toast.error('Failed to rebuild patterns')
     }
   }, [patternWorkspace])
@@ -501,7 +501,7 @@ function TransactionsPage() {
           description: 'View the Transactions tab and use the Reimbursable filter to see flagged expenses.',
         })
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to generate predictions', {
         description: 'Please try again or contact support if the issue persists.',
       })

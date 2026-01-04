@@ -791,7 +791,7 @@ export interface UsePatternWorkspaceParams extends PatternListParams {
  * ```
  */
 export function usePatternWorkspace(params: UsePatternWorkspaceParams = {}) {
-  const { enabled = true, ...queryParams } = params
+  const { enabled: _enabled = true, ...queryParams } = params
 
   const patternsQuery = usePatterns({ ...queryParams })
   const updateSuppression = useUpdatePatternSuppression()
