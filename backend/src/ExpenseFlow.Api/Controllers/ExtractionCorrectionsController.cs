@@ -11,6 +11,7 @@ namespace ExpenseFlow.Api.Controllers;
 /// Feature 024: Extraction Editor Training
 /// </summary>
 [Authorize]
+[Route("api/extraction-corrections")]
 public class ExtractionCorrectionsController : ApiControllerBase
 {
     private readonly IExtractionCorrectionService _correctionService;
