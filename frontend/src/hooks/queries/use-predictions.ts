@@ -791,7 +791,9 @@ export interface UsePatternWorkspaceParams extends PatternListParams {
  * ```
  */
 export function usePatternWorkspace(params: UsePatternWorkspaceParams = {}) {
-  const { enabled: _enabled = true, ...queryParams } = params
+  // Note: 'enabled' is defined in UsePatternWorkspaceParams but not yet wired to usePatterns
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { enabled = true, ...queryParams } = params
 
   const patternsQuery = usePatterns({ ...queryParams })
   const updateSuppression = useUpdatePatternSuppression()
