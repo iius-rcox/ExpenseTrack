@@ -165,33 +165,25 @@ export const ReimbursabilityActions = memo(function ReimbursabilityActions({
   );
 
   // For "none" status, show clickable badge that opens dropdown
+  // Note: Removed Tooltip wrapper - nested asChild causes event handler conflicts
   if (status === 'none') {
     return (
       <div className={cn('flex items-center', className)} onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      'gap-1 cursor-pointer text-xs hover:bg-muted/80 transition-colors',
-                      config.color,
-                      isProcessing && 'opacity-50 cursor-not-allowed'
-                    )}
-                  >
-                    <StatusIcon className="h-3 w-3" />
-                    <span>{config.label}</span>
-                  </Badge>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>{config.tooltip}</p>
-                <p className="text-xs text-muted-foreground mt-1">Click to set status</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <DropdownMenuTrigger asChild>
+            <Badge
+              variant="outline"
+              className={cn(
+                'gap-1 cursor-pointer text-xs hover:bg-muted/80 transition-colors',
+                config.color,
+                isProcessing && 'opacity-50 cursor-not-allowed'
+              )}
+              title={`${config.tooltip} - Click to set status`}
+            >
+              <StatusIcon className="h-3 w-3" />
+              <span>{config.label}</span>
+            </Badge>
+          </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onSelect={handleMarkReimbursable}>
               <Check className="mr-2 h-4 w-4 text-green-600" />
@@ -213,38 +205,25 @@ export const ReimbursabilityActions = memo(function ReimbursabilityActions({
   }
 
   // For confirmed/rejected status, show clickable badge with dropdown
+  // Note: Removed Tooltip wrapper - nested asChild causes event handler conflicts
   return (
     <div className={cn('flex items-center', className)} onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'gap-1 cursor-pointer text-xs hover:opacity-80 transition-opacity',
-                    config.color,
-                    isManualOverride && 'ring-1 ring-offset-1 ring-blue-400',
-                    isProcessing && 'opacity-50 cursor-not-allowed'
-                  )}
-                >
-                  <StatusIcon className="h-3 w-3" />
-                  <span>{status === 'reimbursable' ? 'Business' : 'Personal'}</span>
-                </Badge>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs">
-              <p>{config.tooltip}</p>
-              {isManualOverride && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Manually set by user
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground mt-1">Click to change</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <DropdownMenuTrigger asChild>
+          <Badge
+            variant="outline"
+            className={cn(
+              'gap-1 cursor-pointer text-xs hover:opacity-80 transition-opacity',
+              config.color,
+              isManualOverride && 'ring-1 ring-offset-1 ring-blue-400',
+              isProcessing && 'opacity-50 cursor-not-allowed'
+            )}
+            title={`${config.tooltip}${isManualOverride ? ' (Manually set)' : ''} - Click to change`}
+          >
+            <StatusIcon className="h-3 w-3" />
+            <span>{status === 'reimbursable' ? 'Business' : 'Personal'}</span>
+          </Badge>
+        </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
           {status === 'not-reimbursable' && (
             <DropdownMenuItem onSelect={handleMarkReimbursable}>
