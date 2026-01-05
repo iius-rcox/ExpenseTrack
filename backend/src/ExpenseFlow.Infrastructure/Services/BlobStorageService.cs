@@ -172,6 +172,16 @@ public class BlobStorageService : IBlobStorageService
         // BUG-005 fix: Spaces in filenames cause blob URL mismatches when stored/retrieved
         sanitized = sanitized.Replace(' ', '_');
 
+        // BUG-006 fix: Parentheses and other URL-sensitive characters cause blob retrieval failures
+        // when URL-encoding round-trips through Uri.AbsolutePath decoding
+        sanitized = sanitized
+            .Replace('(', '_')
+            .Replace(')', '_')
+            .Replace('[', '_')
+            .Replace(']', '_')
+            .Replace('#', '_')
+            .Replace('%', '_');
+
         // Limit to 100 characters
         if (sanitized.Length > 100)
         {
