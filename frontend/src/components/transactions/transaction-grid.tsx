@@ -581,33 +581,44 @@ export function TransactionGrid({
                 position: 'relative',
               }}
             >
-              <Table>
-                <TableBody>
-                  {virtualRows.map((virtualRow) => {
-                    const transaction = transactions[virtualRow.index];
-                    return (
-                      <TransactionRow
-                        key={transaction.id}
-                        transaction={transaction}
-                        isSelected={selection.selectedIds.has(transaction.id)}
-                        categories={categories}
-                        onSelect={(shiftKey) =>
-                          handleRowSelect(transaction.id, shiftKey)
-                        }
-                        onEdit={handleRowEdit(transaction.id)}
-                        onClick={handleRowClick(transaction)}
-                        isSaving={savingIds.has(transaction.id)}
-                        onPredictionConfirm={onPredictionConfirm}
-                        onPredictionReject={onPredictionReject}
-                        onMarkReimbursable={onMarkReimbursable}
-                        onMarkNotReimbursable={onMarkNotReimbursable}
-                        onClearReimbursabilityOverride={onClearReimbursabilityOverride}
-                        isPredictionProcessing={isPredictionProcessing}
-                      />
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              {virtualRows.map((virtualRow) => {
+                const transaction = transactions[virtualRow.index];
+                return (
+                  <div
+                    key={transaction.id}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <Table>
+                      <TableBody>
+                        <TransactionRow
+                          transaction={transaction}
+                          isSelected={selection.selectedIds.has(transaction.id)}
+                          categories={categories}
+                          onSelect={(shiftKey) =>
+                            handleRowSelect(transaction.id, shiftKey)
+                          }
+                          onEdit={handleRowEdit(transaction.id)}
+                          onClick={handleRowClick(transaction)}
+                          isSaving={savingIds.has(transaction.id)}
+                          onPredictionConfirm={onPredictionConfirm}
+                          onPredictionReject={onPredictionReject}
+                          onMarkReimbursable={onMarkReimbursable}
+                          onMarkNotReimbursable={onMarkNotReimbursable}
+                          onClearReimbursabilityOverride={onClearReimbursabilityOverride}
+                          isPredictionProcessing={isPredictionProcessing}
+                        />
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
