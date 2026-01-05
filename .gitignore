@@ -99,3 +99,6 @@ test-data/
 example-data/*
 !example-data/.gitkeep
 !example-data/README.md
+
+# Playwright MCP screenshots (temporary test artifacts)
+.playwright-mcp/

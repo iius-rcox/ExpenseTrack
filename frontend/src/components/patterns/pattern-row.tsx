@@ -8,6 +8,7 @@
  */
 
 import { memo, useState, useCallback } from 'react'
+import { Link } from '@tanstack/react-router'
 import { ChevronRight, ChevronDown, Trash2, ExternalLink, Calendar, Hash } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -323,19 +324,20 @@ export const PatternRow = memo(function PatternRow({
 
                   {/* Compact Actions */}
                   <div className="flex items-center gap-1.5">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs gap-1"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        // TODO: Navigate to transactions filtered by this vendor
-                        console.log('View transactions for:', pattern.displayName)
-                      }}
+                    <Link
+                      to="/transactions"
+                      search={{ search: pattern.displayName }}
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <ExternalLink className="h-3 w-3" />
-                      View
-                    </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs gap-1"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        View
+                      </Button>
+                    </Link>
 
                     <AlertDialog
                       open={isDeleteDialogOpen}
