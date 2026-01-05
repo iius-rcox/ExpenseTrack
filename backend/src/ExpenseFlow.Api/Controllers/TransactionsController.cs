@@ -85,6 +85,10 @@ public class TransactionsController : ApiControllerBase
             maxAmount,
             hasPendingPrediction);
 
+        // Batch-fetch predictions for all transactions in one query
+        var transactionIds = transactions.Select(t => t.Id).ToList();
+        var predictions = await _predictionService.GetPredictionsForTransactionsAsync(transactionIds);
+
         var response = new TransactionListResponse
         {
             Transactions = transactions.Select(t => new TransactionSummaryDto
@@ -93,7 +97,8 @@ public class TransactionsController : ApiControllerBase
                 TransactionDate = t.TransactionDate,
                 Description = t.Description,
                 Amount = t.Amount,
-                HasMatchedReceipt = t.MatchedReceiptId.HasValue
+                HasMatchedReceipt = t.MatchedReceiptId.HasValue,
+                Prediction = predictions.TryGetValue(t.Id, out var prediction) ? prediction : null
             }).ToList(),
             TotalCount = totalCount,
             Page = page,
