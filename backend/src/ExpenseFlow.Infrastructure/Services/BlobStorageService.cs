@@ -162,31 +162,36 @@ public class BlobStorageService : IBlobStorageService
 
     private static string SanitizeFilename(string filename)
     {
-        // Remove invalid characters and limit length
-        var invalidChars = Path.GetInvalidFileNameChars();
+        // BUG-005/BUG-006 fix: Many characters cause URL encoding issues when round-tripping
+        // through blob storage URLs. Use allowlist approach for maximum compatibility.
+        // Allowed: letters, digits, underscore, hyphen, period
         var sanitized = new string(filename
-            .Where(c => !invalidChars.Contains(c))
+            .Select(c => char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '.'
+                ? c
+                : '_')  // Replace any problematic character with underscore
             .ToArray());
 
-        // Replace spaces with underscores to prevent URL encoding issues in blob storage
-        // BUG-005 fix: Spaces in filenames cause blob URL mismatches when stored/retrieved
-        sanitized = sanitized.Replace(' ', '_');
+        // Collapse multiple consecutive underscores into single underscore
+        while (sanitized.Contains("__"))
+        {
+            sanitized = sanitized.Replace("__", "_");
+        }
 
-        // BUG-006 fix: Parentheses and other URL-sensitive characters cause blob retrieval failures
-        // when URL-encoding round-trips through Uri.AbsolutePath decoding
-        sanitized = sanitized
-            .Replace('(', '_')
-            .Replace(')', '_')
-            .Replace('[', '_')
-            .Replace(']', '_')
-            .Replace('#', '_')
-            .Replace('%', '_');
+        // Trim leading/trailing underscores (but preserve extension dot)
+        var extension = Path.GetExtension(sanitized);
+        var nameWithoutExtension = Path.GetFileNameWithoutExtension(sanitized).Trim('_');
+        sanitized = nameWithoutExtension + extension;
+
+        // Ensure filename is not empty after sanitization
+        if (string.IsNullOrWhiteSpace(nameWithoutExtension))
+        {
+            sanitized = "file" + extension;
+        }
 
         // Limit to 100 characters
         if (sanitized.Length > 100)
         {
-            var extension = Path.GetExtension(sanitized);
-            var nameWithoutExtension = Path.GetFileNameWithoutExtension(sanitized);
+            nameWithoutExtension = Path.GetFileNameWithoutExtension(sanitized);
             sanitized = nameWithoutExtension[..(100 - extension.Length)] + extension;
         }
 
