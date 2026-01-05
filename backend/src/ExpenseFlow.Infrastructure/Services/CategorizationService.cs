@@ -339,6 +339,24 @@ public class CategorizationService : ICategorizationService
             userId,
             cancellationToken);
 
+        // Extract vendor name using alias matching
+        var vendorAlias = await _vendorAliasService.FindMatchingAliasAsync(transaction.Description);
+        string extractedVendor;
+
+        if (vendorAlias != null)
+        {
+            extractedVendor = vendorAlias.DisplayName;
+            await _vendorAliasService.RecordMatchAsync(vendorAlias.Id);
+            _logger.LogDebug("Extracted vendor {Vendor} from description {Description}",
+                extractedVendor, transaction.Description);
+        }
+        else
+        {
+            extractedVendor = transaction.Description;
+            _logger.LogDebug("No vendor alias match for description {Description}",
+                transaction.Description);
+        }
+
         // Get GL and Department suggestions in parallel
         var glTask = GetGLSuggestionsAsync(transactionId, userId, cancellationToken);
         var deptTask = GetDepartmentSuggestionsAsync(transactionId, userId, cancellationToken);
@@ -352,7 +370,7 @@ public class CategorizationService : ICategorizationService
         {
             TransactionId = transactionId,
             NormalizedDescription = normalizedResult.NormalizedDescription,
-            Vendor = transaction.Description, // TODO: Extract vendor from description
+            Vendor = extractedVendor,
             GL = new GLCategorizationSection
             {
                 TopSuggestion = glSuggestions.TopSuggestion,
