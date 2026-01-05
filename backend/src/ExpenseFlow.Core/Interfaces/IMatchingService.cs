@@ -88,6 +88,15 @@ public interface IMatchingService
     /// <param name="userId">User ID for row-level security</param>
     /// <returns>Statistics including matched, proposed, and unmatched counts</returns>
     Task<MatchingStats> GetStatsAsync(Guid userId);
+
+    /// <summary>
+    /// Batch approves all proposed matches above a confidence threshold.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="minConfidence">Minimum confidence score (0-100) to approve</param>
+    /// <param name="matchIds">Optional specific match IDs to approve (if null, uses threshold)</param>
+    /// <returns>Result with approved and skipped counts</returns>
+    Task<BatchApproveResult> BatchApproveAsync(Guid userId, decimal? minConfidence = null, List<Guid>? matchIds = null);
 }
 
 /// <summary>
@@ -110,3 +119,10 @@ public record MatchingStats(
     int UnmatchedTransactionsCount,
     decimal AutoMatchRate,
     decimal AverageConfidence);
+
+/// <summary>
+/// Result of batch approve operation.
+/// </summary>
+public record BatchApproveResult(
+    int ApprovedCount,
+    int SkippedCount);

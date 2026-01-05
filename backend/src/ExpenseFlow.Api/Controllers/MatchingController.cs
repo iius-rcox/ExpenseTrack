@@ -290,6 +290,33 @@ public class MatchingController : ApiControllerBase
     }
 
     /// <summary>
+    /// Batch approve matches above a confidence threshold.
+    /// </summary>
+    /// <param name="request">Batch approve criteria (IDs or minimum confidence)</param>
+    /// <returns>Result with approved and skipped counts</returns>
+    [HttpPost("batch-approve")]
+    [ProducesResponseType(typeof(BatchApproveResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<BatchApproveResponseDto>> BatchApprove([FromBody] BatchApproveRequestDto? request = null)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation("Batch approve requested by user {UserId} with minConfidence={MinConfidence}, ids={IdCount}",
+            user.Id, request?.MinConfidence, request?.Ids?.Count ?? 0);
+
+        var result = await _matchingService.BatchApproveAsync(
+            user.Id,
+            request?.MinConfidence,
+            request?.Ids);
+
+        return Ok(new BatchApproveResponseDto
+        {
+            Approved = result.ApprovedCount,
+            Skipped = result.SkippedCount
+        });
+    }
+
+    /// <summary>
     /// Get unmatched receipts with extracted data.
     /// </summary>
     /// <param name="page">Page number (1-based)</param>
