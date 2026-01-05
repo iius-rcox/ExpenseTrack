@@ -109,4 +109,14 @@ public interface IReportService
     /// <param name="ct">Cancellation token</param>
     /// <returns>Result with reportId, status, and submittedAt timestamp</returns>
     Task<SubmitReportResponseDto> SubmitAsync(Guid userId, Guid reportId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets a preview of expense lines that would be included in a report for a given period.
+    /// Does not create a report, only returns what would be included.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="period">Period in YYYY-MM format</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>List of expense line DTOs that would be in the report</returns>
+    Task<List<ExpenseLineDto>> GetPreviewAsync(Guid userId, string period, CancellationToken ct = default);
 }

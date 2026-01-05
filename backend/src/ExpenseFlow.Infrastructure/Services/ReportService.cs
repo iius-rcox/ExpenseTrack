@@ -569,6 +569,50 @@ public class ReportService : IReportService
         };
     }
 
+    public async Task<List<ExpenseLineDto>> GetPreviewAsync(Guid userId, string period, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Getting report preview for user {UserId}, period {Period}", userId, period);
+
+        // Parse period to get date range
+        var (startDate, endDate) = ParsePeriod(period);
+
+        // Get confirmed matches for the period
+        var confirmedMatches = await _matchRepository.GetConfirmedByPeriodAsync(userId, startDate, endDate);
+        _logger.LogDebug("Found {MatchCount} confirmed matches for preview", confirmedMatches.Count);
+
+        var previewLines = new List<ExpenseLineDto>();
+        var lineOrder = 1;
+
+        // Create preview lines from confirmed matches
+        foreach (var match in confirmedMatches)
+        {
+            var transaction = match.Transaction;
+            var receipt = match.Receipt;
+
+            previewLines.Add(new ExpenseLineDto
+            {
+                Id = Guid.Empty, // No ID yet - this is just a preview
+                ReportId = Guid.Empty,
+                ReceiptId = receipt.Id,
+                TransactionId = transaction.Id,
+                LineOrder = lineOrder++,
+                ExpenseDate = transaction.TransactionDate,
+                Amount = Math.Abs(transaction.Amount), // Use absolute value for display
+                OriginalDescription = transaction.OriginalDescription,
+                NormalizedDescription = transaction.Description,
+                VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName,
+                HasReceipt = true,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        _logger.LogInformation(
+            "Report preview for period {Period}: {LineCount} lines, total {TotalAmount:C}",
+            period, previewLines.Count, previewLines.Sum(l => l.Amount));
+
+        return previewLines;
+    }
+
     #region Private Helpers
 
     private static (DateOnly StartDate, DateOnly EndDate) ParsePeriod(string period)

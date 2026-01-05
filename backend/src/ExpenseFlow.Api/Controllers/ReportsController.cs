@@ -33,6 +33,60 @@ public class ReportsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Gets a preview of expense lines that would be included in a report for a given period.
+    /// Does not create a report, only returns what would be included.
+    /// </summary>
+    /// <param name="period">Period in YYYY-MM format</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>List of expense lines that would be in the report</returns>
+    [HttpGet("preview")]
+    [ProducesResponseType(typeof(List<ExpenseLineDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<List<ExpenseLineDto>>> GetPreview(
+        [FromQuery] string period,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(period) || !System.Text.RegularExpressions.Regex.IsMatch(period, @"^\d{4}-\d{2}$"))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = "Period must be in YYYY-MM format"
+            });
+        }
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Getting report preview for user {UserId}, period {Period}",
+            user.Id, period);
+
+        var preview = await _reportService.GetPreviewAsync(user.Id, period, ct);
+
+        return Ok(preview);
+    }
+
+    /// <summary>
+    /// Generates a draft expense report for a specific period.
+    /// Alias for POST /reports/draft for frontend compatibility.
+    /// </summary>
+    /// <param name="request">Request containing the period (YYYY-MM format)</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Generated draft report with all lines</returns>
+    [HttpPost("generate")]
+    [ProducesResponseType(typeof(ExpenseReportDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ExpenseReportDto>> Generate(
+        [FromBody] GenerateDraftRequest request,
+        CancellationToken ct)
+    {
+        // This is an alias for GenerateDraft for frontend compatibility
+        return await GenerateDraft(request, ct);
+    }
+
+    /// <summary>
     /// Generates a draft expense report for a specific period.
     /// </summary>
     /// <param name="request">Request containing the period (YYYY-MM format)</param>
