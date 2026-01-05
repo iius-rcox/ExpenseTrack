@@ -834,6 +834,123 @@ public partial class MatchingService : IMatchingService
             Math.Round(averageConfidence, 2));
     }
 
+    /// <inheritdoc />
+    public async Task<BatchApproveResult> BatchApproveAsync(Guid userId, decimal? minConfidence = null, List<Guid>? matchIds = null)
+    {
+        _logger.LogInformation("Batch approve requested by user {UserId} with minConfidence={MinConfidence}, matchIds={MatchIdCount}",
+            userId, minConfidence, matchIds?.Count ?? 0);
+
+        // Get proposed matches that meet the criteria
+        IQueryable<ReceiptTransactionMatch> query = _context.Set<ReceiptTransactionMatch>()
+            .Include(m => m.Receipt)
+            .Include(m => m.Transaction)
+            .Where(m => m.UserId == userId && m.Status == MatchProposalStatus.Proposed);
+
+        if (matchIds != null && matchIds.Any())
+        {
+            // Filter by specific IDs
+            query = query.Where(m => matchIds.Contains(m.Id));
+        }
+        else if (minConfidence.HasValue)
+        {
+            // Filter by confidence threshold
+            query = query.Where(m => m.ConfidenceScore >= minConfidence.Value);
+        }
+        else
+        {
+            // Default: 90% threshold if nothing specified
+            query = query.Where(m => m.ConfidenceScore >= 90m);
+        }
+
+        var matchesToApprove = await query.ToListAsync();
+
+        if (!matchesToApprove.Any())
+        {
+            _logger.LogInformation("No matches found to batch approve for user {UserId}", userId);
+            return new BatchApproveResult(0, 0);
+        }
+
+        var approvedCount = 0;
+        var skippedCount = 0;
+
+        foreach (var match in matchesToApprove)
+        {
+            try
+            {
+                // Update match status
+                match.Status = MatchProposalStatus.Confirmed;
+                match.ConfirmedAt = DateTime.UtcNow;
+                match.ConfirmedByUserId = userId;
+
+                // Link receipt and transaction
+                var receipt = match.Receipt;
+                var transaction = match.Transaction;
+
+                if (receipt == null || transaction == null)
+                {
+                    _logger.LogWarning("Match {MatchId} has null receipt or transaction, skipping", match.Id);
+                    skippedCount++;
+                    continue;
+                }
+
+                receipt.MatchedTransactionId = transaction.Id;
+                receipt.MatchStatus = MatchStatus.Matched;
+                transaction.MatchedReceiptId = receipt.Id;
+                transaction.MatchStatus = MatchStatus.Matched;
+
+                // Mark entities as modified
+                _context.Entry(receipt).State = EntityState.Modified;
+                _context.Entry(transaction).State = EntityState.Modified;
+
+                // Create vendor alias if pattern is available
+                var pattern = ExtractVendorPattern(transaction.OriginalDescription);
+                if (!string.IsNullOrWhiteSpace(pattern))
+                {
+                    var existingAlias = await _vendorAliasService.FindMatchingAliasAsync(pattern);
+                    if (existingAlias != null)
+                    {
+                        existingAlias.MatchCount++;
+                        existingAlias.LastMatchedAt = DateTime.UtcNow;
+                        await _vendorAliasService.AddOrUpdateAsync(existingAlias);
+                        match.MatchedVendorAliasId = existingAlias.Id;
+                    }
+                    else
+                    {
+                        var newAlias = new VendorAlias
+                        {
+                            CanonicalName = receipt.VendorExtracted ?? pattern,
+                            AliasPattern = pattern,
+                            DisplayName = receipt.VendorExtracted ?? pattern,
+                            MatchCount = 1,
+                            LastMatchedAt = DateTime.UtcNow,
+                            Confidence = 1.0m
+                        };
+                        var savedAlias = await _vendorAliasService.AddOrUpdateAsync(newAlias);
+                        match.MatchedVendorAliasId = savedAlias.Id;
+                    }
+                }
+
+                // Mark transaction as reimbursable
+                await _predictionService.MarkTransactionReimbursableAsync(userId, transaction.Id);
+
+                approvedCount++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to approve match {MatchId}", match.Id);
+                skippedCount++;
+            }
+        }
+
+        // Save all changes in a single batch
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Batch approve completed for user {UserId}: {ApprovedCount} approved, {SkippedCount} skipped",
+            userId, approvedCount, skippedCount);
+
+        return new BatchApproveResult(approvedCount, skippedCount);
+    }
+
     private record MatchFindResult(ReceiptTransactionMatch? Match, bool IsAmbiguous);
     private record ScoreResult(decimal TotalScore, string Reason, Guid? MatchedAliasId);
 }
