@@ -29,6 +29,11 @@ public class TransactionSummaryDto
     /// Whether this transaction has a matched receipt.
     /// </summary>
     public bool HasMatchedReceipt { get; set; }
+
+    /// <summary>
+    /// Prediction data for expense reimbursability (nullable if no prediction exists).
+    /// </summary>
+    public PredictionSummaryDto? Prediction { get; set; }
 }
 
 /// <summary>

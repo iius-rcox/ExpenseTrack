@@ -1,4 +1,5 @@
 // API Response Types - mirrors backend DTOs
+import type { PredictionSummary } from './prediction';
 
 // Receipt Types
 export type ReceiptStatus =
@@ -75,6 +76,8 @@ export interface TransactionSummary {
   description: string
   amount: number
   hasMatchedReceipt: boolean
+  /** Prediction data for expense reimbursability (null if no prediction exists) */
+  prediction?: PredictionSummary | null
 }
 
 export interface TransactionDetail extends TransactionSummary {

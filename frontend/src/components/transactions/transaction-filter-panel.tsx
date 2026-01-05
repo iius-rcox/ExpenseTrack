@@ -212,10 +212,10 @@ export function TransactionFilterPanel({
             size="sm"
             onClick={handlePredictionToggle}
             className="gap-2"
-            title="Show transactions with pending expense predictions"
+            title="Show transactions with pending expense predictions awaiting review"
           >
             <Lightbulb className="h-4 w-4" />
-            <span className="hidden sm:inline">Reimbursable</span>
+            <span className="hidden sm:inline">Pending Review</span>
           </Button>
 
           {/* Date Range Dropdown */}
@@ -492,7 +492,7 @@ export function TransactionFilterPanel({
           {filters.hasPendingPrediction && (
             <Badge variant="default" className="gap-1 bg-amber-500">
               <Lightbulb className="h-3 w-3" />
-              Showing Reimbursable
+              Pending Review
               <button
                 onClick={handlePredictionToggle}
                 className="ml-1 hover:text-white/80"

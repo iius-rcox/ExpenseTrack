@@ -262,6 +262,7 @@ export function useTransactionListWithFilters({
         matchConfidence: undefined,
         source: 'import' as const,
         isEditing: false,
+        prediction: summary.prediction ?? null,
       }))
 
       const totalPages = Math.ceil(response.totalCount / response.pageSize)
