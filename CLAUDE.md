@@ -60,6 +60,8 @@ Reference data (departments, projects, GL accounts) is synced from Viewpoint Vis
 - TypeScript 5.7+ with React 18.3+ + Vitest 4.x, Playwright 1.57+, MSW (Mock Service Worker), TanStack Query, TanStack Router (022-frontend-integration-tests)
 - N/A (testing infrastructure only) (022-frontend-integration-tests)
 - .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Query, shadcn/ui (023-expense-prediction)
+- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, existing VendorAliasService (025-vendor-extraction)
+- PostgreSQL 15+ (Supabase) - existing VendorAlias table (025-vendor-extraction)
 
 - **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
 - **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
@@ -148,9 +150,9 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 025-vendor-extraction: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, existing VendorAliasService
 - 023-expense-prediction: Added .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Query, shadcn/ui
 - 022-frontend-integration-tests: Added TypeScript 5.7+ with React 18.3+ + Vitest 4.x, Playwright 1.57+, MSW (Mock Service Worker), TanStack Query, TanStack Router
-- 019-analytics-dashboard: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, FluentValidation
   - Entities: ImportJob (for tracking cache warming import jobs)
   - Services: CacheWarmingService (historical data import, job management)
   - Jobs: CacheWarmingJob (Hangfire background processing)
