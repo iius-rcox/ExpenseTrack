@@ -19,6 +19,7 @@ public partial class MatchingService : IMatchingService
     private readonly IMatchRepository _matchRepository;
     private readonly IFuzzyMatchingService _fuzzyMatchingService;
     private readonly IVendorAliasService _vendorAliasService;
+    private readonly IExpensePredictionService _predictionService;
     private readonly ILogger<MatchingService> _logger;
 
     // Scoring constants
@@ -45,12 +46,14 @@ public partial class MatchingService : IMatchingService
         IMatchRepository matchRepository,
         IFuzzyMatchingService fuzzyMatchingService,
         IVendorAliasService vendorAliasService,
+        IExpensePredictionService predictionService,
         ILogger<MatchingService> logger)
     {
         _context = context;
         _matchRepository = matchRepository;
         _fuzzyMatchingService = fuzzyMatchingService;
         _vendorAliasService = vendorAliasService;
+        _predictionService = predictionService;
         _logger = logger;
     }
 
@@ -647,6 +650,10 @@ public partial class MatchingService : IMatchingService
         // including receipt and transaction updates
         await _matchRepository.UpdateAsync(match);
 
+        // Auto-create reimbursable prediction when match is confirmed
+        // (matching a receipt to a transaction implies it's a business expense)
+        await _predictionService.MarkTransactionReimbursableAsync(userId, transaction.Id);
+
         _logger.LogInformation("Match {MatchId} confirmed by user {UserId}", matchId, userId);
 
         return match;
@@ -750,6 +757,10 @@ public partial class MatchingService : IMatchingService
 
         // AddAsync already calls SaveChangesAsync, which saves all tracked changes
         await _matchRepository.AddAsync(match);
+
+        // Auto-create reimbursable prediction when manual match is created
+        // (matching a receipt to a transaction implies it's a business expense)
+        await _predictionService.MarkTransactionReimbursableAsync(userId, transactionId);
 
         _logger.LogInformation("Manual match created by user {UserId}: Receipt {ReceiptId} -> Transaction {TransactionId}",
             userId, receiptId, transactionId);
