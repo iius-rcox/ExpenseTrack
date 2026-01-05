@@ -231,8 +231,8 @@ public class CategorizationServiceVendorExtractionTests
             Description = description,
             OriginalDescription = description,
             Amount = 99.99m,
-            PostedDate = DateTime.UtcNow,
-            StatementId = Guid.NewGuid()
+            TransactionDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            ImportId = Guid.NewGuid()
         };
     }
 
