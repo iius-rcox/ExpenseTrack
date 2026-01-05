@@ -252,12 +252,41 @@ function ReceiptDetailPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" asChild>
-          <Link to="/receipts">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Receipts
-          </Link>
-        </Button>
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" asChild>
+            <Link to="/receipts">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Receipts
+            </Link>
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" disabled={isDeleting}>
+                {isDeleting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Delete Broken Receipt
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Broken Receipt?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This receipt failed to load and may have corrupted data.
+                  Deleting it will allow you to upload a fresh copy.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete}>
+                  Delete Receipt
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error loading receipt</AlertTitle>
