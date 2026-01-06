@@ -68,7 +68,7 @@ As an expense submitter, I want to see a history of my report generation attempt
 
 1. **Given** I have previously generated reports, **When** I view my generation history, **Then** I see a list of all generation jobs with status, start time, and duration
 2. **Given** a generation job failed, **When** I view its details, **Then** I see a user-friendly explanation of what went wrong and suggested next steps
-3. **Given** a generation job is queued behind others, **When** I view its status, **Then** I see my position in the queue and estimated start time
+3. **Given** a generation job is in Pending status, **When** I view its status, **Then** I see that the job is queued and awaiting processing (Note: duplicate jobs per user/period are prevented, so queue contention is minimal)
 
 ---
 
@@ -129,8 +129,7 @@ As an expense submitter, I want my frequently-used vendors and categories to be 
 
 ### Key Entities
 
-- **ReportGenerationJob**: Represents a background job for generating an expense report. Tracks user, billing period, status (queued/processing/completed/failed/cancelled), progress (lines processed/total), timestamps, and error information.
-- **JobProgress**: Real-time progress information for an active job, including current line, total lines, estimated completion time, and processing rate.
+- **ReportGenerationJob**: Represents a background job for generating an expense report. Tracks user, billing period, status (Pending/Processing/Completed/Failed/Cancelled/CancellationRequested), progress (processedLines/totalLines/failedLines), estimated completion time, timestamps, and error information. Progress is embedded directly in this entity (no separate JobProgress entity).
 
 ## Success Criteria *(mandatory)*
 

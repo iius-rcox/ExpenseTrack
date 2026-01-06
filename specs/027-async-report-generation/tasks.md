@@ -3,7 +3,7 @@
 **Input**: Design documents from `/specs/027-async-report-generation/`
 **Prerequisites**: plan.md ✅, spec.md ✅, research.md ✅, data-model.md ✅, contracts/ ✅
 
-**Tests**: Not explicitly requested in spec - tests are OPTIONAL for this feature.
+**Tests**: Per Constitution Principle II - unit tests for services, integration tests for API endpoints.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -79,6 +79,22 @@
 - [ ] T027 [US1] Add completion callback to navigate to generated report when job completes
 
 **Checkpoint**: User Story 1 complete - users can generate reports with progress visibility
+
+---
+
+## Phase 3b: Testing (Constitution II Compliance)
+
+**Purpose**: Unit and integration tests per Constitution Principle II
+
+- [ ] T027a [US1] Create ReportJobServiceTests (unit) in `backend/tests/ExpenseFlow.UnitTests/Services/ReportJobServiceTests.cs`
+- [ ] T027b [US1] Create ReportJobsControllerTests (integration) in `backend/tests/ExpenseFlow.IntegrationTests/Controllers/ReportJobsControllerTests.cs`
+- [ ] T027c [US1] Create ReportGenerationBackgroundJobTests (unit) in `backend/tests/ExpenseFlow.UnitTests/Jobs/ReportGenerationBackgroundJobTests.cs`
+
+**Test Coverage Requirements**:
+- Unit tests: job creation, status transitions, duplicate prevention, cancellation logic
+- Integration tests: POST returns 202, GET returns progress, DELETE cancels, 409 on duplicate
+
+**Checkpoint**: US1 tests passing - Constitution II compliance verified
 
 ---
 
@@ -273,14 +289,15 @@ With multiple developers:
 | 1 | Setup | 6 | Database migration, entity |
 | 2 | Foundational | 8 | Repository, service, DTOs |
 | 3 | US1 (P1) 🎯 | 13 | Async generation + progress |
+| 3b | Testing | 3 | Constitution II compliance |
 | 4 | US2 (P2) | 9 | Rate limit resilience |
 | 5 | US3 (P3) | 7 | Job history |
 | 6 | US4 (P4) | 7 | Cancellation |
 | 7 | US5 (P5) | 4 | Cache warming |
 | 8 | Polish | 6 | Edge cases, alerts |
 
-**Total Tasks**: 60
-**MVP Scope**: Phase 1 + 2 + 3 = 27 tasks
+**Total Tasks**: 63
+**MVP Scope**: Phase 1 + 2 + 3 + 3b = 30 tasks
 **Parallel Opportunities**: 12 tasks marked [P]
 
 ---
