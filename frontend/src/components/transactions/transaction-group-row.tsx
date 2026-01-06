@@ -119,6 +119,23 @@ function formatDate(date: Date): string {
 }
 
 /**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) {
+      console.warn('[TransactionGroupRow] Empty object detected, using fallback');
+      return fallback;
+    }
+    return fallback;
+  }
+  return String(value);
+}
+
+/**
  * Format short date for child rows
  */
 function formatShortDate(date: Date): string {
@@ -281,7 +298,7 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
               <Checkbox
                 checked={isSelected}
                 onCheckedChange={() => {}}
-                aria-label={`Select group ${group.name}`}
+                aria-label={`Select group ${safeDisplayString(group.name, 'unnamed')}`}
               />
             </div>
             {/* Expand/Collapse Chevron */}
@@ -295,7 +312,7 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
               }}
               aria-expanded={isExpanded}
               aria-controls={`group-${group.id}-transactions`}
-              aria-label={isExpanded ? `Collapse group ${group.name}` : `Expand group ${group.name}`}
+              aria-label={isExpanded ? `Collapse group ${safeDisplayString(group.name, 'unnamed')}` : `Expand group ${safeDisplayString(group.name, 'unnamed')}`}
             >
               {isExpanded ? (
                 <ChevronDown className="h-4 w-4" />
@@ -375,8 +392,8 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
                 className="flex items-center gap-2 group/name"
               >
                 <Layers className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium truncate" title={group.name}>
-                  {group.name}
+                <span className="font-medium truncate" title={safeDisplayString(group.name)}>
+                  {safeDisplayString(group.name)}
                 </span>
                 <Badge variant="secondary" className="text-xs px-1.5">
                   {group.transactionCount} items
@@ -387,7 +404,7 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
                     variant="ghost"
                     className="h-6 w-6 opacity-0 group-hover/name:opacity-100 transition-opacity focus:opacity-100"
                     onClick={handleStartEditName}
-                    aria-label={`Edit name for group ${group.name}`}
+                    aria-label={`Edit name for group ${safeDisplayString(group.name, 'unnamed')}`}
                   >
                     <Pencil className="h-3 w-3" />
                   </Button>
@@ -424,7 +441,7 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
                   size="sm"
                   className="h-7 text-xs text-muted-foreground hover:text-foreground"
                   onClick={(e) => e.stopPropagation()}
-                  aria-label={`Override display date for group ${group.name}`}
+                  aria-label={`Override display date for group ${safeDisplayString(group.name, 'unnamed')}`}
                 >
                   <Calendar className="h-3 w-3 mr-1" />
                   Override date
@@ -535,7 +552,7 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
                 <div
                   id={`group-${group.id}-transactions`}
                   role="region"
-                  aria-label={`Transactions in group ${group.name}`}
+                  aria-label={`Transactions in group ${safeDisplayString(group.name, 'unnamed')}`}
                   className="bg-muted/30 px-4 py-2 ml-10"
                 >
                   {/* Child transaction list */}
@@ -582,8 +599,8 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
                             <span className="text-xs text-muted-foreground w-16 flex-shrink-0">
                               {formatShortDate(tx.date)}
                             </span>
-                            <span className="text-sm truncate flex-1" title={tx.description}>
-                              {tx.description}
+                            <span className="text-sm truncate flex-1" title={safeDisplayString(tx.description)}>
+                              {safeDisplayString(tx.description)}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">

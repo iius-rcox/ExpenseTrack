@@ -62,13 +62,30 @@ function formatDate(date: Date): string {
 }
 
 /**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) {
+      console.warn('[CreateGroupDialog] Empty object detected, using fallback');
+      return fallback;
+    }
+    return fallback;
+  }
+  return String(value);
+}
+
+/**
  * Generate a suggested group name from transactions
  */
 function generateGroupName(transactions: TransactionView[]): string {
   if (transactions.length === 0) return '';
 
   // Try to find a common merchant/description prefix
-  const firstMerchant = transactions[0].merchant || transactions[0].description;
+  const firstMerchant = safeDisplayString(transactions[0].merchant) || safeDisplayString(transactions[0].description);
 
   // Clean up the merchant name (remove numbers, special chars at end)
   const cleanName = firstMerchant
@@ -220,7 +237,7 @@ export function CreateGroupDialog({
                   >
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate flex items-center gap-2">
-                        {tx.merchant || tx.description}
+                        {safeDisplayString(tx.merchant) || safeDisplayString(tx.description)}
                         {isAlreadyGrouped && (
                           <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
                             In Group

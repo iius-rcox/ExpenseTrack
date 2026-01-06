@@ -303,14 +303,47 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
         `/transaction-groups/mixed?${searchParams}`
       );
 
-      // DEBUG: Log raw API response to help diagnose React Error #301
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[useMixedTransactionList] Raw API response:', {
-          transactionCount: response.transactions?.length ?? 0,
-          groupCount: response.groups?.length ?? 0,
-          sampleTransaction: response.transactions?.[0],
-          samplePrediction: response.transactions?.[0]?.prediction,
-        });
+      // Helper to check if value is an empty object {}
+      const isEmptyObject = (val: unknown): boolean =>
+        val !== null &&
+        typeof val === 'object' &&
+        !Array.isArray(val) &&
+        !(val instanceof Date) &&
+        Object.keys(val as object).length === 0;
+
+      // Helper to safely coerce to string, handling empty objects
+      const safeString = (val: unknown): string => {
+        if (val === null || val === undefined) return '';
+        if (isEmptyObject(val)) {
+          console.error('[useMixedTransactionList] Empty object detected, converting to empty string');
+          return '';
+        }
+        return String(val);
+      };
+
+      // DEBUG: Log raw API response - this ALWAYS runs now to help diagnose production issues
+      console.log('[useMixedTransactionList] Raw API response summary:', {
+        transactionCount: response.transactions?.length ?? 0,
+        groupCount: response.groups?.length ?? 0,
+      });
+
+      // Check for any empty objects in the raw response that could cause React Error #301
+      for (let i = 0; i < Math.min(3, response.transactions?.length ?? 0); i++) {
+        const tx = response.transactions[i];
+        if (tx.prediction) {
+          const pred = tx.prediction;
+          // Check ALL prediction fields for empty objects
+          const fieldsToCheck = Object.entries(pred);
+          for (const [key, value] of fieldsToCheck) {
+            if (isEmptyObject(value)) {
+              console.error(`[useMixedTransactionList] FOUND EMPTY OBJECT in prediction.${key} for tx ${tx.id}`);
+            }
+          }
+        }
+        // Also check if the prediction itself is an empty object
+        if (isEmptyObject(tx.prediction)) {
+          console.error(`[useMixedTransactionList] FOUND EMPTY OBJECT as prediction for tx ${tx.id}`);
+        }
       }
 
       // Transform and merge transactions and groups into a single list
@@ -318,15 +351,21 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
 
       // Transform transactions to TransactionViewWithType
       for (const tx of response.transactions) {
-        // Validate prediction fields are primitives, not objects
-        const prediction = tx.prediction;
+        // Skip processing if prediction is an empty object (convert to null)
+        let prediction = tx.prediction;
+        if (isEmptyObject(prediction)) {
+          console.error('[useMixedTransactionList] Skipping empty object prediction for tx:', tx.id);
+          prediction = null;
+        }
+
+        // Additional validation: if prediction exists but has empty object fields
         if (prediction) {
-          // Debug: Check for unexpected object types that would cause React Error #301
-          const fields = ['id', 'vendorName', 'confidenceLevel', 'status', 'suggestedCategory', 'suggestedGLCode'] as const;
+          // Check each field and log any empty objects
+          const fields = ['id', 'transactionId', 'vendorName', 'confidenceLevel', 'status', 'suggestedCategory', 'suggestedGLCode'] as const;
           for (const field of fields) {
-            const value = prediction[field];
-            if (value !== null && value !== undefined && typeof value === 'object') {
-              console.error(`[useMixedTransactionList] Unexpected object in prediction.${field}:`, value, 'for transaction:', tx.id);
+            const value = (prediction as Record<string, unknown>)[field];
+            if (isEmptyObject(value)) {
+              console.error(`[useMixedTransactionList] Empty object in prediction.${field} for tx ${tx.id}, will convert to safe value`);
             }
           }
         }
@@ -336,9 +375,9 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
           id: tx.id,
           date: new Date(tx.transactionDate),
           description: tx.description,
-          merchant: prediction?.vendorName || tx.description.split(' ')[0], // Use vendor from prediction if available
+          merchant: prediction?.vendorName ? safeString(prediction.vendorName) : tx.description.split(' ')[0],
           amount: tx.amount,
-          category: prediction?.suggestedCategory || '',
+          category: prediction?.suggestedCategory ? safeString(prediction.suggestedCategory) : '',
           categoryId: '', // Not available in mixed list response
           notes: '',
           tags: [],
@@ -348,17 +387,23 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
             ? {
                 // Map directly from backend PredictionSummaryDto
                 // Ensure all values are primitives to avoid React Error #301
-                id: String(prediction.id),
-                transactionId: String(prediction.transactionId),
-                patternId: prediction.patternId ? String(prediction.patternId) : null,
-                vendorName: String(prediction.vendorName ?? ''),
-                confidenceScore: Number(prediction.confidenceScore),
+                // Use safeString helper that handles empty objects
+                id: safeString(prediction.id),
+                transactionId: safeString(prediction.transactionId),
+                patternId: prediction.patternId ? safeString(prediction.patternId) : null,
+                vendorName: safeString(prediction.vendorName ?? ''),
+                confidenceScore: isEmptyObject(prediction.confidenceScore) ? 0 : Number(prediction.confidenceScore),
                 // Use backend-provided values directly (already strings via JsonStringEnumConverter)
-                confidenceLevel: prediction.confidenceLevel as 'Low' | 'Medium' | 'High',
-                status: prediction.status as 'Pending' | 'Confirmed' | 'Rejected' | 'Ignored',
-                suggestedCategory: prediction.suggestedCategory ? String(prediction.suggestedCategory) : null,
-                suggestedGLCode: prediction.suggestedGLCode ? String(prediction.suggestedGLCode) : null,
-                isManualOverride: Boolean(prediction.isManualOverride),
+                // Handle edge case where these might be empty objects
+                confidenceLevel: (isEmptyObject(prediction.confidenceLevel) ? 'Low' : prediction.confidenceLevel) as 'Low' | 'Medium' | 'High',
+                status: (isEmptyObject(prediction.status) ? 'Pending' : prediction.status) as 'Pending' | 'Confirmed' | 'Rejected' | 'Ignored',
+                suggestedCategory: prediction.suggestedCategory && !isEmptyObject(prediction.suggestedCategory)
+                  ? safeString(prediction.suggestedCategory)
+                  : null,
+                suggestedGLCode: prediction.suggestedGLCode && !isEmptyObject(prediction.suggestedGLCode)
+                  ? safeString(prediction.suggestedGLCode)
+                  : null,
+                isManualOverride: isEmptyObject(prediction.isManualOverride) ? false : Boolean(prediction.isManualOverride),
               }
             : undefined,
         } as TransactionViewWithType);
@@ -366,6 +411,26 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
 
       // Transform groups to TransactionGroupView
       for (const group of response.groups) {
+        // Check for empty objects in group data
+        const groupFields = ['id', 'name', 'displayDate', 'combinedAmount', 'transactionCount', 'matchStatus'];
+        for (const field of groupFields) {
+          const value = (group as unknown as Record<string, unknown>)[field];
+          if (isEmptyObject(value)) {
+            console.error(`[useMixedTransactionList] FOUND EMPTY OBJECT in group.${field} for group ${group.id}`);
+          }
+        }
+        // Also check transactions array for any empty objects
+        if (group.transactions) {
+          for (const tx of group.transactions) {
+            const txFields = ['id', 'transactionDate', 'amount', 'description'];
+            for (const field of txFields) {
+              const value = (tx as unknown as Record<string, unknown>)[field];
+              if (isEmptyObject(value)) {
+                console.error(`[useMixedTransactionList] FOUND EMPTY OBJECT in group.transaction.${field} for group ${group.id}`);
+              }
+            }
+          }
+        }
         items.push(transformToGroupDetailView(group));
       }
 

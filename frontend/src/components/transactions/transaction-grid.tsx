@@ -121,6 +121,24 @@ const CHILD_ROW_HEIGHT = 36; // Height of each child transaction in expanded gro
 const GROUP_HEADER_PADDING = 48; // Extra padding for group summary row when expanded
 
 /**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) {
+      console.warn('[TransactionGrid] Empty object detected, using fallback');
+      return fallback;
+    }
+    console.error('[TransactionGrid] Unexpected object in render:', value);
+    return fallback;
+  }
+  return String(value);
+}
+
+/**
  * Empty state component
  */
 function EmptyState({ hasFilters }: { hasFilters: boolean }) {
@@ -235,7 +253,7 @@ function MobileTransactionCard({
                   className="h-5 w-5"
                 />
                 <span className="font-medium truncate">
-                  {transaction.merchant || transaction.description}
+                  {safeDisplayString(transaction.merchant) || safeDisplayString(transaction.description)}
                 </span>
               </div>
               <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
@@ -253,9 +271,9 @@ function MobileTransactionCard({
 
           {/* Category & Tags */}
           <div className="flex items-center gap-2 mt-3 flex-wrap">
-            {transaction.category && (
+            {safeDisplayString(transaction.category) && (
               <Badge variant="secondary" className="text-xs">
-                {transaction.category}
+                {safeDisplayString(transaction.category)}
               </Badge>
             )}
             {transaction.matchStatus === 'matched' && (
@@ -585,11 +603,11 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
                         checked={isGroupSelected}
                         onCheckedChange={() => handleRowSelect(item.id, false)}
                         onClick={(e) => e.stopPropagation()}
-                        aria-label={`Select group ${item.name}`}
+                        aria-label={`Select group ${safeDisplayString(item.name, 'unnamed')}`}
                       />
                       <Layers className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{item.name}</div>
+                        <div className="font-medium truncate">{safeDisplayString(item.name)}</div>
                         <div className="text-xs text-muted-foreground">
                           {item.transactionCount} items • {formatAmount(item.combinedAmount)}
                         </div>
@@ -628,7 +646,7 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
                               item.transactions.map((tx) => (
                                 <div key={tx.id} className="flex justify-between text-sm py-1.5 px-2 rounded bg-background/50">
                                   <div className="flex-1 min-w-0">
-                                    <div className="truncate">{tx.description}</div>
+                                    <div className="truncate">{safeDisplayString(tx.description)}</div>
                                     <div className="text-xs text-muted-foreground">
                                       {formatShortDate(tx.date)}
                                     </div>
