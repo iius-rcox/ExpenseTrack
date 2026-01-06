@@ -99,6 +99,7 @@ interface TransactionGroupListResponse {
 
 /**
  * API response for mixed transaction/group list.
+ * Note: Prediction structure matches backend PredictionSummaryDto.
  */
 interface TransactionMixedListResponse {
   transactions: {
@@ -108,11 +109,16 @@ interface TransactionMixedListResponse {
     amount: number;
     hasMatchedReceipt: boolean;
     prediction?: {
-      predictedCategory: string;
-      predictedDepartmentId: string;
-      predictedProjectId: string;
-      confidence: number;
-      isReimbursable: boolean;
+      id: string;
+      transactionId: string;
+      patternId: string | null;
+      vendorName: string;
+      confidenceScore: number;
+      confidenceLevel: 'Low' | 'Medium' | 'High';
+      status: 'Pending' | 'Confirmed' | 'Rejected' | 'Ignored';
+      suggestedCategory: string | null;
+      suggestedGLCode: string | null;
+      isManualOverride: boolean;
     } | null;
   }[];
   groups: TransactionGroupDetailDto[];
@@ -307,9 +313,9 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
           id: tx.id,
           date: new Date(tx.transactionDate),
           description: tx.description,
-          merchant: tx.description.split(' ')[0], // Simple merchant extraction
+          merchant: tx.prediction?.vendorName || tx.description.split(' ')[0], // Use vendor from prediction if available
           amount: tx.amount,
-          category: tx.prediction?.predictedCategory || '',
+          category: tx.prediction?.suggestedCategory || '',
           categoryId: '', // Not available in mixed list response
           notes: '',
           tags: [],
@@ -317,24 +323,18 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
           matchStatus: tx.hasMatchedReceipt ? 'matched' : 'unmatched',
           prediction: tx.prediction
             ? {
-                // Map to PredictionSummary type that transaction-row.tsx expects
-                id: tx.id,
-                transactionId: tx.id,
-                patternId: null, // Not available in mixed list response
-                vendorName: tx.description.split(' ')[0] || 'Unknown',
-                confidenceScore: tx.prediction.confidence,
-                // Calculate confidence level from score (matching backend logic)
-                confidenceLevel: tx.prediction.confidence >= 0.8
-                  ? 'High' as const
-                  : tx.prediction.confidence >= 0.5
-                    ? 'Medium' as const
-                    : 'Low' as const,
-                status: 'Pending' as const, // Predictions are pending until user acts
-                suggestedCategory: tx.prediction.predictedCategory,
-                suggestedGLCode: null, // Not available in this response
-                isManualOverride: false,
-                // Keep additional fields for potential use
-                isReimbursable: tx.prediction.isReimbursable,
+                // Map directly from backend PredictionSummaryDto
+                id: tx.prediction.id,
+                transactionId: tx.prediction.transactionId,
+                patternId: tx.prediction.patternId,
+                vendorName: tx.prediction.vendorName,
+                confidenceScore: tx.prediction.confidenceScore,
+                // Use backend-provided values directly (already strings via JsonStringEnumConverter)
+                confidenceLevel: tx.prediction.confidenceLevel,
+                status: tx.prediction.status,
+                suggestedCategory: tx.prediction.suggestedCategory,
+                suggestedGLCode: tx.prediction.suggestedGLCode,
+                isManualOverride: tx.prediction.isManualOverride,
               }
             : undefined,
         } as TransactionViewWithType);
