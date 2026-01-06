@@ -357,14 +357,9 @@ public class CategorizationService : ICategorizationService
                 transaction.Description);
         }
 
-        // Get GL and Department suggestions in parallel
-        var glTask = GetGLSuggestionsAsync(transactionId, userId, cancellationToken);
-        var deptTask = GetDepartmentSuggestionsAsync(transactionId, userId, cancellationToken);
-
-        await Task.WhenAll(glTask, deptTask);
-
-        var glSuggestions = await glTask;
-        var deptSuggestions = await deptTask;
+        // Get GL and Department suggestions sequentially (DbContext is not thread-safe)
+        var glSuggestions = await GetGLSuggestionsAsync(transactionId, userId, cancellationToken);
+        var deptSuggestions = await GetDepartmentSuggestionsAsync(transactionId, userId, cancellationToken);
 
         return new TransactionCategorizationDto
         {
