@@ -303,38 +303,62 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
         `/transaction-groups/mixed?${searchParams}`
       );
 
+      // DEBUG: Log raw API response to help diagnose React Error #301
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[useMixedTransactionList] Raw API response:', {
+          transactionCount: response.transactions?.length ?? 0,
+          groupCount: response.groups?.length ?? 0,
+          sampleTransaction: response.transactions?.[0],
+          samplePrediction: response.transactions?.[0]?.prediction,
+        });
+      }
+
       // Transform and merge transactions and groups into a single list
       const items: TransactionListItem[] = [];
 
       // Transform transactions to TransactionViewWithType
       for (const tx of response.transactions) {
+        // Validate prediction fields are primitives, not objects
+        const prediction = tx.prediction;
+        if (prediction) {
+          // Debug: Check for unexpected object types that would cause React Error #301
+          const fields = ['id', 'vendorName', 'confidenceLevel', 'status', 'suggestedCategory', 'suggestedGLCode'] as const;
+          for (const field of fields) {
+            const value = prediction[field];
+            if (value !== null && value !== undefined && typeof value === 'object') {
+              console.error(`[useMixedTransactionList] Unexpected object in prediction.${field}:`, value, 'for transaction:', tx.id);
+            }
+          }
+        }
+
         items.push({
           type: 'transaction',
           id: tx.id,
           date: new Date(tx.transactionDate),
           description: tx.description,
-          merchant: tx.prediction?.vendorName || tx.description.split(' ')[0], // Use vendor from prediction if available
+          merchant: prediction?.vendorName || tx.description.split(' ')[0], // Use vendor from prediction if available
           amount: tx.amount,
-          category: tx.prediction?.suggestedCategory || '',
+          category: prediction?.suggestedCategory || '',
           categoryId: '', // Not available in mixed list response
           notes: '',
           tags: [],
           source: 'import',
           matchStatus: tx.hasMatchedReceipt ? 'matched' : 'unmatched',
-          prediction: tx.prediction
+          prediction: prediction
             ? {
                 // Map directly from backend PredictionSummaryDto
-                id: tx.prediction.id,
-                transactionId: tx.prediction.transactionId,
-                patternId: tx.prediction.patternId,
-                vendorName: tx.prediction.vendorName,
-                confidenceScore: tx.prediction.confidenceScore,
+                // Ensure all values are primitives to avoid React Error #301
+                id: String(prediction.id),
+                transactionId: String(prediction.transactionId),
+                patternId: prediction.patternId ? String(prediction.patternId) : null,
+                vendorName: String(prediction.vendorName ?? ''),
+                confidenceScore: Number(prediction.confidenceScore),
                 // Use backend-provided values directly (already strings via JsonStringEnumConverter)
-                confidenceLevel: tx.prediction.confidenceLevel,
-                status: tx.prediction.status,
-                suggestedCategory: tx.prediction.suggestedCategory,
-                suggestedGLCode: tx.prediction.suggestedGLCode,
-                isManualOverride: tx.prediction.isManualOverride,
+                confidenceLevel: prediction.confidenceLevel as 'Low' | 'Medium' | 'High',
+                status: prediction.status as 'Pending' | 'Confirmed' | 'Rejected' | 'Ignored',
+                suggestedCategory: prediction.suggestedCategory ? String(prediction.suggestedCategory) : null,
+                suggestedGLCode: prediction.suggestedGLCode ? String(prediction.suggestedGLCode) : null,
+                isManualOverride: Boolean(prediction.isManualOverride),
               }
             : undefined,
         } as TransactionViewWithType);
