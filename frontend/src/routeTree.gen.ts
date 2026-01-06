@@ -18,6 +18,7 @@ import { Route as AuthenticatedStatementsIndexRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedReportsIndexRouteImport } from './routes/_authenticated/reports/index'
 import { Route as AuthenticatedReceiptsIndexRouteImport } from './routes/_authenticated/receipts/index'
+import { Route as AuthenticatedMissingReceiptsIndexRouteImport } from './routes/_authenticated/missing-receipts/index'
 import { Route as AuthenticatedMatchingIndexRouteImport } from './routes/_authenticated/matching/index'
 import { Route as AuthenticatedAnalyticsIndexRouteImport } from './routes/_authenticated/analytics/index'
 import { Route as AuthenticatedTransactionsTransactionIdRouteImport } from './routes/_authenticated/transactions/$transactionId'
@@ -75,6 +76,12 @@ const AuthenticatedReceiptsIndexRoute =
     path: '/receipts/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedMissingReceiptsIndexRoute =
+  AuthenticatedMissingReceiptsIndexRouteImport.update({
+    id: '/missing-receipts/',
+    path: '/missing-receipts/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMatchingIndexRoute =
   AuthenticatedMatchingIndexRouteImport.update({
     id: '/matching/',
@@ -129,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/transactions/$transactionId': typeof AuthenticatedTransactionsTransactionIdRoute
   '/analytics': typeof AuthenticatedAnalyticsIndexRoute
   '/matching': typeof AuthenticatedMatchingIndexRoute
+  '/missing-receipts': typeof AuthenticatedMissingReceiptsIndexRoute
   '/receipts': typeof AuthenticatedReceiptsIndexRoute
   '/reports': typeof AuthenticatedReportsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
@@ -146,6 +154,7 @@ export interface FileRoutesByTo {
   '/transactions/$transactionId': typeof AuthenticatedTransactionsTransactionIdRoute
   '/analytics': typeof AuthenticatedAnalyticsIndexRoute
   '/matching': typeof AuthenticatedMatchingIndexRoute
+  '/missing-receipts': typeof AuthenticatedMissingReceiptsIndexRoute
   '/receipts': typeof AuthenticatedReceiptsIndexRoute
   '/reports': typeof AuthenticatedReportsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
@@ -165,6 +174,7 @@ export interface FileRoutesById {
   '/_authenticated/transactions/$transactionId': typeof AuthenticatedTransactionsTransactionIdRoute
   '/_authenticated/analytics/': typeof AuthenticatedAnalyticsIndexRoute
   '/_authenticated/matching/': typeof AuthenticatedMatchingIndexRoute
+  '/_authenticated/missing-receipts/': typeof AuthenticatedMissingReceiptsIndexRoute
   '/_authenticated/receipts/': typeof AuthenticatedReceiptsIndexRoute
   '/_authenticated/reports/': typeof AuthenticatedReportsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
     | '/transactions/$transactionId'
     | '/analytics'
     | '/matching'
+    | '/missing-receipts'
     | '/receipts'
     | '/reports'
     | '/settings'
@@ -201,6 +212,7 @@ export interface FileRouteTypes {
     | '/transactions/$transactionId'
     | '/analytics'
     | '/matching'
+    | '/missing-receipts'
     | '/receipts'
     | '/reports'
     | '/settings'
@@ -219,6 +231,7 @@ export interface FileRouteTypes {
     | '/_authenticated/transactions/$transactionId'
     | '/_authenticated/analytics/'
     | '/_authenticated/matching/'
+    | '/_authenticated/missing-receipts/'
     | '/_authenticated/receipts/'
     | '/_authenticated/reports/'
     | '/_authenticated/settings/'
@@ -297,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReceiptsIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/missing-receipts/': {
+      id: '/_authenticated/missing-receipts/'
+      path: '/missing-receipts'
+      fullPath: '/missing-receipts'
+      preLoaderRoute: typeof AuthenticatedMissingReceiptsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/matching/': {
       id: '/_authenticated/matching/'
       path: '/matching'
@@ -358,6 +378,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedTransactionsTransactionIdRoute: typeof AuthenticatedTransactionsTransactionIdRoute
   AuthenticatedAnalyticsIndexRoute: typeof AuthenticatedAnalyticsIndexRoute
   AuthenticatedMatchingIndexRoute: typeof AuthenticatedMatchingIndexRoute
+  AuthenticatedMissingReceiptsIndexRoute: typeof AuthenticatedMissingReceiptsIndexRoute
   AuthenticatedReceiptsIndexRoute: typeof AuthenticatedReceiptsIndexRoute
   AuthenticatedReportsIndexRoute: typeof AuthenticatedReportsIndexRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
@@ -376,6 +397,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
     AuthenticatedTransactionsTransactionIdRoute,
   AuthenticatedAnalyticsIndexRoute: AuthenticatedAnalyticsIndexRoute,
   AuthenticatedMatchingIndexRoute: AuthenticatedMatchingIndexRoute,
+  AuthenticatedMissingReceiptsIndexRoute:
+    AuthenticatedMissingReceiptsIndexRoute,
   AuthenticatedReceiptsIndexRoute: AuthenticatedReceiptsIndexRoute,
   AuthenticatedReportsIndexRoute: AuthenticatedReportsIndexRoute,
   AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,

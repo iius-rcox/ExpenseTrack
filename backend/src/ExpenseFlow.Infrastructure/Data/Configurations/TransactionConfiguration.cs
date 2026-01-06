@@ -66,6 +66,16 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .HasDefaultValue(MatchStatus.Unmatched)
             .IsRequired();
 
+        // Feature 026: Missing Receipts UI
+        builder.Property(t => t.ReceiptUrl)
+            .HasColumnName("receipt_url")
+            .HasMaxLength(2048)  // URL max length
+            .IsRequired(false);
+
+        builder.Property(t => t.ReceiptDismissed)
+            .HasColumnName("receipt_dismissed")
+            .IsRequired(false);
+
         builder.Property(t => t.CreatedAt)
             .HasColumnName("created_at")
             .HasDefaultValueSql("NOW()")
@@ -103,5 +113,9 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         // Sprint 5: Match status index
         builder.HasIndex(t => new { t.UserId, t.MatchStatus })
             .HasDatabaseName("ix_transactions_match_status");
+
+        // Feature 026: Missing receipts query index
+        builder.HasIndex(t => new { t.UserId, t.MatchedReceiptId, t.ReceiptDismissed })
+            .HasDatabaseName("ix_transactions_user_missing_receipt");
     }
 }

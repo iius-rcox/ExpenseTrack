@@ -33,9 +33,9 @@ As an expense report user, I want to store a URL where I can retrieve a missing 
 
 **Acceptance Scenarios**:
 
-1. **Given** a user views a missing receipt entry, **When** they click "Add Receipt URL", **Then** they can enter and save a valid URL
+1. **Given** a user views a missing receipt entry, **When** they click "Add Receipt URL", **Then** they can enter and save any text as the URL
 2. **Given** a user has saved a URL for a missing receipt, **When** they return to view that entry, **Then** they see the stored URL displayed with a clickable link
-3. **Given** a user enters an invalid URL format, **When** they try to save, **Then** they see a validation error and the invalid URL is not saved
+3. **Given** a user saves an empty URL field, **When** they save, **Then** the URL field is cleared (null)
 
 ---
 
@@ -96,11 +96,12 @@ As an expense report user, I want to mark a transaction as "not reimbursable" or
 
 ### Functional Requirements
 
-- **FR-001**: System MUST display a dedicated "Missing Receipts" page accessible from the main navigation
+- **FR-001**: System MUST display a "Missing Receipts" summary widget on the Matching page (`/matching`) with a link to a dedicated full list page (`/missing-receipts`)
+- **FR-001a**: The widget MUST display: total missing receipt count, up to 3 most recent missing receipts (date, vendor, amount), and a quick upload button for each item
 - **FR-002**: System MUST show all transactions that are predicted reimbursable but have no matched receipt
 - **FR-003**: Each missing receipt entry MUST display: transaction date, vendor/description, amount, and days since transaction
 - **FR-004**: Users MUST be able to add, edit, and remove a receipt retrieval URL for each missing receipt entry
-- **FR-005**: Saved URLs MUST be validated as properly formatted URLs before saving
+- **FR-005**: Receipt URLs are stored as plain text strings without validation (user responsibility to ensure correctness)
 - **FR-006**: Users MUST be able to upload a receipt directly from the missing receipts view
 - **FR-007**: When a receipt is successfully matched to a transaction, the system MUST automatically remove it from the missing receipts list
 - **FR-008**: Users MUST be able to dismiss/ignore transactions that are incorrectly flagged
@@ -108,11 +109,14 @@ As an expense report user, I want to mark a transaction as "not reimbursable" or
 - **FR-010**: Missing receipts list MUST support sorting by date, amount, or vendor name
 - **FR-011**: Saved receipt URLs MUST open in a new browser tab when clicked
 - **FR-012**: System MUST show an empty state with helpful guidance when no missing receipts exist
+- **FR-013**: Full list page MUST paginate results at 25 items per page with standard page navigation
 
 ### Key Entities
 
-- **MissingReceiptEntry**: Represents a transaction flagged as reimbursable without a matched receipt. Contains: transaction reference, optional receipt URL, dismissed status, created date
-- **ReceiptUrl**: The URL where a receipt can be retrieved (e.g., airline portal, hotel booking confirmation). Contains: URL string, added date, notes (optional)
+- **MissingReceiptEntry** *(view model, not persisted)*: Computed at query time from Transactions where reimbursable (user override takes precedence over AI prediction) AND no matched receipt exists AND not dismissed. Contains: transaction reference, optional receipt URL, dismissed status
+- **Transaction** *(extended)*: Existing entity extended with two new nullable fields:
+  - `ReceiptUrl`: Optional URL where receipt can be retrieved (e.g., airline portal, hotel booking confirmation)
+  - `ReceiptDismissed`: Boolean flag indicating transaction should be excluded from missing receipts list
 
 ## Success Criteria *(mandatory)*
 
@@ -120,10 +124,15 @@ As an expense report user, I want to mark a transaction as "not reimbursable" or
 
 - **SC-001**: Users can view all missing receipts within 2 seconds of page load
 - **SC-002**: Users can add a receipt URL in under 30 seconds
-- **SC-003**: Users can upload a receipt from the missing receipts view with the same ease as the main receipts page
+- **SC-003**: Users can upload a receipt from the missing receipts view in ≤3 clicks (click upload → select file → confirm)
 - **SC-004**: 80% of users who visit the missing receipts page take action on at least one item (add URL, upload, or dismiss)
 - **SC-005**: The missing receipts count is reduced by 50% within the first week of feature launch for active users
 - **SC-006**: Zero missing receipts are incorrectly removed from the list (only removed when actually matched or explicitly dismissed)
+
+## Constraints & Tradeoffs
+
+- **No URL validation**: Receipt URLs are stored as plain strings without format or reachability validation. This tradeoff accepts potential user error in exchange for simplicity and avoiding false negatives (many receipt portals require authentication, causing valid URLs to fail reachability checks).
+- **Computed view over materialized table**: Missing receipts are computed at query time rather than synced to a dedicated table. This avoids sync complexity but means the list freshness depends on query performance.
 
 ## Assumptions
 
@@ -132,3 +141,14 @@ As an expense report user, I want to mark a transaction as "not reimbursable" or
 - Users are authenticated and can only see their own missing receipts
 - The existing Transaction entity can be extended or linked to store receipt URLs
 - Receipt URLs are plain text storage - no verification that the URL actually contains a receipt
+
+## Clarifications
+
+### Session 2026-01-05
+
+- Q: Should missing receipts be a computed view or materialized entity? → A: Computed view - Missing receipts derived at query time from Transactions + Predictions; URL stored on Transaction entity
+- Q: Where should Missing Receipts UI be placed in navigation? → A: Dashboard widget on Matching page (/matching) with link to full list page
+- Q: What should the widget display and what quick actions? → A: Count + top 3 most recent items with quick upload button per item
+- Q: How to determine reimbursability when user override and AI prediction differ? → A: User override takes precedence; fall back to AI prediction if no override exists
+- Q: What scale should we design for? → A: Medium scale (20-100 per user), paginated list at 25 per page with standard indexed queries
+- Q: What URL validation approach for receipt URLs? → A: No validation - accept any string; user responsibility to ensure correctness

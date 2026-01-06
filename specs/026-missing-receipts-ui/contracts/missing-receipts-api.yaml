@@ -1,0 +1,324 @@
+openapi: 3.0.3
+info:
+  title: Missing Receipts API
+  description: API endpoints for managing missing receipts (transactions marked reimbursable without matched receipts)
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: API prefix
+
+tags:
+  - name: Missing Receipts
+    description: Operations for viewing and managing missing receipts
+
+paths:
+  /missing-receipts:
+    get:
+      summary: List missing receipts
+      description: |
+        Returns paginated list of transactions that are:
+        - Marked as reimbursable (user override or confirmed AI prediction)
+        - Have no matched receipt (MatchedReceiptId is null)
+        - Not dismissed (ReceiptDismissed is null or false)
+      operationId: listMissingReceipts
+      tags:
+        - Missing Receipts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: sortBy
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [date, amount, vendor]
+            default: date
+        - name: sortOrder
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: includeDismissed
+          in: query
+          description: Include dismissed items in results
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Paginated list of missing receipts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissingReceiptsListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /missing-receipts/widget:
+    get:
+      summary: Get widget summary
+      description: Returns count and top 3 most recent missing receipts for dashboard widget
+      operationId: getMissingReceiptsWidget
+      tags:
+        - Missing Receipts
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Widget summary data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissingReceiptsWidgetResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /missing-receipts/{transactionId}/url:
+    patch:
+      summary: Update receipt URL
+      description: Set or clear the receipt retrieval URL for a transaction
+      operationId: updateReceiptUrl
+      tags:
+        - Missing Receipts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          description: Transaction ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReceiptUrlRequest'
+      responses:
+        '200':
+          description: URL updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissingReceiptSummary'
+        '404':
+          description: Transaction not found or not in missing receipts
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /missing-receipts/{transactionId}/dismiss:
+    patch:
+      summary: Dismiss or restore transaction
+      description: |
+        Dismiss a transaction from the missing receipts list or restore a dismissed transaction.
+        - Pass `dismiss: true` to remove from missing receipts
+        - Pass `dismiss: false` or `dismiss: null` to restore
+      operationId: dismissMissingReceipt
+      tags:
+        - Missing Receipts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          description: Transaction ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DismissReceiptRequest'
+      responses:
+        '200':
+          description: Dismiss status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissingReceiptSummary'
+        '404':
+          description: Transaction not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Azure AD / Entra ID JWT token
+
+  schemas:
+    MissingReceiptSummary:
+      type: object
+      description: Summary of a transaction missing a receipt
+      required:
+        - transactionId
+        - transactionDate
+        - description
+        - amount
+        - daysSinceTransaction
+        - isDismissed
+        - source
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+          description: Transaction ID
+        transactionDate:
+          type: string
+          format: date
+          description: Date of the transaction
+        description:
+          type: string
+          description: Vendor/description from transaction
+        amount:
+          type: number
+          format: decimal
+          description: Transaction amount
+        daysSinceTransaction:
+          type: integer
+          description: Number of days since transaction date
+        receiptUrl:
+          type: string
+          nullable: true
+          maxLength: 2048
+          description: Optional URL where receipt can be retrieved
+        isDismissed:
+          type: boolean
+          description: Whether transaction has been dismissed from missing receipts list
+        source:
+          type: string
+          enum: [UserOverride, AIPrediction]
+          description: How reimbursability was determined
+
+    MissingReceiptsListResponse:
+      type: object
+      description: Paginated list of missing receipts
+      required:
+        - items
+        - totalCount
+        - page
+        - pageSize
+        - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissingReceiptSummary'
+        totalCount:
+          type: integer
+          description: Total count matching filters
+        page:
+          type: integer
+          description: Current page (1-based)
+        pageSize:
+          type: integer
+          description: Items per page
+        totalPages:
+          type: integer
+          description: Total number of pages
+
+    MissingReceiptsWidgetResponse:
+      type: object
+      description: Widget summary for dashboard card
+      required:
+        - totalCount
+        - recentItems
+      properties:
+        totalCount:
+          type: integer
+          description: Total count of missing receipts
+        recentItems:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/MissingReceiptSummary'
+          description: Top 3 most recent missing receipts
+
+    UpdateReceiptUrlRequest:
+      type: object
+      description: Request to update receipt URL
+      properties:
+        receiptUrl:
+          type: string
+          nullable: true
+          maxLength: 2048
+          description: URL where receipt can be retrieved. Pass null or empty to clear.
+
+    DismissReceiptRequest:
+      type: object
+      description: Request to dismiss or restore transaction
+      properties:
+        dismiss:
+          type: boolean
+          nullable: true
+          description: True to dismiss, false/null to restore
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807 Problem Details
+      properties:
+        type:
+          type: string
+          description: URI reference identifying the problem type
+        title:
+          type: string
+          description: Short human-readable summary
+        status:
+          type: integer
+          description: HTTP status code
+        detail:
+          type: string
+          description: Human-readable explanation
+        instance:
+          type: string
+          description: URI reference identifying this occurrence

@@ -152,6 +152,9 @@ public static class ServiceCollectionExtensions
         // Feature 024: Extraction Editor Training
         services.AddScoped<IExtractionCorrectionService, ExtractionCorrectionService>();
 
+        // Feature 026: Missing Receipts UI
+        services.AddScoped<IMissingReceiptService, MissingReceiptService>();
+
         return services;
     }
 }

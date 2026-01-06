@@ -31,6 +31,7 @@ import { BatchReviewPanel } from '@/components/matching/batch-review-panel'
 import { MatchProposalCard } from '@/components/matching/match-proposal-card'
 import { MatchStatsSummary } from '@/components/matching/match-stats-summary'
 import { ManualMatchDialog } from '@/components/matching/manual-match-dialog'
+import { MissingReceiptsWidget } from '@/components/missing-receipts/missing-receipts-widget'
 import { toast } from 'sonner'
 import {
   GitCompareArrows,
@@ -190,8 +191,16 @@ function MatchingPage() {
         </div>
       </div>
 
-      {/* Stats Summary */}
-      <MatchStatsSummary stats={stats} isLoading={loadingStats} />
+      {/* Stats Summary with Missing Receipts Widget */}
+      <div className="grid gap-6 lg:grid-cols-[1fr,300px]">
+        <MatchStatsSummary stats={stats} isLoading={loadingStats} />
+        <MissingReceiptsWidget
+          onQuickUpload={(_transactionId) => {
+            // Quick upload integration will be added in T024 (User Story 3)
+            toast.info('Quick upload coming in next update')
+          }}
+        />
+      </div>
 
       {/* View Mode Toggle - Only show for Proposed tab */}
       {activeTab === 'Proposed' && (
