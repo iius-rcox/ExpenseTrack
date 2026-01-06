@@ -183,9 +183,7 @@ public class ReportGenerationBackgroundJob
         var lineOrder = 1;
         var processedLines = 0;
         var failedLines = 0;
-        var tier1Hits = 0;
-        var tier2Hits = 0;
-        var tier3Hits = 0;
+        var tierCounters = new TierCounters();
         var missingReceiptCount = 0;
         var lastProgressUpdate = DateTime.UtcNow;
         var processingStartTime = DateTime.UtcNow;
@@ -196,7 +194,7 @@ public class ReportGenerationBackgroundJob
             try
             {
                 var line = await ProcessMatchAsync(match, lineOrder++, predictedTransactionLookup,
-                    ref tier1Hits, ref tier2Hits, ref tier3Hits, cancellationToken);
+                    tierCounters, cancellationToken);
                 lines.Add(line);
             }
             catch (Exception ex)
@@ -237,7 +235,7 @@ public class ReportGenerationBackgroundJob
             {
                 var line = await ProcessUnmatchedTransactionAsync(
                     transaction, lineOrder++, predictedTransactionLookup,
-                    ref tier1Hits, ref tier2Hits, ref tier3Hits, cancellationToken);
+                    tierCounters, cancellationToken);
                 lines.Add(line);
                 missingReceiptCount++;
             }
@@ -282,9 +280,9 @@ public class ReportGenerationBackgroundJob
         report.TotalAmount = lines.Sum(l => l.Amount);
         report.LineCount = lines.Count;
         report.MissingReceiptCount = missingReceiptCount;
-        report.Tier1HitCount = tier1Hits;
-        report.Tier2HitCount = tier2Hits;
-        report.Tier3HitCount = tier3Hits;
+        report.Tier1HitCount = tierCounters.Tier1;
+        report.Tier2HitCount = tierCounters.Tier2;
+        report.Tier3HitCount = tierCounters.Tier3;
 
         // Save report to database
         await _reportRepository.AddAsync(report, cancellationToken);
@@ -300,12 +298,10 @@ public class ReportGenerationBackgroundJob
     /// Processes a confirmed match into an expense line.
     /// </summary>
     private async Task<ExpenseLine> ProcessMatchAsync(
-        Match match,
+        ReceiptTransactionMatch match,
         int lineOrder,
         Dictionary<Guid, PredictedTransactionDto> predictions,
-        ref int tier1Hits,
-        ref int tier2Hits,
-        ref int tier3Hits,
+        TierCounters tierCounters,
         CancellationToken ct)
     {
         var transaction = match.Transaction;
@@ -345,7 +341,7 @@ public class ReportGenerationBackgroundJob
             line.GLCode = glSuggestion.Code;
             line.GLCodeTier = glSuggestion.Tier;
             line.GLCodeSource = glSuggestion.Source;
-            UpdateTierCounts(glSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
+            UpdateTierCounts(glSuggestion.Tier, tierCounters);
         }
 
         // Apply department suggestion
@@ -356,7 +352,7 @@ public class ReportGenerationBackgroundJob
             line.DepartmentCode = deptSuggestion.Code;
             line.DepartmentTier = deptSuggestion.Tier;
             line.DepartmentSource = deptSuggestion.Source;
-            UpdateTierCounts(deptSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
+            UpdateTierCounts(deptSuggestion.Tier, tierCounters);
         }
 
         return line;
@@ -369,9 +365,7 @@ public class ReportGenerationBackgroundJob
         Transaction transaction,
         int lineOrder,
         Dictionary<Guid, PredictedTransactionDto> predictions,
-        ref int tier1Hits,
-        ref int tier2Hits,
-        ref int tier3Hits,
+        TierCounters tierCounters,
         CancellationToken ct)
     {
         // Get categorization
@@ -409,7 +403,7 @@ public class ReportGenerationBackgroundJob
             line.GLCode = glSuggestion.Code;
             line.GLCodeTier = glSuggestion.Tier;
             line.GLCodeSource = glSuggestion.Source;
-            UpdateTierCounts(glSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
+            UpdateTierCounts(glSuggestion.Tier, tierCounters);
         }
         else if (hasPrediction && !string.IsNullOrEmpty(prediction!.SuggestedGLCode))
         {
@@ -426,7 +420,7 @@ public class ReportGenerationBackgroundJob
             line.DepartmentCode = deptSuggestion.Code;
             line.DepartmentTier = deptSuggestion.Tier;
             line.DepartmentSource = deptSuggestion.Source;
-            UpdateTierCounts(deptSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
+            UpdateTierCounts(deptSuggestion.Tier, tierCounters);
         }
         else if (hasPrediction && !string.IsNullOrEmpty(prediction!.SuggestedDepartment))
         {
@@ -441,7 +435,7 @@ public class ReportGenerationBackgroundJob
     /// <summary>
     /// Creates a minimal expense line when processing fails.
     /// </summary>
-    private static ExpenseLine CreateFailedLine(Match match, int lineOrder) => new()
+    private static ExpenseLine CreateFailedLine(ReceiptTransactionMatch match, int lineOrder) => new()
     {
         ReceiptId = match.ReceiptId,
         TransactionId = match.TransactionId,
@@ -451,7 +445,6 @@ public class ReportGenerationBackgroundJob
         OriginalDescription = match.Transaction.OriginalDescription,
         NormalizedDescription = match.Transaction.OriginalDescription,
         HasReceipt = true,
-        RequiresManualCategorization = true,
         CreatedAt = DateTime.UtcNow
     };
 
@@ -469,7 +462,6 @@ public class ReportGenerationBackgroundJob
         NormalizedDescription = transaction.OriginalDescription,
         HasReceipt = false,
         MissingReceiptJustification = MissingReceiptJustification.NotProvided,
-        RequiresManualCategorization = true,
         CreatedAt = DateTime.UtcNow
     };
 
@@ -558,7 +550,7 @@ public class ReportGenerationBackgroundJob
     /// <summary>
     /// Gets categorization safely, returning null on failure.
     /// </summary>
-    private async Task<CategorizationResult?> GetCategorizationSafeAsync(
+    private async Task<TransactionCategorizationDto?> GetCategorizationSafeAsync(
         Guid transactionId,
         Guid userId,
         CancellationToken ct)
@@ -584,7 +576,8 @@ public class ReportGenerationBackgroundJob
     {
         try
         {
-            return await _normalizationService.NormalizeAsync(description, userId, ct);
+            var result = await _normalizationService.NormalizeAsync(description, userId, ct);
+            return result.NormalizedDescription;
         }
         catch (Exception ex)
         {
@@ -593,20 +586,31 @@ public class ReportGenerationBackgroundJob
         }
     }
 
-    private static void UpdateTierCounts(int tier, ref int tier1, ref int tier2, ref int tier3)
+    private static void UpdateTierCounts(int tier, TierCounters counters)
     {
         switch (tier)
         {
             case 1:
-                tier1++;
+                counters.Tier1++;
                 break;
             case 2:
-                tier2++;
+                counters.Tier2++;
                 break;
             case 3:
-                tier3++;
+                counters.Tier3++;
                 break;
         }
+    }
+
+    /// <summary>
+    /// Mutable container for tier hit counts. Used instead of ref parameters
+    /// since C# doesn't allow ref parameters in async methods.
+    /// </summary>
+    private class TierCounters
+    {
+        public int Tier1 { get; set; }
+        public int Tier2 { get; set; }
+        public int Tier3 { get; set; }
     }
 
     private static (DateOnly startDate, DateOnly endDate) ParsePeriod(string period)
