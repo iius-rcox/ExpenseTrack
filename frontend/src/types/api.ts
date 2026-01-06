@@ -488,6 +488,41 @@ export interface RecentActivityItem {
   timestamp: string
 }
 
+// Missing Receipts Types (Feature 026)
+export type ReimbursabilitySource = 'UserOverride' | 'AIPrediction'
+
+export interface MissingReceiptSummary {
+  transactionId: string
+  transactionDate: string // ISO date
+  description: string
+  amount: number
+  daysSinceTransaction: number
+  receiptUrl: string | null
+  isDismissed: boolean
+  source: ReimbursabilitySource
+}
+
+export interface MissingReceiptsListResponse {
+  items: MissingReceiptSummary[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface MissingReceiptsWidget {
+  totalCount: number
+  recentItems: MissingReceiptSummary[]
+}
+
+export interface UpdateReceiptUrlRequest {
+  receiptUrl?: string | null
+}
+
+export interface DismissReceiptRequest {
+  dismiss?: boolean | null
+}
+
 // Error Types
 export interface ProblemDetails {
   title: string

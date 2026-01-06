@@ -57,6 +57,19 @@ public class Transaction : BaseEntity
     /// </summary>
     public MatchStatus MatchStatus { get; set; } = MatchStatus.Unmatched;
 
+    /// <summary>
+    /// Optional URL where receipt can be retrieved (e.g., airline portal, hotel booking).
+    /// Stored as plain text without validation (user responsibility).
+    /// </summary>
+    public string? ReceiptUrl { get; set; }
+
+    /// <summary>
+    /// When true, transaction is excluded from the missing receipts list.
+    /// Allows users to dismiss transactions incorrectly flagged as reimbursable.
+    /// Set to null or false to include in missing receipts list.
+    /// </summary>
+    public bool? ReceiptDismissed { get; set; }
+
     // Navigation properties
     public User User { get; set; } = null!;
     public StatementImport Import { get; set; } = null!;
