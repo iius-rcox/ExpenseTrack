@@ -317,13 +317,24 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
           matchStatus: tx.hasMatchedReceipt ? 'matched' : 'unmatched',
           prediction: tx.prediction
             ? {
+                // Map to PredictionSummary type that transaction-row.tsx expects
                 id: tx.id,
-                predictedCategory: tx.prediction.predictedCategory,
-                predictedDepartmentId: tx.prediction.predictedDepartmentId,
-                predictedProjectId: tx.prediction.predictedProjectId,
-                confidence: tx.prediction.confidence,
+                transactionId: tx.id,
+                patternId: null, // Not available in mixed list response
+                vendorName: tx.description.split(' ')[0] || 'Unknown',
+                confidenceScore: tx.prediction.confidence,
+                // Calculate confidence level from score (matching backend logic)
+                confidenceLevel: tx.prediction.confidence >= 0.8
+                  ? 'High' as const
+                  : tx.prediction.confidence >= 0.5
+                    ? 'Medium' as const
+                    : 'Low' as const,
+                status: 'Pending' as const, // Predictions are pending until user acts
+                suggestedCategory: tx.prediction.predictedCategory,
+                suggestedGLCode: null, // Not available in this response
+                isManualOverride: false,
+                // Keep additional fields for potential use
                 isReimbursable: tx.prediction.isReimbursable,
-                feedbackStatus: 'pending',
               }
             : undefined,
         } as TransactionViewWithType);
