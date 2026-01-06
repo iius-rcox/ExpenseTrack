@@ -11,7 +11,7 @@
  * @see data-model.md Section 4.4 for TransactionGridProps specification
  */
 
-import { useRef, useCallback, useMemo, useState, useEffect } from 'react';
+import { useRef, useCallback, useMemo, useState, useEffect, useLayoutEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -21,6 +21,9 @@ import {
   FileX2,
   Loader2,
   Calendar,
+  Layers,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Table,
@@ -38,17 +41,20 @@ import { SwipeActionRow } from '@/components/mobile/swipe-action-row';
 import { cn } from '@/lib/utils';
 import type {
   TransactionView,
+  TransactionListItem,
+  TransactionGroupView,
   TransactionSortConfig,
   TransactionSortField,
   TransactionSelectionState,
 } from '@/types/transaction';
+import { TransactionGroupRow } from './transaction-group-row';
 
 /**
  * Props for the TransactionGrid component
  */
 interface TransactionGridProps {
-  /** List of transactions to display */
-  transactions: TransactionView[];
+  /** List of items to display (transactions and/or groups) */
+  items: TransactionListItem[];
   /** Loading state */
   isLoading?: boolean;
   /** Current sort configuration */
@@ -81,12 +87,38 @@ interface TransactionGridProps {
   onClearReimbursabilityOverride?: (transactionId: string) => void;
   /** Whether a prediction/reimbursability action is processing */
   isPredictionProcessing?: boolean;
+  // =========================================================================
+  // Group-specific handlers (Feature 028)
+  // =========================================================================
+  /** Set of expanded group IDs */
+  expandedGroupIds?: Set<string>;
+  /** Callback when group expansion is toggled */
+  onGroupToggle?: (groupId: string) => void;
+  /** Callback when group name is edited */
+  onGroupEditName?: (groupId: string, name: string) => void;
+  /** Callback when group date is edited */
+  onGroupEditDate?: (groupId: string, date: Date) => void;
+  /** Callback when transaction is removed from group */
+  onGroupRemoveTransaction?: (groupId: string, transactionId: string) => void;
+  /** Callback when group is deleted/dissolved */
+  onGroupDelete?: (groupId: string) => void;
+  /** Whether group operations are processing */
+  isGroupProcessing?: boolean;
 }
 
 /**
- * Row height constant for virtualization
+ * Legacy prop name support - accepts either 'items' or 'transactions'
+ */
+type TransactionGridPropsWithLegacy = TransactionGridProps | (Omit<TransactionGridProps, 'items'> & {
+  transactions: TransactionView[];
+});
+
+/**
+ * Row height constants for virtualization
  */
 const ROW_HEIGHT = 56;
+const CHILD_ROW_HEIGHT = 36; // Height of each child transaction in expanded group
+const GROUP_HEADER_PADDING = 48; // Extra padding for group summary row when expanded
 
 /**
  * Empty state component
@@ -244,27 +276,78 @@ function MobileTransactionCard({
 }
 
 /**
- * Virtualized transaction grid component
+ * Helper to check if an item is a group.
+ * Defensive check verifies required group properties exist at runtime.
  */
-export function TransactionGrid({
-  transactions,
-  isLoading = false,
-  sort,
-  selection,
-  categories,
-  onSortChange,
-  onSelectionChange,
-  onTransactionEdit,
-  onTransactionClick,
-  savingIds = new Set(),
-  containerHeight = 600,
-  onPredictionConfirm,
-  onPredictionReject,
-  onMarkReimbursable,
-  onMarkNotReimbursable,
-  onClearReimbursabilityOverride,
-  isPredictionProcessing = false,
-}: TransactionGridProps) {
+function isGroup(item: TransactionListItem): item is TransactionGroupView {
+  return (
+    item.type === 'group' &&
+    'transactionCount' in item &&
+    'combinedAmount' in item &&
+    'displayDate' in item
+  );
+}
+
+/**
+ * Format amount for display in mobile group cards
+ */
+function formatAmount(amount: number): string {
+  const formatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(Math.abs(amount));
+  return amount < 0 ? `-${formatted}` : formatted;
+}
+
+/**
+ * Format date for display in mobile group cards (short format)
+ */
+function formatShortDate(date: Date): string {
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+/**
+ * Virtualized transaction grid component
+ *
+ * Supports rendering both transactions and transaction groups in a single list.
+ * Groups are rendered as expandable accordion rows.
+ */
+export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
+  // Support legacy 'transactions' prop name for backwards compatibility
+  const items: TransactionListItem[] = 'items' in props
+    ? props.items
+    : (props.transactions || []).map(t => ({ ...t, type: 'transaction' as const }));
+
+  const {
+    isLoading = false,
+    sort,
+    selection,
+    categories,
+    onSortChange,
+    onSelectionChange,
+    onTransactionEdit,
+    onTransactionClick,
+    savingIds = new Set(),
+    containerHeight = 600,
+    onPredictionConfirm,
+    onPredictionReject,
+    onMarkReimbursable,
+    onMarkNotReimbursable,
+    onClearReimbursabilityOverride,
+    isPredictionProcessing = false,
+    // Group-specific props (Feature 028)
+    expandedGroupIds = new Set(),
+    onGroupToggle,
+    onGroupEditName,
+    onGroupEditDate,
+    onGroupRemoveTransaction,
+    onGroupDelete,
+    isGroupProcessing = false,
+  } = props as TransactionGridProps;
+
   const parentRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -277,19 +360,51 @@ export function TransactionGrid({
   }, []);
 
   // Virtual row count
-  const rowCount = transactions.length;
+  const rowCount = items.length;
 
-  // Setup virtualizer
+  // Calculate dynamic row height based on whether group is expanded
+  const getRowHeight = useCallback(
+    (index: number): number => {
+      const item = items[index];
+      if (!item) return ROW_HEIGHT;
+
+      // Check if this is an expanded group
+      if (isGroup(item) && expandedGroupIds?.has(item.id)) {
+        // Base height + child rows + summary padding
+        const childCount = item.transactions?.length ?? item.transactionCount;
+        return ROW_HEIGHT + (childCount * CHILD_ROW_HEIGHT) + GROUP_HEADER_PADDING;
+      }
+
+      return ROW_HEIGHT;
+    },
+    [items, expandedGroupIds]
+  );
+
+  // Setup virtualizer with dynamic row heights
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: getRowHeight,
     overscan: 5, // Render 5 extra rows above/below viewport
+    // Key by items + expanded state to force recalculation when groups expand/collapse
+    getItemKey: (index) => {
+      const item = items[index];
+      if (!item) return index;
+      const isExpanded = isGroup(item) && expandedGroupIds?.has(item.id);
+      return `${item.id}-${isExpanded}`;
+    },
   });
 
   // Get visible range
   const virtualRows = virtualizer.getVirtualItems();
   const totalHeight = virtualizer.getTotalSize();
+
+  // Recalculate measurements when expanded groups change
+  // Using useLayoutEffect to measure synchronously before paint,
+  // preventing visual flickering during expand/collapse
+  useLayoutEffect(() => {
+    virtualizer.measure();
+  }, [virtualizer, expandedGroupIds]);
 
   // Handle sort column click
   const handleSortClick = useCallback(
@@ -323,12 +438,12 @@ export function TransactionGrid({
     } else {
       // Select all
       onSelectionChange({
-        selectedIds: new Set(transactions.map((t) => t.id)),
+        selectedIds: new Set(items.map((t) => t.id)),
         lastSelectedId: null,
         isSelectAll: true,
       });
     }
-  }, [selection.isSelectAll, transactions, onSelectionChange]);
+  }, [selection.isSelectAll, items, onSelectionChange]);
 
   // Handle row selection
   const handleRowSelect = useCallback(
@@ -337,10 +452,10 @@ export function TransactionGrid({
 
       if (shiftKey && selection.lastSelectedId) {
         // Range selection
-        const lastIndex = transactions.findIndex(
+        const lastIndex = items.findIndex(
           (t) => t.id === selection.lastSelectedId
         );
-        const currentIndex = transactions.findIndex(
+        const currentIndex = items.findIndex(
           (t) => t.id === transactionId
         );
 
@@ -349,7 +464,7 @@ export function TransactionGrid({
           const end = Math.max(lastIndex, currentIndex);
 
           for (let i = start; i <= end; i++) {
-            newSelection.add(transactions[i].id);
+            newSelection.add(items[i].id);
           }
         }
       } else {
@@ -364,10 +479,10 @@ export function TransactionGrid({
       onSelectionChange({
         selectedIds: newSelection,
         lastSelectedId: transactionId,
-        isSelectAll: newSelection.size === transactions.length,
+        isSelectAll: newSelection.size === items.length,
       });
     },
-    [selection, transactions, onSelectionChange]
+    [selection, items, onSelectionChange]
   );
 
   // Handle row edit
@@ -406,7 +521,7 @@ export function TransactionGrid({
   // Indeterminate state for select-all checkbox
   const isIndeterminate =
     selection.selectedIds.size > 0 &&
-    selection.selectedIds.size < transactions.length;
+    selection.selectedIds.size < items.length;
 
   // Mobile View
   if (isMobile) {
@@ -424,7 +539,7 @@ export function TransactionGrid({
             <span className="text-sm text-muted-foreground">
               {selection.selectedIds.size > 0
                 ? `${selection.selectedIds.size} selected`
-                : `${transactions.length} transactions`}
+                : `${items.length} items`}
             </span>
           </div>
           <Button
@@ -445,20 +560,108 @@ export function TransactionGrid({
         {/* Mobile Transaction List */}
         {isLoading ? (
           <MobileLoadingSkeleton count={5} />
-        ) : transactions.length === 0 ? (
+        ) : items.length === 0 ? (
           <EmptyState hasFilters={hasActiveFilters} />
         ) : (
           <div className="space-y-2">
-            {transactions.map((transaction) => (
-              <MobileTransactionCard
-                key={transaction.id}
-                transaction={transaction}
-                isSelected={selection.selectedIds.has(transaction.id)}
-                onSelect={() => handleRowSelect(transaction.id, false)}
-                onClick={() => onTransactionClick?.(transaction)}
-                onEdit={() => onTransactionEdit(transaction.id, {})}
-              />
-            ))}
+            {items.map((item) => {
+              if (isGroup(item)) {
+                const isGroupExpanded = expandedGroupIds?.has(item.id) ?? false;
+                const isGroupSelected = selection.selectedIds.has(item.id);
+                return (
+                  <Card
+                    key={item.id}
+                    className={cn(
+                      "overflow-hidden transition-colors",
+                      isGroupSelected && "ring-2 ring-primary bg-primary/5"
+                    )}
+                  >
+                    {/* Group Header */}
+                    <div
+                      className="p-4 flex items-center gap-3 cursor-pointer"
+                      onClick={() => onGroupToggle?.(item.id)}
+                    >
+                      <Checkbox
+                        checked={isGroupSelected}
+                        onCheckedChange={() => handleRowSelect(item.id, false)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Select group ${item.name}`}
+                      />
+                      <Layers className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{item.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {item.transactionCount} items • {formatAmount(item.combinedAmount)}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 flex-shrink-0"
+                        aria-expanded={isGroupExpanded}
+                        aria-label={isGroupExpanded ? 'Collapse group' : 'Expand group'}
+                      >
+                        {isGroupExpanded ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Expanded Child Transactions */}
+                    <AnimatePresence>
+                      {isGroupExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="border-t bg-muted/30"
+                        >
+                          <div className="p-3 space-y-2">
+                            {isGroupProcessing ? (
+                              <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Loading...</span>
+                              </div>
+                            ) : item.transactions && item.transactions.length > 0 ? (
+                              item.transactions.map((tx) => (
+                                <div key={tx.id} className="flex justify-between text-sm py-1.5 px-2 rounded bg-background/50">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="truncate">{tx.description}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {formatShortDate(tx.date)}
+                                    </div>
+                                  </div>
+                                  <div className="font-medium tabular-nums">
+                                    {formatAmount(tx.amount)}
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-sm text-muted-foreground text-center py-2">
+                                No transactions loaded
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </Card>
+                );
+              }
+              const transaction = item as TransactionView;
+              return (
+                <MobileTransactionCard
+                  key={transaction.id}
+                  transaction={transaction}
+                  isSelected={selection.selectedIds.has(transaction.id)}
+                  onSelect={() => handleRowSelect(transaction.id, false)}
+                  onClick={() => onTransactionClick?.(transaction)}
+                  onEdit={() => onTransactionEdit(transaction.id, {})}
+                />
+              );
+            })}
           </div>
         )}
       </div>
@@ -571,7 +774,7 @@ export function TransactionGrid({
                 <LoadingSkeleton count={8} />
               </TableBody>
             </Table>
-          ) : transactions.length === 0 ? (
+          ) : items.length === 0 ? (
             <EmptyState hasFilters={hasActiveFilters} />
           ) : (
             <div
@@ -582,7 +785,44 @@ export function TransactionGrid({
               }}
             >
               {virtualRows.map((virtualRow) => {
-                const transaction = transactions[virtualRow.index];
+                const item = items[virtualRow.index];
+
+                // Render group row (Feature 028)
+                if (isGroup(item)) {
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        minHeight: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <Table>
+                        <TableBody>
+                          <TransactionGroupRow
+                            group={item}
+                            isSelected={selection.selectedIds.has(item.id)}
+                            isExpanded={expandedGroupIds.has(item.id)}
+                            onSelect={(shiftKey) => handleRowSelect(item.id, shiftKey)}
+                            onToggleExpand={() => onGroupToggle?.(item.id)}
+                            onEditName={onGroupEditName ? (name) => onGroupEditName(item.id, name) : undefined}
+                            onEditDate={onGroupEditDate ? (date) => onGroupEditDate(item.id, date) : undefined}
+                            onRemoveTransaction={onGroupRemoveTransaction ? (txId) => onGroupRemoveTransaction(item.id, txId) : undefined}
+                            onDeleteGroup={onGroupDelete ? () => onGroupDelete(item.id) : undefined}
+                            isProcessing={isGroupProcessing}
+                          />
+                        </TableBody>
+                      </Table>
+                    </div>
+                  );
+                }
+
+                // Render transaction row
+                const transaction = item as TransactionView;
                 return (
                   <div
                     key={transaction.id}
@@ -626,7 +866,7 @@ export function TransactionGrid({
 
       {/* Loading Overlay */}
       <AnimatePresence>
-        {isLoading && transactions.length > 0 && (
+        {isLoading && items.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

@@ -70,8 +70,15 @@ public class Transaction : BaseEntity
     /// </summary>
     public bool? ReceiptDismissed { get; set; }
 
+    /// <summary>
+    /// FK to TransactionGroup. When set, this transaction is part of a group
+    /// and should not appear as a standalone row in the UI.
+    /// </summary>
+    public Guid? GroupId { get; set; }
+
     // Navigation properties
     public User User { get; set; } = null!;
     public StatementImport Import { get; set; } = null!;
     public Receipt? MatchedReceipt { get; set; }
+    public TransactionGroup? Group { get; set; }
 }

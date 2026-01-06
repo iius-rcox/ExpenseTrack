@@ -25,7 +25,11 @@ public class ReceiptTransactionMatchConfiguration : IEntityTypeConfiguration<Rec
 
         builder.Property(m => m.TransactionId)
             .HasColumnName("transaction_id")
-            .IsRequired();
+            .IsRequired(false);
+
+        builder.Property(m => m.TransactionGroupId)
+            .HasColumnName("transaction_group_id")
+            .IsRequired(false);
 
         builder.Property(m => m.UserId)
             .HasColumnName("user_id")
@@ -103,6 +107,11 @@ public class ReceiptTransactionMatchConfiguration : IEntityTypeConfiguration<Rec
             .HasForeignKey(m => m.TransactionId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne(m => m.TransactionGroup)
+            .WithMany()
+            .HasForeignKey(m => m.TransactionGroupId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasOne(m => m.User)
             .WithMany()
             .HasForeignKey(m => m.UserId)
@@ -128,6 +137,9 @@ public class ReceiptTransactionMatchConfiguration : IEntityTypeConfiguration<Rec
         builder.HasIndex(m => m.TransactionId)
             .HasDatabaseName("ix_rtm_transaction");
 
+        builder.HasIndex(m => m.TransactionGroupId)
+            .HasDatabaseName("ix_rtm_transaction_group");
+
         // Partial unique index: one receipt can only have one confirmed match
         builder.HasIndex(m => m.ReceiptId)
             .HasDatabaseName("ix_rtm_receipt_confirmed")
@@ -138,7 +150,13 @@ public class ReceiptTransactionMatchConfiguration : IEntityTypeConfiguration<Rec
         builder.HasIndex(m => m.TransactionId)
             .HasDatabaseName("ix_rtm_transaction_confirmed")
             .IsUnique()
-            .HasFilter("status = 1");
+            .HasFilter("status = 1 AND transaction_id IS NOT NULL");
+
+        // Partial unique index: one transaction group can only have one confirmed match
+        builder.HasIndex(m => m.TransactionGroupId)
+            .HasDatabaseName("ix_rtm_transaction_group_confirmed")
+            .IsUnique()
+            .HasFilter("status = 1 AND transaction_group_id IS NOT NULL");
 
         // Check constraint: confidence must be in valid range
         builder.ToTable(t => t.HasCheckConstraint(
@@ -149,5 +167,10 @@ public class ReceiptTransactionMatchConfiguration : IEntityTypeConfiguration<Rec
         builder.ToTable(t => t.HasCheckConstraint(
             "chk_status_valid",
             "status IN (0, 1, 2)"));
+
+        // Check constraint: exactly one of transaction_id or transaction_group_id must be set
+        builder.ToTable(t => t.HasCheckConstraint(
+            "chk_transaction_or_group",
+            "(transaction_id IS NOT NULL AND transaction_group_id IS NULL) OR (transaction_id IS NULL AND transaction_group_id IS NOT NULL)"));
     }
 }

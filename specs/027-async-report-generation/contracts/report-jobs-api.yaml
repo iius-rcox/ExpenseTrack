@@ -1,0 +1,399 @@
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Report Jobs API
+  description: API for async report generation with background job processing and progress tracking
+  version: 1.0.0
+  contact:
+    name: ExpenseFlow Team
+
+servers:
+  - url: /api
+    description: Base API path
+
+security:
+  - BearerAuth: []
+
+paths:
+  /report-jobs:
+    post:
+      summary: Start report generation job
+      description: |
+        Initiates background processing for expense report generation.
+        Returns immediately with job ID and status.
+        Only one active job per user+period is allowed.
+      operationId: createReportJob
+      tags:
+        - ReportJobs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportJobRequest'
+            examples:
+              january2026:
+                summary: January 2026 report
+                value:
+                  period: "2026-01"
+      responses:
+        '202':
+          description: Job accepted and queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJobDto'
+              examples:
+                pending:
+                  summary: Job queued
+                  value:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    period: "2026-01"
+                    status: "Pending"
+                    totalLines: 0
+                    processedLines: 0
+                    failedLines: 0
+                    progressPercent: 0
+                    statusMessage: "Job queued for processing"
+                    estimatedCompletionAt: null
+                    startedAt: null
+                    completedAt: null
+                    generatedReportId: null
+                    errorMessage: null
+                    createdAt: "2026-01-05T15:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Active job already exists for this period
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: "https://tools.ietf.org/html/rfc7231#section-6.5.8"
+                title: "Conflict"
+                status: 409
+                detail: "An active report generation job already exists for period 2026-01"
+                instance: "/api/report-jobs"
+                extensions:
+                  existingJobId: "550e8400-e29b-41d4-a716-446655440000"
+
+    get:
+      summary: List report generation jobs
+      description: Get paginated list of report generation jobs for the current user
+      operationId: listReportJobs
+      tags:
+        - ReportJobs
+      parameters:
+        - name: status
+          in: query
+          description: Filter by job status
+          schema:
+            $ref: '#/components/schemas/ReportJobStatus'
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: List of report generation jobs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJobListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /report-jobs/{jobId}:
+    get:
+      summary: Get job status
+      description: |
+        Get current status and progress of a report generation job.
+        Use this endpoint for polling progress updates.
+      operationId: getReportJob
+      tags:
+        - ReportJobs
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Report job ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Job status and progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJobDto'
+              examples:
+                processing:
+                  summary: Job in progress
+                  value:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    period: "2026-01"
+                    status: "Processing"
+                    totalLines: 300
+                    processedLines: 150
+                    failedLines: 2
+                    progressPercent: 50
+                    statusMessage: "Processing line 150 of 300"
+                    estimatedCompletionAt: "2026-01-05T15:35:00Z"
+                    startedAt: "2026-01-05T15:30:00Z"
+                    completedAt: null
+                    generatedReportId: null
+                    errorMessage: null
+                    createdAt: "2026-01-05T15:29:55Z"
+                completed:
+                  summary: Job completed
+                  value:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    period: "2026-01"
+                    status: "Completed"
+                    totalLines: 300
+                    processedLines: 300
+                    failedLines: 5
+                    progressPercent: 100
+                    statusMessage: "Report generated successfully"
+                    estimatedCompletionAt: null
+                    startedAt: "2026-01-05T15:30:00Z"
+                    completedAt: "2026-01-05T15:37:22Z"
+                    generatedReportId: "660e8400-e29b-41d4-a716-446655440001"
+                    errorMessage: null
+                    createdAt: "2026-01-05T15:29:55Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Cancel job
+      description: |
+        Request cancellation of an active report generation job.
+        The job will stop at the next checkpoint (within 10 seconds).
+        Cannot cancel jobs that are already completed, failed, or cancelled.
+      operationId: cancelReportJob
+      tags:
+        - ReportJobs
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Report job ID to cancel
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Cancellation requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJobDto'
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                period: "2026-01"
+                status: "CancellationRequested"
+                statusMessage: "Cancellation requested, job will stop shortly"
+        '400':
+          description: Job cannot be cancelled (already completed/failed/cancelled)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Azure AD JWT token
+
+  schemas:
+    CreateReportJobRequest:
+      type: object
+      required:
+        - period
+      properties:
+        period:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: Billing period in YYYY-MM format
+          example: "2026-01"
+
+    ReportJobDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique job identifier
+        period:
+          type: string
+          description: Billing period (YYYY-MM)
+        status:
+          $ref: '#/components/schemas/ReportJobStatus'
+        totalLines:
+          type: integer
+          description: Total expense lines to process
+          minimum: 0
+        processedLines:
+          type: integer
+          description: Number of lines processed so far
+          minimum: 0
+        failedLines:
+          type: integer
+          description: Lines that failed categorization after retries
+          minimum: 0
+        progressPercent:
+          type: integer
+          description: Progress percentage (0-100)
+          minimum: 0
+          maximum: 100
+        statusMessage:
+          type: string
+          description: Human-readable status message
+        estimatedCompletionAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Estimated completion time (updated dynamically)
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When processing started
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When job completed (success/failure/cancelled)
+        generatedReportId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of generated report (null until completed)
+        errorMessage:
+          type: string
+          nullable: true
+          description: User-friendly error message if failed
+        createdAt:
+          type: string
+          format: date-time
+          description: When job was created
+
+    ReportJobStatus:
+      type: string
+      enum:
+        - Pending
+        - Processing
+        - Completed
+        - Failed
+        - Cancelled
+        - CancellationRequested
+      description: |
+        * `Pending` - Job queued, waiting to start
+        * `Processing` - Actively processing expense lines
+        * `Completed` - Finished successfully, report ready
+        * `Failed` - Unrecoverable error occurred
+        * `Cancelled` - User cancelled the job
+        * `CancellationRequested` - Cancellation pending, will stop shortly
+
+    ReportJobListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportJobDto'
+        totalCount:
+          type: integer
+          description: Total number of jobs matching filter
+        page:
+          type: integer
+          description: Current page number
+        pageSize:
+          type: integer
+          description: Items per page
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807 Problem Details
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        extensions:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://tools.ietf.org/html/rfc7231#section-6.5.1"
+            title: "Bad Request"
+            status: 400
+            detail: "Period must be in YYYY-MM format"
+            instance: "/api/report-jobs"
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://tools.ietf.org/html/rfc7235#section-3.1"
+            title: "Unauthorized"
+            status: 401
+            detail: "Missing or invalid authentication token"
+            instance: "/api/report-jobs"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://tools.ietf.org/html/rfc7231#section-6.5.4"
+            title: "Not Found"
+            status: 404
+            detail: "Report job not found"
+            instance: "/api/report-jobs/550e8400-e29b-41d4-a716-446655440000"
+
+tags:
+  - name: ReportJobs
+    description: Async report generation job management

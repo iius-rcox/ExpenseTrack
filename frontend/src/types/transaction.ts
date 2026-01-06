@@ -72,6 +72,8 @@ export interface TransactionView {
   statementId?: string;
   /** Import file name for display */
   importFileName?: string;
+  /** ID of the transaction group this belongs to (Feature 028) */
+  groupId?: string;
   /** Expense prediction for this transaction (Feature 023) */
   prediction?: PredictionSummary | null;
 }
@@ -313,4 +315,149 @@ export interface TransactionExportParams {
   format: TransactionExportFormat;
   ids?: string[]; // If empty, exports all matching current filters
   filters?: TransactionFilters;
+}
+
+// =============================================================================
+// Transaction Groups (Feature 028)
+// =============================================================================
+
+/**
+ * Match status for groups (mirrors backend enum).
+ */
+export type GroupMatchStatus = 'unmatched' | 'proposed' | 'matched';
+
+/**
+ * Simplified child transaction for expanded group view.
+ * Only includes data needed for the collapsed list display.
+ */
+export interface GroupMemberTransaction {
+  /** Transaction ID */
+  id: string;
+  /** Transaction date */
+  date: Date;
+  /** Transaction amount */
+  amount: number;
+  /** Transaction description */
+  description: string;
+}
+
+/**
+ * View model for transaction group display.
+ * Used in the mixed list alongside regular transactions.
+ */
+export interface TransactionGroupView {
+  /** Unique group ID */
+  id: string;
+  /** Discriminator for mixed list rendering */
+  type: 'group';
+  /** Display name (e.g., "Twilio (3 charges)") */
+  name: string;
+  /** Display date (max of children or override) */
+  displayDate: Date;
+  /** Whether the display date was manually overridden */
+  isDateOverridden: boolean;
+  /** Combined total of all child transactions */
+  combinedAmount: number;
+  /** Number of transactions in the group */
+  transactionCount: number;
+  /** Current match status */
+  matchStatus: GroupMatchStatus;
+  /** ID of matched receipt (if matched) */
+  matchedReceiptId?: string;
+  /** Child transactions (loaded when expanded) */
+  transactions?: GroupMemberTransaction[];
+  /** When the group was created */
+  createdAt: Date;
+}
+
+/**
+ * Extends TransactionView with discriminator for mixed list.
+ */
+export interface TransactionViewWithType extends TransactionView {
+  /** Discriminator for mixed list rendering */
+  type: 'transaction';
+}
+
+/**
+ * Union type for mixed transaction/group list items.
+ * Use type discriminator to handle each case.
+ */
+export type TransactionListItem = TransactionViewWithType | TransactionGroupView;
+
+/**
+ * Props for the TransactionGroupRow component.
+ */
+export interface TransactionGroupRowProps {
+  /** Group data */
+  group: TransactionGroupView;
+  /** Whether this row is selected */
+  isSelected: boolean;
+  /** Whether the row is expanded */
+  isExpanded: boolean;
+  /** Selection callback */
+  onSelect: (shiftKey: boolean) => void;
+  /** Toggle expansion callback */
+  onToggleExpand: () => void;
+  /** Callback when group name is edited */
+  onEditName?: (name: string) => void;
+  /** Callback when display date is overridden */
+  onEditDate?: (date: Date) => void;
+  /** Callback when a transaction is removed from the group */
+  onRemoveTransaction?: (transactionId: string) => void;
+  /** Callback to delete/dissolve the entire group */
+  onDeleteGroup?: () => void;
+  /** Whether group actions are processing */
+  isProcessing?: boolean;
+  /** Whether child transactions are loading (for expansion) */
+  isLoadingChildren?: boolean;
+  /** Error message if loading children failed */
+  childLoadError?: string | null;
+  /** Callback to retry loading children */
+  onRetryLoadChildren?: () => void;
+}
+
+/**
+ * Props for the CreateGroupDialog component.
+ */
+export interface CreateGroupDialogProps {
+  /** Whether the dialog is open */
+  open: boolean;
+  /** Callback to close the dialog */
+  onOpenChange: (open: boolean) => void;
+  /** Transactions to be grouped */
+  transactions: TransactionView[];
+  /** Callback when group is created */
+  onCreateGroup: (name: string, dateOverride?: Date) => void;
+  /** Whether creation is in progress */
+  isCreating?: boolean;
+}
+
+/**
+ * Request body for creating a transaction group.
+ */
+export interface CreateGroupRequest {
+  /** Transaction IDs to group */
+  transactionIds: string[];
+  /** Optional custom name (auto-generated if not provided) */
+  name?: string;
+  /** Optional date override */
+  displayDateOverride?: string; // ISO date
+}
+
+/**
+ * Request body for updating a transaction group.
+ */
+export interface UpdateGroupRequest {
+  /** New group name */
+  name?: string;
+  /** New display date (sets isDateOverridden = true) */
+  displayDate?: string; // ISO date
+}
+
+/**
+ * Request body for adding transactions to a group.
+ */
+export interface AddToGroupRequest {
+  /** Transaction IDs to add */
+  transactionIds: string[];
 }

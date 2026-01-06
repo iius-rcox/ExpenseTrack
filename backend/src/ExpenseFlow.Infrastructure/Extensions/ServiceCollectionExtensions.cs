@@ -155,6 +155,14 @@ public static class ServiceCollectionExtensions
         // Feature 026: Missing Receipts UI
         services.AddScoped<IMissingReceiptService, MissingReceiptService>();
 
+        // Feature 027: Async Report Generation
+        services.AddScoped<IReportJobRepository, ReportJobRepository>();
+        services.AddScoped<IReportJobService, ReportJobService>();
+        services.AddScoped<ReportGenerationBackgroundJob>();
+
+        // Feature 028: Transaction Grouping
+        services.AddScoped<ITransactionGroupService, TransactionGroupService>();
+
         return services;
     }
 }

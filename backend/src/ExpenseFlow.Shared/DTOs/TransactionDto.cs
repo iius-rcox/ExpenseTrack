@@ -31,6 +31,11 @@ public class TransactionSummaryDto
     public bool HasMatchedReceipt { get; set; }
 
     /// <summary>
+    /// ID of the transaction group this transaction belongs to (nullable if ungrouped).
+    /// </summary>
+    public Guid? GroupId { get; set; }
+
+    /// <summary>
     /// Prediction data for expense reimbursability (nullable if no prediction exists).
     /// </summary>
     public PredictionSummaryDto? Prediction { get; set; }
