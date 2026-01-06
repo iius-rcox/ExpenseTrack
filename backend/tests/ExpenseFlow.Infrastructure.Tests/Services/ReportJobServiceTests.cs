@@ -128,6 +128,110 @@ public class ReportJobServiceTests : IDisposable
         newJob.Id.Should().NotBe(existingJob.Id);
     }
 
+    [Fact]
+    public async Task CreateJobAsync_ConcurrentDuplicateRequest_ThrowsInvalidOperationException()
+    {
+        // Arrange - Test TOCTOU fix: when a race condition causes unique constraint violation,
+        // the service should catch DbUpdateException and throw InvalidOperationException
+        var period = "2026-01";
+
+        // Create a mock repository that simulates the race condition:
+        // - GetActiveByUserAndPeriodAsync returns null (no active job found)
+        // - AddAsync throws DbUpdateException (another request won the race)
+        var mockRepository = new Mock<IReportJobRepository>();
+
+        mockRepository
+            .Setup(r => r.GetActiveByUserAndPeriodAsync(_testUserId, period, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ReportGenerationJob?)null);
+
+        // Simulate PostgreSQL unique constraint violation
+        var innerException = new Exception(
+            "duplicate key value violates unique constraint \"ix_report_generation_jobs_user_period_active\"");
+        var dbUpdateException = new DbUpdateException("Database update failed", innerException);
+
+        mockRepository
+            .Setup(r => r.AddAsync(It.IsAny<ReportGenerationJob>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(dbUpdateException);
+
+        var serviceWithMock = new ReportJobService(
+            mockRepository.Object,
+            _backgroundJobClientMock.Object,
+            _loggerMock.Object);
+
+        // Act
+        var act = () => serviceWithMock.CreateJobAsync(_testUserId, period);
+
+        // Assert - should convert DbUpdateException to InvalidOperationException with expected message
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*already exists*");
+    }
+
+    [Fact]
+    public async Task CreateJobAsync_GenericDuplicateKeyError_ThrowsInvalidOperationException()
+    {
+        // Arrange - Test TOCTOU fix with generic "duplicate key" message (covers multiple DB engines)
+        var period = "2026-01";
+
+        var mockRepository = new Mock<IReportJobRepository>();
+
+        mockRepository
+            .Setup(r => r.GetActiveByUserAndPeriodAsync(_testUserId, period, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ReportGenerationJob?)null);
+
+        // Simulate generic duplicate key error (could be SQL Server, SQLite, etc.)
+        var innerException = new Exception("Cannot insert duplicate key row in object");
+        var dbUpdateException = new DbUpdateException("Database update failed", innerException);
+
+        mockRepository
+            .Setup(r => r.AddAsync(It.IsAny<ReportGenerationJob>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(dbUpdateException);
+
+        var serviceWithMock = new ReportJobService(
+            mockRepository.Object,
+            _backgroundJobClientMock.Object,
+            _loggerMock.Object);
+
+        // Act
+        var act = () => serviceWithMock.CreateJobAsync(_testUserId, period);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*already exists*");
+    }
+
+    [Fact]
+    public async Task CreateJobAsync_SqliteUniqueConstraintError_ThrowsInvalidOperationException()
+    {
+        // Arrange - Test TOCTOU fix with SQLite-style error message
+        var period = "2026-01";
+
+        var mockRepository = new Mock<IReportJobRepository>();
+
+        mockRepository
+            .Setup(r => r.GetActiveByUserAndPeriodAsync(_testUserId, period, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ReportGenerationJob?)null);
+
+        // Simulate SQLite unique constraint violation
+        var innerException = new Exception("UNIQUE constraint failed: report_generation_jobs.user_id, report_generation_jobs.period");
+        var dbUpdateException = new DbUpdateException("Database update failed", innerException);
+
+        mockRepository
+            .Setup(r => r.AddAsync(It.IsAny<ReportGenerationJob>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(dbUpdateException);
+
+        var serviceWithMock = new ReportJobService(
+            mockRepository.Object,
+            _backgroundJobClientMock.Object,
+            _loggerMock.Object);
+
+        // Act
+        var act = () => serviceWithMock.CreateJobAsync(_testUserId, period);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*already exists*");
+    }
+
     #endregion
 
     #region GetByIdAsync Tests

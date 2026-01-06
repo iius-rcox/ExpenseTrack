@@ -333,6 +333,40 @@ public class ReportGenerationBackgroundJobTests : IDisposable
         updatedJob.ErrorMessage.Should().Contain("Database error");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_CancellationDuringExceptionHandling_PreservesCancelledStatus()
+    {
+        // Arrange - Test for race condition fix: when cancellation and exception occur simultaneously,
+        // the cancellation status should be preserved instead of being overwritten with Failed
+        var reportJob = await CreateTestJobAsync(ReportJobStatus.Pending);
+        var transactions = CreateTestTransactions(3);
+
+        _transactionRepositoryMock
+            .Setup(r => r.GetUnmatchedByPeriodAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>()))
+            .ReturnsAsync(transactions);
+
+        // Simulate cancellation request arriving during report save failure
+        _reportRepositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()))
+            .Returns(async (ExpenseReport _, CancellationToken ct) =>
+            {
+                // Simulate cancellation request arriving just before the exception
+                var job = await _repository.GetByIdAsync(reportJob.Id, ct);
+                job!.Status = ReportJobStatus.CancellationRequested;
+                await _repository.UpdateAsync(job, ct);
+
+                throw new Exception("Database error during save");
+            });
+
+        // Act - should NOT throw because cancellation is detected and handled gracefully
+        await _job.ExecuteAsync(reportJob.Id, CancellationToken.None);
+
+        // Assert - status should be Cancelled, NOT Failed
+        var updatedJob = await _repository.GetByIdAsync(reportJob.Id);
+        updatedJob!.Status.Should().Be(ReportJobStatus.Cancelled);
+        updatedJob.ErrorMessage.Should().Be("Cancelled by user");
+    }
+
     #endregion
 
     #region Helper Methods

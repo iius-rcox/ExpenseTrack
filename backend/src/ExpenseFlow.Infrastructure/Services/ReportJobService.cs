@@ -54,9 +54,7 @@ public class ReportJobService : IReportJobService
         {
             job = await _repository.AddAsync(job, ct);
         }
-        catch (DbUpdateException ex) when (
-            ex.InnerException?.Message.Contains("ix_report_generation_jobs_user_period_active") == true ||
-            ex.InnerException?.Message.Contains("duplicate key") == true)
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
         {
             // Another job was created between our check and insert - return same error as duplicate check
             _logger.LogWarning(
@@ -159,5 +157,32 @@ public class ReportJobService : IReportJobService
     public async Task<ReportGenerationJob?> GetActiveJobAsync(Guid userId, string period, CancellationToken ct = default)
     {
         return await _repository.GetActiveByUserAndPeriodAsync(userId, period, ct);
+    }
+
+    /// <summary>
+    /// Detects unique constraint violations across different database engines.
+    /// PostgreSQL, SQL Server, and SQLite have different error message formats.
+    /// </summary>
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        var message = ex.InnerException?.Message ?? ex.Message;
+
+        // PostgreSQL: "duplicate key value violates unique constraint"
+        if (message.Contains("ix_report_generation_jobs_user_period_active"))
+            return true;
+
+        if (message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // SQL Server: "Violation of UNIQUE KEY constraint" or "Cannot insert duplicate key row"
+        if (message.Contains("UNIQUE KEY constraint", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // SQLite: "UNIQUE constraint failed"
+        if (message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase) &&
+            message.Contains("report_generation_jobs", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
     }
 }
