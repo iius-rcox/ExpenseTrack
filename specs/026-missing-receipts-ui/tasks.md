@@ -143,7 +143,7 @@
 
 - [x] T033 [P] Add loading skeletons for list and widget components
 - [x] T034 [P] Add error boundary and retry logic for failed API calls
-- [ ] T035 Apply database migration to staging environment (manual step per CLAUDE.md)
+- [x] T035 Apply database migration to staging environment (manual step per CLAUDE.md)
 - [ ] T036 Run quickstart.md validation scenarios
 
 ---
