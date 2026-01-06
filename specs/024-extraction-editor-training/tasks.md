@@ -186,7 +186,7 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T054 [P] Apply database migration to staging environment per CLAUDE.md instructions (SQL in quickstart.md - requires cluster access)
+- [x] T054 [P] Apply database migration to staging environment per CLAUDE.md instructions (SQL in quickstart.md - requires cluster access)
 - [ ] T055 [P] Run quickstart.md verification steps end-to-end
 - [ ] T056 Performance validation: verify field edit + save < 10 seconds (SC-001)
 - [ ] T057 Performance validation: verify side-by-side view load < 2 seconds (SC-005)

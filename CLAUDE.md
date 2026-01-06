@@ -60,6 +60,8 @@ Reference data (departments, projects, GL accounts) is synced from Viewpoint Vis
 - TypeScript 5.7+ with React 18.3+ + Vitest 4.x, Playwright 1.57+, MSW (Mock Service Worker), TanStack Query, TanStack Router (022-frontend-integration-tests)
 - N/A (testing infrastructure only) (022-frontend-integration-tests)
 - .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Query, shadcn/ui (023-expense-prediction)
+- .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Query, shadcn/ui (024-extraction-editor-training)
+- PostgreSQL 15+ (Supabase) (024-extraction-editor-training)
 - .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, existing VendorAliasService (025-vendor-extraction)
 - PostgreSQL 15+ (Supabase) - existing VendorAlias table (025-vendor-extraction)
 - .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Router, TanStack Query, shadcn/ui (026-missing-receipts-ui)
@@ -154,6 +156,7 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 ## Recent Changes
 - 026-missing-receipts-ui: Added .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Router, TanStack Query, shadcn/ui
 - 025-vendor-extraction: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, existing VendorAliasService
+- 024-extraction-editor-training: Added .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Query, shadcn/ui
 - 023-expense-prediction: Added .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Query, shadcn/ui
   - Entities: ImportJob (for tracking cache warming import jobs)
   - Services: CacheWarmingService (historical data import, job management)
