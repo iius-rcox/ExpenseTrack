@@ -558,3 +558,45 @@ export class ApiError extends Error {
     return this.status === 400
   }
 }
+
+// Feature 027: Report Job Types (Async Report Generation)
+export type ReportJobStatus =
+  | 'Pending'
+  | 'Processing'
+  | 'Completed'
+  | 'Failed'
+  | 'Cancelled'
+  | 'CancellationRequested'
+
+export interface ReportJob {
+  id: string
+  period: string
+  status: ReportJobStatus
+  totalLines: number
+  processedLines: number
+  failedLines: number
+  /** Computed progress percentage (0-100) */
+  progressPercent: number
+  errorMessage: string | null
+  estimatedCompletionAt: string | null
+  startedAt: string | null
+  completedAt: string | null
+  createdAt: string
+  generatedReportId: string | null
+}
+
+export interface ReportJobListResponse {
+  items: ReportJob[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export interface CreateReportJobRequest {
+  period: string // YYYY-MM format
+}
+
+export interface ActiveJobResponse {
+  hasActiveJob: boolean
+  job: ReportJob | null
+}

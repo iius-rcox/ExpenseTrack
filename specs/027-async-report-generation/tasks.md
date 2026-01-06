@@ -25,11 +25,11 @@
 
 **Purpose**: Database migration and core entity creation
 
-- [ ] T001 Create ReportJobStatus enum in `backend/src/ExpenseFlow.Core/Entities/ReportJobStatus.cs`
-- [ ] T002 Create ReportGenerationJob entity in `backend/src/ExpenseFlow.Core/Entities/ReportGenerationJob.cs`
-- [ ] T003 Create ReportGenerationJobConfiguration in `backend/src/ExpenseFlow.Infrastructure/Data/Configurations/ReportGenerationJobConfiguration.cs`
-- [ ] T004 Add DbSet<ReportGenerationJob> to ExpenseFlowDbContext in `backend/src/ExpenseFlow.Infrastructure/Data/ExpenseFlowDbContext.cs`
-- [ ] T005 Generate EF Core migration using `dotnet ef migrations add AddReportGenerationJobs`
+- [x] T001 Create ReportJobStatus enum in `backend/src/ExpenseFlow.Core/Entities/ReportJobStatus.cs`
+- [x] T002 Create ReportGenerationJob entity in `backend/src/ExpenseFlow.Core/Entities/ReportGenerationJob.cs`
+- [x] T003 Create ReportGenerationJobConfiguration in `backend/src/ExpenseFlow.Infrastructure/Data/Configurations/ReportGenerationJobConfiguration.cs`
+- [x] T004 Add DbSet<ReportGenerationJob> to ExpenseFlowDbContext in `backend/src/ExpenseFlow.Infrastructure/Data/ExpenseFlowDbContext.cs`
+- [x] T005 Generate EF Core migration using `dotnet ef migrations add AddReportGenerationJobs`
 - [ ] T006 Apply migration to staging database (see data-model.md for SQL)
 
 ---
@@ -40,14 +40,14 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T007 [P] Create IReportJobRepository interface in `backend/src/ExpenseFlow.Core/Interfaces/IReportJobRepository.cs`
-- [ ] T008 [P] Create ReportJobDto in `backend/src/ExpenseFlow.Shared/DTOs/ReportJobDto.cs`
-- [ ] T009 [P] Create CreateReportJobRequest in `backend/src/ExpenseFlow.Shared/DTOs/CreateReportJobRequest.cs`
-- [ ] T010 [P] Create ReportJobListResponse in `backend/src/ExpenseFlow.Shared/DTOs/ReportJobListResponse.cs`
-- [ ] T011 Implement ReportJobRepository in `backend/src/ExpenseFlow.Infrastructure/Repositories/ReportJobRepository.cs`
-- [ ] T012 Create IReportJobService interface in `backend/src/ExpenseFlow.Core/Interfaces/IReportJobService.cs`
-- [ ] T013 Implement ReportJobService (job creation, status, list, cancel) in `backend/src/ExpenseFlow.Infrastructure/Services/ReportJobService.cs`
-- [ ] T014 Register IReportJobRepository and IReportJobService in DI container in `backend/src/ExpenseFlow.Infrastructure/Extensions/ServiceCollectionExtensions.cs`
+- [x] T007 [P] Create IReportJobRepository interface in `backend/src/ExpenseFlow.Core/Interfaces/IReportJobRepository.cs`
+- [x] T008 [P] Create ReportJobDto in `backend/src/ExpenseFlow.Shared/DTOs/ReportJobDto.cs`
+- [x] T009 [P] Create CreateReportJobRequest in `backend/src/ExpenseFlow.Shared/DTOs/CreateReportJobRequest.cs`
+- [x] T010 [P] Create ReportJobListResponse in `backend/src/ExpenseFlow.Shared/DTOs/ReportJobListResponse.cs`
+- [x] T011 Implement ReportJobRepository in `backend/src/ExpenseFlow.Infrastructure/Repositories/ReportJobRepository.cs`
+- [x] T012 Create IReportJobService interface in `backend/src/ExpenseFlow.Core/Interfaces/IReportJobService.cs`
+- [x] T013 Implement ReportJobService (job creation, status, list, cancel) in `backend/src/ExpenseFlow.Infrastructure/Services/ReportJobService.cs`
+- [x] T014 Register IReportJobRepository and IReportJobService in DI container in `backend/src/ExpenseFlow.Infrastructure/Extensions/ServiceCollectionExtensions.cs`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -61,22 +61,22 @@
 
 ### Backend Implementation for User Story 1
 
-- [ ] T015 [US1] Create GenerateReportRequestValidator in `backend/src/ExpenseFlow.Api/Validators/GenerateReportRequestValidator.cs`
-- [ ] T016 [US1] Create ReportJobsController with POST endpoint (returns 202 Accepted) in `backend/src/ExpenseFlow.Api/Controllers/ReportJobsController.cs`
-- [ ] T017 [US1] Add GET /report-jobs/{id} endpoint for status polling to ReportJobsController
-- [ ] T018 [US1] Create ReportGenerationBackgroundJob (Hangfire job) in `backend/src/ExpenseFlow.Infrastructure/Jobs/ReportGenerationBackgroundJob.cs`
-- [ ] T019 [US1] Refactor ReportService.GenerateDraftAsync to support progress callbacks in `backend/src/ExpenseFlow.Infrastructure/Services/ReportService.cs`
-- [ ] T020 [US1] Implement progress update logic (every 10 lines or 5 seconds) in ReportGenerationBackgroundJob
-- [ ] T021 [US1] Add estimated completion time calculation based on processing rate in ReportGenerationBackgroundJob
-- [ ] T022 [US1] Add Serilog logging for job start, progress, and completion in ReportGenerationBackgroundJob
+- [x] T015 [US1] Create CreateReportJobRequestValidator in `backend/src/ExpenseFlow.Api/Validators/CreateReportJobRequestValidator.cs`
+- [x] T016 [US1] Create ReportJobsController with POST endpoint (returns 202 Accepted) in `backend/src/ExpenseFlow.Api/Controllers/ReportJobsController.cs`
+- [x] T017 [US1] Add GET /report-jobs/{id} endpoint for status polling to ReportJobsController
+- [x] T018 [US1] Create ReportGenerationBackgroundJob (Hangfire job) in `backend/src/ExpenseFlow.Infrastructure/Jobs/ReportGenerationBackgroundJob.cs`
+- [x] T019 [US1] Implemented line-by-line processing with progress tracking in ReportGenerationBackgroundJob (replaces refactoring ReportService)
+- [x] T020 [US1] Implement progress update logic (every 10 lines or 5 seconds) in ReportGenerationBackgroundJob
+- [x] T021 [US1] Add estimated completion time calculation based on processing rate in ReportGenerationBackgroundJob
+- [x] T022 [US1] Add Serilog logging for job start, progress, and completion in ReportGenerationBackgroundJob
 
 ### Frontend Implementation for User Story 1
 
-- [ ] T023 [P] [US1] Create useReportJob hook with adaptive polling in `frontend/src/hooks/queries/use-report-jobs.ts`
-- [ ] T024 [P] [US1] Create useCreateReportJob mutation hook in `frontend/src/hooks/queries/use-report-jobs.ts`
-- [ ] T025 [US1] Create ReportGenerationProgress component in `frontend/src/components/reports/report-generation-progress.tsx`
-- [ ] T026 [US1] Integrate ReportGenerationProgress into reports page/flow (update existing report generation trigger)
-- [ ] T027 [US1] Add completion callback to navigate to generated report when job completes
+- [x] T023 [P] [US1] Create useReportJob hook with adaptive polling in `frontend/src/hooks/queries/use-report-jobs.ts`
+- [x] T024 [P] [US1] Create useCreateReportJob mutation hook in `frontend/src/hooks/queries/use-report-jobs.ts`
+- [x] T025 [US1] Create ReportGenerationProgress component in `frontend/src/components/reports/report-generation-progress.tsx`
+- [x] T026 [US1] Integrate ReportGenerationProgress into reports page/flow (update existing report generation trigger)
+- [x] T027 [US1] Add completion callback to navigate to generated report when job completes
 
 **Checkpoint**: User Story 1 complete - users can generate reports with progress visibility
 
@@ -86,9 +86,9 @@
 
 **Purpose**: Unit and integration tests per Constitution Principle II
 
-- [ ] T027a [US1] Create ReportJobServiceTests (unit) in `backend/tests/ExpenseFlow.UnitTests/Services/ReportJobServiceTests.cs`
-- [ ] T027b [US1] Create ReportJobsControllerTests (integration) in `backend/tests/ExpenseFlow.IntegrationTests/Controllers/ReportJobsControllerTests.cs`
-- [ ] T027c [US1] Create ReportGenerationBackgroundJobTests (unit) in `backend/tests/ExpenseFlow.UnitTests/Jobs/ReportGenerationBackgroundJobTests.cs`
+- [x] T027a [US1] Create ReportJobServiceTests (unit) in `backend/tests/ExpenseFlow.Infrastructure.Tests/Services/ReportJobServiceTests.cs`
+- [x] T027b [US1] Create ReportJobsControllerTests (integration) in `backend/tests/ExpenseFlow.Api.Tests/Controllers/ReportJobsControllerTests.cs`
+- [x] T027c [US1] Create ReportGenerationBackgroundJobTests (unit) in `backend/tests/ExpenseFlow.Infrastructure.Tests/Jobs/ReportGenerationBackgroundJobTests.cs`
 
 **Test Coverage Requirements**:
 - Unit tests: job creation, status transitions, duplicate prevention, cancellation logic

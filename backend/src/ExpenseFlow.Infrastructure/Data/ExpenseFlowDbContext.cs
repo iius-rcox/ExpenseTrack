@@ -63,6 +63,9 @@ public class ExpenseFlowDbContext : DbContext
     // Feature 024: Extraction Editor Training
     public DbSet<ExtractionCorrection> ExtractionCorrections => Set<ExtractionCorrection>();
 
+    // Feature 027: Async Report Generation
+    public DbSet<ReportGenerationJob> ReportGenerationJobs => Set<ReportGenerationJob>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
