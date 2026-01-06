@@ -10,6 +10,7 @@ namespace ExpenseFlow.Api.Controllers;
 /// Allows users to group multiple transactions into a single unit for receipt matching.
 /// </summary>
 [Authorize]
+[Route("api/transaction-groups")] // Explicit kebab-case route for frontend compatibility
 public class TransactionGroupsController : ApiControllerBase
 {
     private readonly ITransactionGroupService _groupService;
