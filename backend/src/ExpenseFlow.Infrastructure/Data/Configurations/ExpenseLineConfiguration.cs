@@ -117,6 +117,16 @@ public class ExpenseLineConfiguration : IEntityTypeConfiguration<ExpenseLine>
             .HasDefaultValue(false)
             .IsRequired();
 
+        // Feature 023: Expense Prediction auto-suggestion tracking
+        builder.Property(e => e.IsAutoSuggested)
+            .HasColumnName("is_auto_suggested")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(e => e.PredictionId)
+            .HasColumnName("prediction_id")
+            .IsRequired(false);
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
             .HasDefaultValueSql("NOW()")
