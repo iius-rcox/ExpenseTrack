@@ -32,6 +32,24 @@ import type {
 } from '@/types/prediction';
 
 /**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ * Empty objects are truthy in JS, so `value && <span>{value}</span>` will fail!
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) {
+      console.warn('[ExpenseBadge] Empty object detected, using fallback');
+      return fallback;
+    }
+    return fallback;
+  }
+  return String(value);
+}
+
+/**
  * Props for the ExpenseBadge component.
  */
 export interface ExpenseBadgeProps {
@@ -169,9 +187,9 @@ export const ExpenseBadge = memo(function ExpenseBadge({
           <TooltipContent side="top" className="max-w-xs">
             <div className="space-y-1">
               <p className="font-medium">{label}</p>
-              {prediction.suggestedCategory && (
+              {safeDisplayString(prediction.suggestedCategory) && (
                 <p className="text-xs text-muted-foreground">
-                  Suggested: {prediction.suggestedCategory}
+                  Suggested: {safeDisplayString(prediction.suggestedCategory)}
                 </p>
               )}
               <div className="flex items-center gap-2 pt-1">
@@ -216,7 +234,7 @@ export const ExpenseBadge = memo(function ExpenseBadge({
       <ConfidenceIndicator score={confidenceScore} size="sm" />
 
       {/* Category suggestion */}
-      {prediction.suggestedCategory && (
+      {safeDisplayString(prediction.suggestedCategory) && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -227,11 +245,11 @@ export const ExpenseBadge = memo(function ExpenseBadge({
                   'opacity-80'
                 )}
               >
-                {prediction.suggestedCategory}
+                {safeDisplayString(prediction.suggestedCategory)}
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              Suggested category: {prediction.suggestedCategory}
+              Suggested category: {safeDisplayString(prediction.suggestedCategory)}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
