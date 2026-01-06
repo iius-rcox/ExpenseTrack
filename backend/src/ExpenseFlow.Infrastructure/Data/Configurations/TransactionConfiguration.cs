@@ -76,6 +76,11 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .HasColumnName("receipt_dismissed")
             .IsRequired(false);
 
+        // Transaction Grouping: FK to TransactionGroup
+        builder.Property(t => t.GroupId)
+            .HasColumnName("group_id")
+            .IsRequired(false);
+
         builder.Property(t => t.CreatedAt)
             .HasColumnName("created_at")
             .HasDefaultValueSql("NOW()")
@@ -117,5 +122,9 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         // Feature 026: Missing receipts query index
         builder.HasIndex(t => new { t.UserId, t.MatchedReceiptId, t.ReceiptDismissed })
             .HasDatabaseName("ix_transactions_user_missing_receipt");
+
+        // Transaction Grouping: index for group lookups
+        builder.HasIndex(t => t.GroupId)
+            .HasDatabaseName("ix_transactions_group_id");
     }
 }

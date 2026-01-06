@@ -166,10 +166,15 @@ public class MatchRepository : IMatchRepository
         return await _context.ReceiptTransactionMatches
             .Include(m => m.Receipt)
             .Include(m => m.Transaction)
+            .Include(m => m.TransactionGroup)
             .Include(m => m.MatchedVendorAlias)
             .Where(m => m.UserId == userId && m.Status == MatchProposalStatus.Confirmed)
-            .Where(m => m.Transaction.TransactionDate >= startDate && m.Transaction.TransactionDate <= endDate)
-            .OrderBy(m => m.Transaction.TransactionDate)
+            .Where(m =>
+                // For transaction matches, filter by transaction date
+                (m.TransactionId != null && m.Transaction!.TransactionDate >= startDate && m.Transaction!.TransactionDate <= endDate) ||
+                // For group matches, filter by group display date
+                (m.TransactionGroupId != null && m.TransactionGroup!.DisplayDate >= startDate && m.TransactionGroup!.DisplayDate <= endDate))
+            .OrderBy(m => m.TransactionId != null ? m.Transaction!.TransactionDate : m.TransactionGroup!.DisplayDate)
             .ThenBy(m => m.CreatedAt)
             .ToListAsync();
     }

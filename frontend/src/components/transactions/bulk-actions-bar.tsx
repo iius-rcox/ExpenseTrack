@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   CircleCheck,
   CircleX,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -48,8 +49,60 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { BulkActionsBarProps } from '@/types/transaction';
+
+/**
+ * Selection composition for mixed lists (Feature 028)
+ */
+export interface SelectionComposition {
+  /** Number of transactions in selection */
+  transactionCount: number;
+  /** Number of groups in selection */
+  groupCount: number;
+  /** Whether selection contains only transactions */
+  hasOnlyTransactions: boolean;
+  /** Whether selection contains only groups */
+  hasOnlyGroups: boolean;
+  /** Whether selection is mixed (transactions + groups) */
+  isMixed: boolean;
+}
+
+/**
+ * Compute selection composition from items and selection state.
+ * Use this to determine which bulk actions should be enabled.
+ */
+export function computeSelectionComposition(
+  items: Array<{ id: string; type?: 'transaction' | 'group' }>,
+  selectedIds: Set<string>
+): SelectionComposition {
+  let transactionCount = 0;
+  let groupCount = 0;
+
+  for (const item of items) {
+    if (selectedIds.has(item.id)) {
+      if (item.type === 'group') {
+        groupCount++;
+      } else {
+        transactionCount++;
+      }
+    }
+  }
+
+  return {
+    transactionCount,
+    groupCount,
+    hasOnlyTransactions: transactionCount > 0 && groupCount === 0,
+    hasOnlyGroups: groupCount > 0 && transactionCount === 0,
+    isMixed: transactionCount > 0 && groupCount > 0,
+  };
+}
 
 /**
  * Extended props with additional data
@@ -61,6 +114,12 @@ interface BulkActionsBarComponentProps extends BulkActionsBarProps {
   availableTags: string[];
   /** Whether a bulk operation is in progress */
   isProcessing?: boolean;
+  /** Callback to group selected transactions (Feature 028) */
+  onGroup?: () => void;
+  /** Whether grouping is allowed for current selection */
+  canGroup?: boolean;
+  /** Selection composition for mixed lists (Feature 028) */
+  selectionComposition?: SelectionComposition;
 }
 
 /**
@@ -78,7 +137,14 @@ export function BulkActionsBar({
   onMarkReimbursable,
   onMarkNotReimbursable,
   isProcessing = false,
+  onGroup,
+  canGroup = false,
+  selectionComposition,
 }: BulkActionsBarComponentProps) {
+  // Determine if transaction-specific actions should be disabled
+  // Groups don't have categories or tags, so these actions are only valid for transactions
+  const hasGroups = (selectionComposition?.groupCount ?? 0) > 0;
+  const transactionActionsDisabled = isProcessing || hasGroups;
   // State for dialogs
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -146,68 +212,125 @@ export function BulkActionsBar({
           </div>
 
           {/* Categorize Action */}
-          <Select onValueChange={handleCategoryChange} disabled={isProcessing}>
-            <SelectTrigger className="w-[160px] h-9">
-              <FolderOpen className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Set category" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Select onValueChange={handleCategoryChange} disabled={transactionActionsDisabled}>
+                    <SelectTrigger className="w-[160px] h-9">
+                      <FolderOpen className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Set category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TooltipTrigger>
+              {hasGroups && (
+                <TooltipContent>
+                  <p>Groups cannot be categorized. Select only transactions.</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Group Action (Feature 028) */}
+          {onGroup && canGroup && selectedCount >= 2 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={onGroup}
+              disabled={isProcessing}
+            >
+              <Layers className="h-4 w-4" />
+              Group ({selectedCount})
+            </Button>
+          )}
 
           {/* Reimbursability Actions */}
           {onMarkReimbursable && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
-              onClick={onMarkReimbursable}
-              disabled={isProcessing}
-            >
-              <CircleCheck className="h-4 w-4" />
-              Business
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
+                      onClick={onMarkReimbursable}
+                      disabled={transactionActionsDisabled}
+                    >
+                      <CircleCheck className="h-4 w-4" />
+                      Business
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {hasGroups && (
+                  <TooltipContent>
+                    <p>Groups cannot be marked as reimbursable. Select only transactions.</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           )}
 
           {onMarkNotReimbursable && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-              onClick={onMarkNotReimbursable}
-              disabled={isProcessing}
-            >
-              <CircleX className="h-4 w-4" />
-              Personal
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      onClick={onMarkNotReimbursable}
+                      disabled={transactionActionsDisabled}
+                    >
+                      <CircleX className="h-4 w-4" />
+                      Personal
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {hasGroups && (
+                  <TooltipContent>
+                    <p>Groups cannot be marked as personal. Select only transactions.</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           )}
 
           {/* Tag Action */}
-          <DropdownMenu
-            open={isTagDropdownOpen}
-            onOpenChange={setIsTagDropdownOpen}
-          >
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                disabled={isProcessing}
-              >
-                <Tag className="h-4 w-4" />
-                Add tags
-                {selectedTags.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">
-                    {selectedTags.length}
-                  </Badge>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <DropdownMenu
+                    open={isTagDropdownOpen && !transactionActionsDisabled}
+                    onOpenChange={(open) => !transactionActionsDisabled && setIsTagDropdownOpen(open)}
+                  >
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        disabled={transactionActionsDisabled}
+                      >
+                        <Tag className="h-4 w-4" />
+                        Add tags
+                        {selectedTags.length > 0 && (
+                          <Badge variant="secondary" className="ml-1">
+                            {selectedTags.length}
+                          </Badge>
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="center">
               <div className="p-2">
                 <div className="font-medium mb-2">Select Tags</div>
@@ -244,7 +367,16 @@ export function BulkActionsBar({
                 )}
               </div>
             </DropdownMenuContent>
-          </DropdownMenu>
+                  </DropdownMenu>
+                </span>
+              </TooltipTrigger>
+              {hasGroups && (
+                <TooltipContent>
+                  <p>Groups cannot have tags. Select only transactions.</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
 
           {/* Export Action */}
           <Button

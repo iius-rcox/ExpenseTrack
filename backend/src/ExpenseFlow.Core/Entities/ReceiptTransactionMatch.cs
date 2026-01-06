@@ -10,8 +10,11 @@ public class ReceiptTransactionMatch : BaseEntity
     /// <summary>FK to Receipts</summary>
     public Guid ReceiptId { get; set; }
 
-    /// <summary>FK to Transactions</summary>
-    public Guid TransactionId { get; set; }
+    /// <summary>FK to Transactions (nullable when matching a group)</summary>
+    public Guid? TransactionId { get; set; }
+
+    /// <summary>FK to TransactionGroups (nullable when matching a single transaction)</summary>
+    public Guid? TransactionGroupId { get; set; }
 
     /// <summary>FK to Users (denormalized for queries)</summary>
     public Guid UserId { get; set; }
@@ -51,7 +54,8 @@ public class ReceiptTransactionMatch : BaseEntity
 
     // Navigation properties
     public Receipt Receipt { get; set; } = null!;
-    public Transaction Transaction { get; set; } = null!;
+    public Transaction? Transaction { get; set; }
+    public TransactionGroup? TransactionGroup { get; set; }
     public User User { get; set; } = null!;
     public VendorAlias? MatchedVendorAlias { get; set; }
     public User? ConfirmedByUser { get; set; }

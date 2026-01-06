@@ -16,7 +16,6 @@ import { useState, useCallback, useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import {
-  useTransactionListWithFilters,
   useTransactionCategories,
   useTransactionTags,
   useUpdateTransaction,
@@ -28,6 +27,15 @@ import {
   useClearReimbursabilityOverride,
   useBulkMarkReimbursability,
 } from '@/hooks/queries/use-transactions'
+import {
+  useMixedTransactionList,
+  useCreateTransactionGroup,
+  useUpdateTransactionGroup,
+  useDeleteTransactionGroup,
+  useRemoveTransactionFromGroup,
+  useCanGroupTransactions,
+} from '@/hooks/queries/use-transaction-groups'
+import { computeSelectionComposition } from '@/components/transactions/bulk-actions-bar'
 import { usePatternWorkspace, useGeneratePredictions } from '@/hooks/queries/use-predictions'
 import { Link } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
@@ -38,6 +46,7 @@ import { Upload, Sparkles, ListFilter } from 'lucide-react'
 import { TransactionFilterPanel } from '@/components/transactions/transaction-filter-panel'
 import { TransactionGrid } from '@/components/transactions/transaction-grid'
 import { BulkActionsBar } from '@/components/transactions/bulk-actions-bar'
+import { CreateGroupDialog } from '@/components/transactions/create-group-dialog'
 import {
   PatternGrid,
   PatternStats,
@@ -58,6 +67,7 @@ import type {
   TransactionFilters,
   TransactionSortConfig,
   TransactionSelectionState,
+  TransactionListItem,
 } from '@/types/transaction'
 import type {
   PatternGridFilters,
@@ -110,6 +120,10 @@ function TransactionsPage() {
   // Track which transactions are currently being saved
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
 
+  // Transaction grouping state (Feature 028)
+  const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false)
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set())
+
   // =========================================================================
   // Pattern State
   // =========================================================================
@@ -146,16 +160,19 @@ function TransactionsPage() {
     [search, navigate]
   )
 
-  // Data fetching
+  // Data fetching - use mixed list to include both transactions and groups
   const {
-    data: transactionData,
+    data: mixedListData,
     isLoading,
     error,
-  } = useTransactionListWithFilters({
-    filters,
-    sort,
+  } = useMixedTransactionList({
     page: search.page,
     pageSize: search.pageSize,
+    startDate: filters.dateRange.start?.toISOString().split('T')[0],
+    endDate: filters.dateRange.end?.toISOString().split('T')[0],
+    search: filters.search || undefined,
+    sortBy: sort.field === 'date' || sort.field === 'amount' ? sort.field : 'date',
+    sortOrder: sort.direction,
   })
 
   // Reference data
@@ -198,6 +215,17 @@ function TransactionsPage() {
   const markNotReimbursable = useMarkTransactionNotReimbursable()
   const clearReimbursabilityOverride = useClearReimbursabilityOverride()
   const bulkMarkReimbursability = useBulkMarkReimbursability()
+
+  // Transaction grouping mutations (Feature 028)
+  const createGroup = useCreateTransactionGroup()
+  const updateGroup = useUpdateTransactionGroup()
+  const deleteGroup = useDeleteTransactionGroup()
+  const removeFromGroup = useRemoveTransactionFromGroup()
+  const selectedTransactionIds = useMemo(
+    () => Array.from(selection.selectedIds),
+    [selection.selectedIds]
+  )
+  const { canGroup } = useCanGroupTransactions(selectedTransactionIds)
 
   // Handle filter changes
   const handleFilterChange = useCallback(
@@ -433,12 +461,133 @@ function TransactionsPage() {
     setSelection(DEFAULT_TRANSACTION_SELECTION)
   }, [])
 
+  // Transaction grouping handlers (Feature 028)
+  const handleOpenGroupDialog = useCallback(() => {
+    setShowCreateGroupDialog(true)
+  }, [])
+
+  const handleCloseGroupDialog = useCallback(() => {
+    setShowCreateGroupDialog(false)
+  }, [])
+
+  const handleCreateGroup = useCallback(
+    (name: string, dateOverride?: Date) => {
+      const transactionIds = Array.from(selection.selectedIds)
+      createGroup.mutate(
+        {
+          transactionIds,
+          name,
+          displayDateOverride: dateOverride?.toISOString().split('T')[0],
+        },
+        {
+          onSuccess: (group) => {
+            toast.success(`Created group "${group.name}"`, {
+              description: `${group.transactionCount} transactions grouped`,
+            })
+            setShowCreateGroupDialog(false)
+            setSelection(DEFAULT_TRANSACTION_SELECTION)
+          },
+          onError: (error) => {
+            toast.error(`Failed to create group: ${error.message}`)
+          },
+        }
+      )
+    },
+    [selection.selectedIds, createGroup]
+  )
+
+  // Group expansion toggle handler
+  const handleGroupToggle = useCallback((groupId: string) => {
+    setExpandedGroupIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupId)) {
+        next.delete(groupId)
+      } else {
+        next.add(groupId)
+      }
+      return next
+    })
+  }, [])
+
+  // Group name edit handler
+  const handleGroupEditName = useCallback(
+    (groupId: string, name: string) => {
+      updateGroup.mutate(
+        { id: groupId, updates: { name } },
+        {
+          onError: (error) => {
+            toast.error(`Failed to update group: ${error.message}`)
+          },
+        }
+      )
+    },
+    [updateGroup]
+  )
+
+  // Group date edit handler
+  const handleGroupEditDate = useCallback(
+    (groupId: string, date: Date) => {
+      updateGroup.mutate(
+        { id: groupId, updates: { displayDate: date.toISOString().split('T')[0] } },
+        {
+          onError: (error) => {
+            toast.error(`Failed to update group date: ${error.message}`)
+          },
+        }
+      )
+    },
+    [updateGroup]
+  )
+
+  // Remove transaction from group handler
+  const handleGroupRemoveTransaction = useCallback(
+    (groupId: string, transactionId: string) => {
+      removeFromGroup.mutate(
+        { groupId, transactionId },
+        {
+          onError: (error) => {
+            toast.error(`Failed to remove transaction: ${error.message}`)
+          },
+        }
+      )
+    },
+    [removeFromGroup]
+  )
+
+  // Delete (ungroup) entire group handler
+  const handleGroupDelete = useCallback(
+    (groupId: string) => {
+      deleteGroup.mutate(groupId, {
+        onSuccess: () => {
+          toast.success('Group disbanded successfully')
+          // Clear any expanded state for this group
+          setExpandedGroupIds((prev) => {
+            const next = new Set(prev)
+            next.delete(groupId)
+            return next
+          })
+        },
+        onError: (error) => {
+          toast.error(`Failed to ungroup: ${error.message}`)
+        },
+      })
+    },
+    [deleteGroup]
+  )
+
   // Processing state for bulk actions
   const isProcessing =
     bulkUpdate.isPending ||
     bulkDelete.isPending ||
     exportTransactions.isPending ||
-    bulkMarkReimbursability.isPending
+    bulkMarkReimbursability.isPending ||
+    createGroup.isPending
+
+  // Processing state for group operations
+  const isGroupProcessing =
+    updateGroup.isPending ||
+    deleteGroup.isPending ||
+    removeFromGroup.isPending
 
   // =========================================================================
   // Pattern Handlers
@@ -508,10 +657,31 @@ function TransactionsPage() {
     }
   }, [generatePredictions])
 
-  // Transform transaction list for grid
-  const transactions = useMemo(
-    () => transactionData?.transactions || [],
-    [transactionData]
+  // Mixed list items for grid (transactions and groups)
+  const items: TransactionListItem[] = useMemo(
+    () => mixedListData?.items || [],
+    [mixedListData]
+  )
+
+  // Extract just transactions for legacy compatibility and group dialog
+  const transactions: TransactionView[] = useMemo(
+    () => items.filter((item): item is TransactionView & { type: 'transaction' } =>
+      item.type === 'transaction'
+    ),
+    [items]
+  )
+
+  // Get selected transactions for the group dialog (Feature 028)
+  // Only transactions can be selected for grouping, not existing groups
+  const selectedTransactions = useMemo(
+    () => transactions.filter((t) => selection.selectedIds.has(t.id)),
+    [transactions, selection.selectedIds]
+  )
+
+  // Compute selection composition for smart bulk action disabling
+  const selectionComposition = useMemo(
+    () => computeSelectionComposition(items, selection.selectedIds),
+    [items, selection.selectedIds]
   )
 
   return (
@@ -569,7 +739,7 @@ function TransactionsPage() {
 
           {/* Transaction Grid */}
           <TransactionGrid
-            transactions={transactions}
+            items={items}
             isLoading={isLoading}
             sort={sort}
             selection={selection}
@@ -579,7 +749,7 @@ function TransactionsPage() {
             onTransactionEdit={handleTransactionEdit}
             onTransactionClick={handleTransactionClick}
             savingIds={savingIds}
-            containerHeight={Math.min(600, Math.max(400, transactions.length * 56))}
+            containerHeight={Math.min(600, Math.max(400, items.length * 56))}
             onMarkReimbursable={handleMarkReimbursable}
             onMarkNotReimbursable={handleMarkNotReimbursable}
             onClearReimbursabilityOverride={handleClearReimbursabilityOverride}
@@ -588,15 +758,23 @@ function TransactionsPage() {
               markNotReimbursable.isPending ||
               clearReimbursabilityOverride.isPending
             }
+            // Group-specific props (Feature 028)
+            expandedGroupIds={expandedGroupIds}
+            onGroupToggle={handleGroupToggle}
+            onGroupEditName={handleGroupEditName}
+            onGroupEditDate={handleGroupEditDate}
+            onGroupRemoveTransaction={handleGroupRemoveTransaction}
+            onGroupDelete={handleGroupDelete}
+            isGroupProcessing={isGroupProcessing}
           />
 
           {/* Pagination Info */}
-          {transactionData && transactionData.totalCount > 0 && (
+          {mixedListData && mixedListData.totalCount > 0 && (
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <p>
                 Showing {((search.page - 1) * search.pageSize) + 1} to{' '}
-                {Math.min(search.page * search.pageSize, transactionData.totalCount)} of{' '}
-                {transactionData.totalCount} transactions
+                {Math.min(search.page * search.pageSize, mixedListData.totalCount)} of{' '}
+                {mixedListData.totalCount} items
               </p>
               <div className="flex gap-2">
                 <Button
@@ -615,7 +793,7 @@ function TransactionsPage() {
                   variant="outline"
                   size="sm"
                   disabled={
-                    search.page >= Math.ceil(transactionData.totalCount / search.pageSize)
+                    search.page >= Math.ceil(mixedListData.totalCount / search.pageSize)
                   }
                   onClick={() =>
                     navigate({
@@ -642,6 +820,18 @@ function TransactionsPage() {
             onMarkReimbursable={handleBulkMarkReimbursable}
             onMarkNotReimbursable={handleBulkMarkNotReimbursable}
             isProcessing={isProcessing}
+            onGroup={handleOpenGroupDialog}
+            canGroup={canGroup && (selectionComposition?.hasOnlyTransactions ?? false)}
+            selectionComposition={selectionComposition}
+          />
+
+          {/* Create Group Dialog (Feature 028) */}
+          <CreateGroupDialog
+            open={showCreateGroupDialog}
+            onOpenChange={handleCloseGroupDialog}
+            transactions={selectedTransactions}
+            onCreateGroup={handleCreateGroup}
+            isCreating={createGroup.isPending}
           />
         </TabsContent>
 

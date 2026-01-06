@@ -160,6 +160,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IReportJobService, ReportJobService>();
         services.AddScoped<ReportGenerationBackgroundJob>();
 
+        // Feature 028: Transaction Grouping
+        services.AddScoped<ITransactionGroupService, TransactionGroupService>();
+
         return services;
     }
 }

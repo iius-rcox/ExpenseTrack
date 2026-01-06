@@ -66,6 +66,9 @@ public class ExpenseFlowDbContext : DbContext
     // Feature 027: Async Report Generation
     public DbSet<ReportGenerationJob> ReportGenerationJobs => Set<ReportGenerationJob>();
 
+    // Feature 028: Transaction Grouping
+    public DbSet<TransactionGroup> TransactionGroups => Set<TransactionGroup>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
