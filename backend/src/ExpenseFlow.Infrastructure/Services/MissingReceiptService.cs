@@ -191,14 +191,14 @@ public class MissingReceiptService : IMissingReceiptService
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         // Subquery: Get the best prediction per transaction (prefer IsManualOverride=true)
-        // Using GroupBy with only aggregate functions ensures proper SQL translation
+        // Using Any() for boolean aggregation - translates to BOOL_OR in PostgreSQL
         var bestPredictions = _dbContext.TransactionPredictions
             .Where(p => p.UserId == userId && p.Status == PredictionStatus.Confirmed)
             .GroupBy(p => p.TransactionId)
             .Select(g => new
             {
                 TransactionId = g.Key,
-                IsManualOverride = g.Max(p => p.IsManualOverride)
+                IsManualOverride = g.Any(p => p.IsManualOverride)
             });
 
         // Main query: Join transactions with their best prediction
@@ -285,7 +285,7 @@ public class MissingReceiptService : IMissingReceiptService
                 DaysSinceTransaction = today.DayNumber - g.Key.TransactionDate.DayNumber,
                 ReceiptUrl = g.Key.ReceiptUrl,
                 IsDismissed = g.Key.ReceiptDismissed == true,
-                Source = g.Max(p => p != null && p.IsManualOverride)
+                Source = g.Any(p => p != null && p.IsManualOverride)
                     ? ReimbursabilitySource.UserOverride
                     : ReimbursabilitySource.AIPrediction
             }
