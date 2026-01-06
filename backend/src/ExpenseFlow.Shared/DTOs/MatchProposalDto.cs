@@ -16,9 +16,14 @@ public class MatchProposalDto
     public Guid ReceiptId { get; set; }
 
     /// <summary>
-    /// Linked transaction ID.
+    /// Linked transaction ID (null if matched to a group).
     /// </summary>
-    public Guid TransactionId { get; set; }
+    public Guid? TransactionId { get; set; }
+
+    /// <summary>
+    /// Linked transaction group ID (null if matched to a transaction).
+    /// </summary>
+    public Guid? TransactionGroupId { get; set; }
 
     /// <summary>
     /// Overall confidence score (0-100).

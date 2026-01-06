@@ -1285,8 +1285,8 @@ public class ExpensePredictionService : IExpensePredictionService
         // Check which transactions already have matched receipts
         var transactionIds = predictedTransactions.Select(p => p.TransactionId).ToList();
         var matchedTransactionIds = await _dbContext.ReceiptTransactionMatches
-            .Where(m => transactionIds.Contains(m.TransactionId) && m.Status == MatchProposalStatus.Confirmed)
-            .Select(m => m.TransactionId)
+            .Where(m => m.TransactionId.HasValue && transactionIds.Contains(m.TransactionId.Value) && m.Status == MatchProposalStatus.Confirmed)
+            .Select(m => m.TransactionId!.Value)
             .ToHashSetAsync();
 
         return predictedTransactions.Select(p => new PredictedTransactionDto
