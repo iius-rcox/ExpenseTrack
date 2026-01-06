@@ -125,10 +125,18 @@ public class ReceiptService : IReceiptService
         int pageNumber = 1,
         int pageSize = 20,
         ReceiptStatus? status = null,
+        MatchStatus? matchStatus = null,
+        string? vendor = null,
+        DateOnly? receiptDateFrom = null,
+        DateOnly? receiptDateTo = null,
         DateTime? fromDate = null,
-        DateTime? toDate = null)
+        DateTime? toDate = null,
+        string? sortBy = null,
+        string? sortOrder = null)
     {
-        return await _receiptRepository.GetPagedAsync(userId, pageNumber, pageSize, status, fromDate, toDate);
+        return await _receiptRepository.GetPagedAsync(
+            userId, pageNumber, pageSize, status, matchStatus, vendor,
+            receiptDateFrom, receiptDateTo, fromDate, toDate, sortBy, sortOrder);
     }
 
     public async Task<bool> DeleteReceiptAsync(Guid id, Guid userId)

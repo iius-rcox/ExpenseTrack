@@ -144,13 +144,19 @@ public class ReceiptsController : ApiControllerBase
     }
 
     /// <summary>
-    /// Gets a paginated list of receipts for the current user.
+    /// Gets a paginated list of receipts for the current user with filtering and sorting.
     /// </summary>
     /// <param name="pageNumber">Page number (1-based)</param>
     /// <param name="pageSize">Items per page (max 100)</param>
-    /// <param name="status">Optional status filter</param>
-    /// <param name="fromDate">Optional start date filter</param>
-    /// <param name="toDate">Optional end date filter</param>
+    /// <param name="status">Optional receipt status filter</param>
+    /// <param name="matchStatus">Optional match status filter (Unmatched, Proposed, Matched)</param>
+    /// <param name="vendor">Optional vendor name search (case-insensitive)</param>
+    /// <param name="receiptDateFrom">Optional receipt date start filter</param>
+    /// <param name="receiptDateTo">Optional receipt date end filter</param>
+    /// <param name="fromDate">Optional upload date start filter</param>
+    /// <param name="toDate">Optional upload date end filter</param>
+    /// <param name="sortBy">Sort field: date, amount, vendor, created (default)</param>
+    /// <param name="sortOrder">Sort order: asc or desc (default)</param>
     /// <returns>Paginated list of receipts</returns>
     [HttpGet]
     [ProducesResponseType(typeof(ReceiptListResponseDto), StatusCodes.Status200OK)]
@@ -158,8 +164,14 @@ public class ReceiptsController : ApiControllerBase
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] ReceiptStatus? status = null,
+        [FromQuery] MatchStatus? matchStatus = null,
+        [FromQuery] string? vendor = null,
+        [FromQuery] DateOnly? receiptDateFrom = null,
+        [FromQuery] DateOnly? receiptDateTo = null,
         [FromQuery] DateTime? fromDate = null,
-        [FromQuery] DateTime? toDate = null)
+        [FromQuery] DateTime? toDate = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortOrder = null)
     {
         if (pageNumber < 1) pageNumber = 1;
         if (pageSize < 1) pageSize = 20;
@@ -167,7 +179,8 @@ public class ReceiptsController : ApiControllerBase
 
         var user = await _userService.GetOrCreateUserAsync(User);
         var (items, totalCount) = await _receiptService.GetReceiptsAsync(
-            user.Id, pageNumber, pageSize, status, fromDate, toDate);
+            user.Id, pageNumber, pageSize, status, matchStatus, vendor,
+            receiptDateFrom, receiptDateTo, fromDate, toDate, sortBy, sortOrder);
 
         var response = new ReceiptListResponseDto
         {

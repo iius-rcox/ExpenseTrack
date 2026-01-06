@@ -62,17 +62,49 @@ public class ReceiptRepository : IReceiptRepository
         int pageNumber = 1,
         int pageSize = 20,
         ReceiptStatus? status = null,
+        MatchStatus? matchStatus = null,
+        string? vendor = null,
+        DateOnly? receiptDateFrom = null,
+        DateOnly? receiptDateTo = null,
         DateTime? fromDate = null,
-        DateTime? toDate = null)
+        DateTime? toDate = null,
+        string? sortBy = null,
+        string? sortOrder = null)
     {
         var query = _context.Receipts
             .Where(r => r.UserId == userId);
 
+        // Receipt status filter
         if (status.HasValue)
         {
             query = query.Where(r => r.Status == status.Value);
         }
 
+        // Match status filter
+        if (matchStatus.HasValue)
+        {
+            query = query.Where(r => r.MatchStatus == matchStatus.Value);
+        }
+
+        // Vendor search (case-insensitive)
+        if (!string.IsNullOrWhiteSpace(vendor))
+        {
+            query = query.Where(r => r.VendorExtracted != null &&
+                EF.Functions.ILike(r.VendorExtracted, $"%{vendor}%"));
+        }
+
+        // Receipt date filter (DateExtracted)
+        if (receiptDateFrom.HasValue)
+        {
+            query = query.Where(r => r.DateExtracted >= receiptDateFrom.Value);
+        }
+
+        if (receiptDateTo.HasValue)
+        {
+            query = query.Where(r => r.DateExtracted <= receiptDateTo.Value);
+        }
+
+        // Upload date filter (CreatedAt)
         if (fromDate.HasValue)
         {
             query = query.Where(r => r.CreatedAt >= fromDate.Value);
@@ -85,8 +117,27 @@ public class ReceiptRepository : IReceiptRepository
 
         var totalCount = await query.CountAsync();
 
+        // Apply sorting
+        var isDescending = string.Equals(sortOrder, "desc", StringComparison.OrdinalIgnoreCase) ||
+                           string.IsNullOrEmpty(sortOrder);
+
+        query = sortBy?.ToLowerInvariant() switch
+        {
+            "date" => isDescending
+                ? query.OrderByDescending(r => r.DateExtracted)
+                : query.OrderBy(r => r.DateExtracted),
+            "amount" => isDescending
+                ? query.OrderByDescending(r => r.AmountExtracted)
+                : query.OrderBy(r => r.AmountExtracted),
+            "vendor" => isDescending
+                ? query.OrderByDescending(r => r.VendorExtracted)
+                : query.OrderBy(r => r.VendorExtracted),
+            _ => isDescending
+                ? query.OrderByDescending(r => r.CreatedAt)
+                : query.OrderBy(r => r.CreatedAt)
+        };
+
         var items = await query
-            .OrderByDescending(r => r.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();

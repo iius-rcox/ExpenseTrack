@@ -1,14 +1,14 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { useReceiptList, useReceiptStatusCounts } from '@/hooks/queries/use-receipts'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { ReceiptCard, ReceiptCardSkeleton } from '@/components/receipts/receipt-card'
 import { ReceiptUploadDropzone } from '@/components/receipts/receipt-upload-dropzone'
+import { ReceiptFilterPanel, type ReceiptFilters } from '@/components/receipts/receipt-filter-panel'
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,12 @@ import { Receipt, Upload, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const receiptSearchSchema = z.object({
   status: z.string().optional(),
+  matchStatus: z.enum(['unmatched', 'proposed', 'matched']).optional(),
+  vendor: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  sortBy: z.enum(['date', 'amount', 'vendor', 'created']).optional().default('created'),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
   page: z.coerce.number().optional().default(1),
   pageSize: z.coerce.number().optional().default(20),
 })
@@ -30,52 +36,62 @@ export const Route = createFileRoute('/_authenticated/receipts/')({
   component: ReceiptsPage,
 })
 
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'All Receipts' },
-  { value: 'Pending', label: 'Pending' },
-  { value: 'Processing', label: 'Processing' },
-  { value: 'Processed', label: 'Processed' },
-  { value: 'Unmatched', label: 'Unmatched' },
-  { value: 'Matched', label: 'Matched' },
-  { value: 'Error', label: 'Error' },
-]
-
 function ReceiptsPage() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
 
-  const status = search.status
-  const page = search.page
-  const pageSize = search.pageSize
+  const { status, matchStatus, vendor, dateFrom, dateTo, sortBy, sortOrder, page, pageSize } = search
 
   const { data: receipts, isLoading, error } = useReceiptList({
-    status: status === 'all' ? undefined : status,
+    status,
+    matchStatus,
+    vendor,
+    dateFrom,
+    dateTo,
+    sortBy,
+    sortOrder,
     page,
     pageSize,
   })
 
   const { data: statusCounts } = useReceiptStatusCounts()
 
-  const handleStatusChange = (newStatus: string) => {
-    navigate({
-      search: {
-        status: newStatus === 'all' ? undefined : newStatus,
-        page: 1,
-        pageSize,
-      },
-    })
-  }
+  // Memoize current filters object for the panel
+  const currentFilters = useMemo<ReceiptFilters>(() => ({
+    status,
+    matchStatus,
+    vendor,
+    dateFrom,
+    dateTo,
+    sortBy: sortBy || 'created',
+    sortOrder: sortOrder || 'desc',
+  }), [status, matchStatus, vendor, dateFrom, dateTo, sortBy, sortOrder])
 
-  const handlePageChange = (newPage: number) => {
+  const handleFiltersChange = useCallback((newFilters: ReceiptFilters) => {
     navigate({
       search: {
-        status,
-        page: newPage,
+        status: newFilters.status,
+        matchStatus: newFilters.matchStatus,
+        vendor: newFilters.vendor,
+        dateFrom: newFilters.dateFrom,
+        dateTo: newFilters.dateTo,
+        sortBy: newFilters.sortBy,
+        sortOrder: newFilters.sortOrder,
+        page: 1, // Reset to first page on filter change
         pageSize,
       },
     })
-  }
+  }, [navigate, pageSize])
+
+  const handlePageChange = useCallback((newPage: number) => {
+    navigate({
+      search: {
+        ...search,
+        page: newPage,
+      },
+    })
+  }, [navigate, search])
 
   const totalPages = receipts ? Math.ceil(receipts.totalCount / pageSize) : 0
 
@@ -109,30 +125,13 @@ function ReceiptsPage() {
         </Dialog>
       </div>
 
-      {/* Status Counts */}
-      {statusCounts && (
-        <div className="flex flex-wrap gap-2">
-          {STATUS_OPTIONS.map(({ value, label }) => {
-            const count = value === 'all'
-              ? statusCounts.total
-              : statusCounts.counts[value] ?? 0
-
-            return (
-              <Button
-                key={value}
-                variant={status === value || (status === undefined && value === 'all') ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleStatusChange(value)}
-              >
-                {label}
-                <Badge variant="secondary" className="ml-2">
-                  {count}
-                </Badge>
-              </Button>
-            )
-          })}
-        </div>
-      )}
+      {/* Filter Panel */}
+      <ReceiptFilterPanel
+        filters={currentFilters}
+        onFiltersChange={handleFiltersChange}
+        statusCounts={statusCounts?.counts}
+        totalCount={receipts?.totalCount}
+      />
 
       {/* Error State */}
       {error && (
@@ -158,16 +157,31 @@ function ReceiptsPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Receipt className="h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-lg font-semibold">No receipts found</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {status ? `No receipts with status "${status}"` : 'Upload your first receipt to get started'}
+            <p className="text-sm text-muted-foreground mt-1 text-center max-w-sm">
+              {(status || matchStatus || vendor)
+                ? 'No receipts match your current filters. Try adjusting your search criteria.'
+                : 'Upload your first receipt to get started'}
             </p>
-            <Button
-              className="mt-4"
-              onClick={() => setUploadDialogOpen(true)}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload Receipts
-            </Button>
+            {(status || matchStatus || vendor) ? (
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => handleFiltersChange({
+                  sortBy: 'created',
+                  sortOrder: 'desc',
+                })}
+              >
+                Clear Filters
+              </Button>
+            ) : (
+              <Button
+                className="mt-4"
+                onClick={() => setUploadDialogOpen(true)}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Receipts
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

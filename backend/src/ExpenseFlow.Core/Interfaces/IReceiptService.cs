@@ -24,15 +24,21 @@ public interface IReceiptService
     Task<Receipt?> GetReceiptAsync(Guid id, Guid userId);
 
     /// <summary>
-    /// Gets a paginated list of receipts for a user.
+    /// Gets a paginated list of receipts for a user with filtering and sorting.
     /// </summary>
     Task<(List<Receipt> Items, int TotalCount)> GetReceiptsAsync(
         Guid userId,
         int pageNumber = 1,
         int pageSize = 20,
         ReceiptStatus? status = null,
+        MatchStatus? matchStatus = null,
+        string? vendor = null,
+        DateOnly? receiptDateFrom = null,
+        DateOnly? receiptDateTo = null,
         DateTime? fromDate = null,
-        DateTime? toDate = null);
+        DateTime? toDate = null,
+        string? sortBy = null,
+        string? sortOrder = null);
 
     /// <summary>
     /// Deletes a receipt and its associated blob storage files.

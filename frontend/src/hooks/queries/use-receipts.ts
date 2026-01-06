@@ -23,18 +23,40 @@ export const receiptKeys = {
 
 interface ReceiptListParams {
   status?: string
+  matchStatus?: 'unmatched' | 'proposed' | 'matched'
+  vendor?: string
+  dateFrom?: string
+  dateTo?: string
+  sortBy?: 'date' | 'amount' | 'vendor' | 'created'
+  sortOrder?: 'asc' | 'desc'
   page?: number
   pageSize?: number
 }
 
 export function useReceiptList(params: ReceiptListParams = {}) {
-  const { status, page = 1, pageSize = 20 } = params
+  const {
+    status,
+    matchStatus,
+    vendor,
+    dateFrom,
+    dateTo,
+    sortBy,
+    sortOrder,
+    page = 1,
+    pageSize = 20
+  } = params
 
   return useQuery({
-    queryKey: receiptKeys.list({ status, page, pageSize }),
+    queryKey: receiptKeys.list({ status, matchStatus, vendor, dateFrom, dateTo, sortBy, sortOrder, page, pageSize }),
     queryFn: async () => {
       const searchParams = new URLSearchParams()
       if (status) searchParams.set('status', status)
+      if (matchStatus) searchParams.set('matchStatus', matchStatus.charAt(0).toUpperCase() + matchStatus.slice(1))
+      if (vendor) searchParams.set('vendor', vendor)
+      if (dateFrom) searchParams.set('receiptDateFrom', dateFrom)
+      if (dateTo) searchParams.set('receiptDateTo', dateTo)
+      if (sortBy) searchParams.set('sortBy', sortBy)
+      if (sortOrder) searchParams.set('sortOrder', sortOrder)
       searchParams.set('pageNumber', String(page))
       searchParams.set('pageSize', String(pageSize))
 

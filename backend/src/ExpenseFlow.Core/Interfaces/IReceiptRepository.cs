@@ -43,22 +43,34 @@ public interface IReceiptRepository
     Task<bool> DeleteAsync(Guid id, Guid userId);
 
     /// <summary>
-    /// Gets a paginated list of receipts for a user.
+    /// Gets a paginated list of receipts for a user with filtering and sorting.
     /// </summary>
     /// <param name="userId">User ID for row-level security</param>
     /// <param name="pageNumber">1-based page number</param>
     /// <param name="pageSize">Number of items per page</param>
-    /// <param name="status">Optional status filter</param>
-    /// <param name="fromDate">Optional start date filter</param>
-    /// <param name="toDate">Optional end date filter</param>
-    /// <returns>Paginated list of receipts ordered by created date descending</returns>
+    /// <param name="status">Optional receipt status filter</param>
+    /// <param name="matchStatus">Optional match status filter</param>
+    /// <param name="vendor">Optional vendor name search (case-insensitive)</param>
+    /// <param name="receiptDateFrom">Optional receipt date start filter (DateExtracted)</param>
+    /// <param name="receiptDateTo">Optional receipt date end filter (DateExtracted)</param>
+    /// <param name="fromDate">Optional upload date start filter (CreatedAt)</param>
+    /// <param name="toDate">Optional upload date end filter (CreatedAt)</param>
+    /// <param name="sortBy">Sort field: date, amount, vendor, created (default)</param>
+    /// <param name="sortOrder">Sort order: asc or desc (default)</param>
+    /// <returns>Paginated list of receipts</returns>
     Task<(List<Receipt> Items, int TotalCount)> GetPagedAsync(
         Guid userId,
         int pageNumber = 1,
         int pageSize = 20,
         ReceiptStatus? status = null,
+        MatchStatus? matchStatus = null,
+        string? vendor = null,
+        DateOnly? receiptDateFrom = null,
+        DateOnly? receiptDateTo = null,
         DateTime? fromDate = null,
-        DateTime? toDate = null);
+        DateTime? toDate = null,
+        string? sortBy = null,
+        string? sortOrder = null);
 
     /// <summary>
     /// Gets count of receipts by status for a user.
