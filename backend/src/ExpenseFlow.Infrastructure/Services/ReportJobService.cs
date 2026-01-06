@@ -2,6 +2,7 @@ using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Infrastructure.Jobs;
 using Hangfire;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace ExpenseFlow.Infrastructure.Services;
@@ -48,14 +49,32 @@ public class ReportJobService : IReportJobService
             CreatedAt = DateTime.UtcNow
         };
 
-        // Save to database
-        job = await _repository.AddAsync(job, ct);
+        // Save to database - handle TOCTOU race condition via unique constraint
+        try
+        {
+            job = await _repository.AddAsync(job, ct);
+        }
+        catch (DbUpdateException ex) when (
+            ex.InnerException?.Message.Contains("ix_report_generation_jobs_user_period_active") == true ||
+            ex.InnerException?.Message.Contains("duplicate key") == true)
+        {
+            // Another job was created between our check and insert - return same error as duplicate check
+            _logger.LogWarning(
+                "Concurrent duplicate job creation for user {UserId} period {Period}",
+                userId, period);
+
+            throw new InvalidOperationException(
+                $"An active report generation job already exists for period {period}");
+        }
 
         _logger.LogInformation(
             "Created report generation job {JobId} for user {UserId} period {Period}",
             job.Id, userId, period);
 
         // Enqueue Hangfire job
+        // NOTE: Use CancellationToken.None intentionally - the background job runs independently
+        // of the HTTP request. User cancellation is handled via database status checking
+        // (IsCancellationRequestedAsync) within the background job's processing loop.
         var hangfireJobId = _backgroundJobClient.Enqueue<ReportGenerationBackgroundJob>(
             bgJob => bgJob.ExecuteAsync(job.Id, CancellationToken.None));
 

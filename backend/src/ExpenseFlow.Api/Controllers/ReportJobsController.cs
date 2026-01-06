@@ -227,6 +227,7 @@ public class ReportJobsController : ApiControllerBase
         Id = job.Id,
         Period = job.Period,
         Status = job.Status.ToString(),
+        StatusMessage = GetStatusMessage(job),
         TotalLines = job.TotalLines,
         ProcessedLines = job.ProcessedLines,
         FailedLines = job.FailedLines,
@@ -236,6 +237,21 @@ public class ReportJobsController : ApiControllerBase
         CompletedAt = job.CompletedAt,
         CreatedAt = job.CreatedAt,
         GeneratedReportId = job.GeneratedReportId
+    };
+
+    private static string GetStatusMessage(ReportGenerationJob job) => job.Status switch
+    {
+        ReportJobStatus.Pending => "Waiting to start...",
+        ReportJobStatus.Processing when job.TotalLines > 0 =>
+            $"Processing {job.ProcessedLines:N0} of {job.TotalLines:N0} lines...",
+        ReportJobStatus.Processing => "Gathering transactions...",
+        ReportJobStatus.Completed when job.FailedLines > 0 =>
+            $"Completed with {job.FailedLines:N0} lines requiring review",
+        ReportJobStatus.Completed => "Report generated successfully",
+        ReportJobStatus.Failed => job.ErrorMessage ?? "Report generation failed",
+        ReportJobStatus.Cancelled => "Cancelled by user",
+        ReportJobStatus.CancellationRequested => "Cancelling...",
+        _ => job.Status.ToString()
     };
 }
 

@@ -112,6 +112,19 @@ public class ReportGenerationBackgroundJob
         {
             _logger.LogError(ex, "Report generation job {JobId} failed", jobId);
 
+            // Check if job was already cancelled - don't overwrite cancellation status
+            // This prevents race conditions where cancellation + exception occur simultaneously
+            var currentJob = await _jobRepository.GetByIdAsync(job.Id, CancellationToken.None);
+            if (currentJob?.Status == ReportJobStatus.Cancelled ||
+                currentJob?.Status == ReportJobStatus.CancellationRequested)
+            {
+                _logger.LogInformation(
+                    "Job {JobId} was cancelled during error handling, preserving cancelled status",
+                    jobId);
+                await MarkAsCancelledAsync(job, CancellationToken.None);
+                return; // Don't rethrow - cancellation is expected
+            }
+
             job.Status = ReportJobStatus.Failed;
             job.CompletedAt = DateTime.UtcNow;
             job.ErrorMessage = ex.Message;
@@ -180,13 +193,6 @@ public class ReportGenerationBackgroundJob
         // Process confirmed matches (with receipts)
         foreach (var match in confirmedMatches)
         {
-            // Check for cancellation
-            if (await ShouldCancelAsync(job.Id, cancellationToken))
-            {
-                _logger.LogInformation("Job {JobId} cancelled at line {Line}/{Total}", job.Id, processedLines, totalLines);
-                return null;
-            }
-
             try
             {
                 var line = await ProcessMatchAsync(match, lineOrder++, predictedTransactionLookup,
@@ -204,9 +210,16 @@ public class ReportGenerationBackgroundJob
 
             processedLines++;
 
-            // Update progress periodically
+            // Update progress and check cancellation periodically (reduces N+1 queries)
             if (ShouldUpdateProgress(processedLines, lastProgressUpdate))
             {
+                // Check for cancellation only on progress updates to minimize DB queries
+                if (await ShouldCancelAsync(job.Id, cancellationToken))
+                {
+                    _logger.LogInformation("Job {JobId} cancelled at line {Line}/{Total}", job.Id, processedLines, totalLines);
+                    return null;
+                }
+
                 var estimatedCompletion = CalculateEstimatedCompletion(
                     processedLines, totalLines, processingStartTime);
 
@@ -220,13 +233,6 @@ public class ReportGenerationBackgroundJob
         // Process unmatched transactions (missing receipts)
         foreach (var transaction in unmatchedTransactions)
         {
-            // Check for cancellation
-            if (await ShouldCancelAsync(job.Id, cancellationToken))
-            {
-                _logger.LogInformation("Job {JobId} cancelled at line {Line}/{Total}", job.Id, processedLines, totalLines);
-                return null;
-            }
-
             try
             {
                 var line = await ProcessUnmatchedTransactionAsync(
@@ -248,9 +254,16 @@ public class ReportGenerationBackgroundJob
 
             processedLines++;
 
-            // Update progress periodically
+            // Update progress and check cancellation periodically (reduces N+1 queries)
             if (ShouldUpdateProgress(processedLines, lastProgressUpdate))
             {
+                // Check for cancellation only on progress updates to minimize DB queries
+                if (await ShouldCancelAsync(job.Id, cancellationToken))
+                {
+                    _logger.LogInformation("Job {JobId} cancelled at line {Line}/{Total}", job.Id, processedLines, totalLines);
+                    return null;
+                }
+
                 var estimatedCompletion = CalculateEstimatedCompletion(
                     processedLines, totalLines, processingStartTime);
 

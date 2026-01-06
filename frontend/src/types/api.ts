@@ -572,6 +572,8 @@ export interface ReportJob {
   id: string
   period: string
   status: ReportJobStatus
+  /** Human-readable status message for display */
+  statusMessage: string
   totalLines: number
   processedLines: number
   failedLines: number

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -45,18 +45,29 @@ export function ReportGenerationProgress({
   const { data: job, isLoading, error: fetchError } = useReportJob(jobId)
   const { mutate: cancelJob, isPending: isCancelling } = useCancelReportJob()
 
-  // Trigger callbacks on terminal states
+  // Store callbacks in ref to avoid dependency issues and prevent infinite loops
+  // This ensures callbacks fire exactly once per terminal state transition
+  const callbacksRef = useRef({ onComplete, onError, onCancel })
+  callbacksRef.current = { onComplete, onError, onCancel }
+
+  // Track if we've already fired a callback to prevent duplicates
+  const hasFiredRef = useRef(false)
+
+  // Trigger callbacks on terminal states (once per job)
   useEffect(() => {
-    if (!job) return
+    if (!job || hasFiredRef.current) return
 
     if (job.status === 'Completed' && job.generatedReportId) {
-      onComplete?.(job.generatedReportId)
+      hasFiredRef.current = true
+      callbacksRef.current.onComplete?.(job.generatedReportId)
     } else if (job.status === 'Failed' && job.errorMessage) {
-      onError?.(job.errorMessage)
+      hasFiredRef.current = true
+      callbacksRef.current.onError?.(job.errorMessage)
     } else if (job.status === 'Cancelled') {
-      onCancel?.()
+      hasFiredRef.current = true
+      callbacksRef.current.onCancel?.()
     }
-  }, [job?.status, job?.generatedReportId, job?.errorMessage, onComplete, onError, onCancel])
+  }, [job?.status, job?.generatedReportId, job?.errorMessage])
 
   const handleCancel = () => {
     cancelJob(jobId)
@@ -98,7 +109,7 @@ export function ReportGenerationProgress({
           <StatusBadge status={job.status} />
         </div>
         <CardDescription>
-          {job.period} - {getStatusDescription(job)}
+          {job.period} - {job.statusMessage || getStatusDescription(job)}
         </CardDescription>
       </CardHeader>
 
