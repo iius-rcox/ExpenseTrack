@@ -190,44 +190,36 @@ public class MissingReceiptService : IMissingReceiptService
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        // Query for transactions with confirmed predictions
-        var query = from t in _dbContext.Transactions
-                    where t.UserId == userId
-                       && t.MatchedReceiptId == null
-                       && (includeDismissed || t.ReceiptDismissed != true)
-                    // Join with confirmed predictions
-                    join p in _dbContext.TransactionPredictions
-                        on new { t.Id, t.UserId } equals new { Id = p.TransactionId, p.UserId }
-                    where p.Status == PredictionStatus.Confirmed
-                    // Prefer user override (IsManualOverride = true) over AI prediction
-                    orderby p.IsManualOverride descending
-                    select new
-                    {
-                        Transaction = t,
-                        Prediction = p
-                    };
-
-        // Group by transaction to handle multiple predictions (take the one with IsManualOverride first)
-        return query
-            .GroupBy(x => x.Transaction.Id)
+        // Subquery: Get the best prediction per transaction (prefer IsManualOverride=true)
+        // Using GroupBy with only aggregate functions ensures proper SQL translation
+        var bestPredictions = _dbContext.TransactionPredictions
+            .Where(p => p.UserId == userId && p.Status == PredictionStatus.Confirmed)
+            .GroupBy(p => p.TransactionId)
             .Select(g => new
             {
-                Transaction = g.First().Transaction,
-                IsManualOverride = g.Max(x => x.Prediction.IsManualOverride)
-            })
-            .Select(x => new MissingReceiptSummaryDto
-            {
-                TransactionId = x.Transaction.Id,
-                TransactionDate = x.Transaction.TransactionDate,
-                Description = x.Transaction.Description,
-                Amount = x.Transaction.Amount,
-                DaysSinceTransaction = today.DayNumber - x.Transaction.TransactionDate.DayNumber,
-                ReceiptUrl = x.Transaction.ReceiptUrl,
-                IsDismissed = x.Transaction.ReceiptDismissed == true,
-                Source = x.IsManualOverride
-                    ? ReimbursabilitySource.UserOverride
-                    : ReimbursabilitySource.AIPrediction
+                TransactionId = g.Key,
+                IsManualOverride = g.Max(p => p.IsManualOverride)
             });
+
+        // Main query: Join transactions with their best prediction
+        return from t in _dbContext.Transactions
+               join bp in bestPredictions on t.Id equals bp.TransactionId
+               where t.UserId == userId
+                  && t.MatchedReceiptId == null
+                  && (includeDismissed || t.ReceiptDismissed != true)
+               select new MissingReceiptSummaryDto
+               {
+                   TransactionId = t.Id,
+                   TransactionDate = t.TransactionDate,
+                   Description = t.Description,
+                   Amount = t.Amount,
+                   DaysSinceTransaction = today.DayNumber - t.TransactionDate.DayNumber,
+                   ReceiptUrl = t.ReceiptUrl,
+                   IsDismissed = t.ReceiptDismissed == true,
+                   Source = bp.IsManualOverride
+                       ? ReimbursabilitySource.UserOverride
+                       : ReimbursabilitySource.AIPrediction
+               };
     }
 
     /// <summary>
@@ -256,6 +248,7 @@ public class MissingReceiptService : IMissingReceiptService
 
     /// <summary>
     /// Gets a single transaction summary by ID.
+    /// Uses a single query with left join to avoid N+1 problem.
     /// </summary>
     private async Task<MissingReceiptSummaryDto?> GetTransactionSummaryAsync(
         Guid userId,
@@ -264,9 +257,17 @@ public class MissingReceiptService : IMissingReceiptService
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var transaction = await _dbContext.Transactions
-            .Where(t => t.Id == transactionId && t.UserId == userId)
-            .Select(t => new
+        // Single query: Join transaction with its best prediction (if any)
+        var result = await (
+            from t in _dbContext.Transactions
+            where t.Id == transactionId && t.UserId == userId
+            // Left join with predictions, preferring IsManualOverride
+            join p in _dbContext.TransactionPredictions
+                .Where(p => p.Status == PredictionStatus.Confirmed)
+                on new { TransactionId = t.Id, t.UserId } equals new { p.TransactionId, p.UserId }
+                into predictions
+            from p in predictions.DefaultIfEmpty()
+            group p by new
             {
                 t.Id,
                 t.TransactionDate,
@@ -274,33 +275,23 @@ public class MissingReceiptService : IMissingReceiptService
                 t.Amount,
                 t.ReceiptUrl,
                 t.ReceiptDismissed
-            })
-            .FirstOrDefaultAsync(ct);
+            } into g
+            select new MissingReceiptSummaryDto
+            {
+                TransactionId = g.Key.Id,
+                TransactionDate = g.Key.TransactionDate,
+                Description = g.Key.Description,
+                Amount = g.Key.Amount,
+                DaysSinceTransaction = today.DayNumber - g.Key.TransactionDate.DayNumber,
+                ReceiptUrl = g.Key.ReceiptUrl,
+                IsDismissed = g.Key.ReceiptDismissed == true,
+                Source = g.Max(p => p != null && p.IsManualOverride)
+                    ? ReimbursabilitySource.UserOverride
+                    : ReimbursabilitySource.AIPrediction
+            }
+        ).FirstOrDefaultAsync(ct);
 
-        if (transaction == null)
-            return null;
-
-        // Check for prediction to determine source
-        var prediction = await _dbContext.TransactionPredictions
-            .Where(p => p.TransactionId == transactionId
-                     && p.UserId == userId
-                     && p.Status == PredictionStatus.Confirmed)
-            .OrderByDescending(p => p.IsManualOverride)
-            .FirstOrDefaultAsync(ct);
-
-        return new MissingReceiptSummaryDto
-        {
-            TransactionId = transaction.Id,
-            TransactionDate = transaction.TransactionDate,
-            Description = transaction.Description,
-            Amount = transaction.Amount,
-            DaysSinceTransaction = today.DayNumber - transaction.TransactionDate.DayNumber,
-            ReceiptUrl = transaction.ReceiptUrl,
-            IsDismissed = transaction.ReceiptDismissed == true,
-            Source = prediction?.IsManualOverride == true
-                ? ReimbursabilitySource.UserOverride
-                : ReimbursabilitySource.AIPrediction
-        };
+        return result;
     }
 
     #endregion

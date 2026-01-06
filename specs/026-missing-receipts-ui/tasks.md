@@ -41,7 +41,7 @@
 - [x] T006 Add GetWidgetDataAsync method to MissingReceiptService (count + top 3 items)
 - [x] T007 Add UpdateReceiptUrlAsync method to MissingReceiptService
 - [x] T008 Add DismissTransactionAsync method to MissingReceiptService (dismiss/restore logic)
-- [ ] T008a [P] Create unit tests for MissingReceiptService in `backend/tests/ExpenseFlow.Core.Tests/Services/MissingReceiptServiceTests.cs` (test GetMissingReceiptsAsync, GetWidgetDataAsync, UpdateReceiptUrlAsync, DismissTransactionAsync)
+- [x] T008a [P] Create unit tests for MissingReceiptService in `backend/tests/ExpenseFlow.Infrastructure.Tests/Services/MissingReceiptServiceTests.cs` (test GetMissingReceiptsAsync, GetWidgetDataAsync, UpdateReceiptUrlAsync, DismissTransactionAsync)
 - [x] T009 Register MissingReceiptService in DI container in `backend/src/ExpenseFlow.Infrastructure/Extensions/ServiceCollectionExtensions.cs`
 - [x] T010 Create MissingReceiptsController with all endpoints in `backend/src/ExpenseFlow.Api/Controllers/MissingReceiptsController.cs`
 - [ ] T010a [P] Create integration tests for MissingReceiptsController in `backend/tests/ExpenseFlow.Api.Tests/Controllers/MissingReceiptsControllerTests.cs` (test all 4 endpoints with auth, validation, and error cases)
