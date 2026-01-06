@@ -61,13 +61,14 @@ export function useGenerateReport() {
 
   return useMutation({
     mutationFn: async (data: GenerateDraftRequest) => {
-      // Use extended timeout (90s) for report generation which involves
-      // AI categorization and description normalization for each line
+      // Use extended timeout (180s) for report generation which involves
+      // AI categorization and description normalization for each line.
+      // Note: OpenAI rate limiting (HTTP 429) can significantly slow processing.
       return apiFetch<ExpenseReport>('/reports/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-        timeout: 90000, // 90 seconds
+        timeout: 180000, // 180 seconds (3 minutes)
       })
     },
     onSuccess: () => {
