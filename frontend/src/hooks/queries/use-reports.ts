@@ -61,10 +61,13 @@ export function useGenerateReport() {
 
   return useMutation({
     mutationFn: async (data: GenerateDraftRequest) => {
+      // Use extended timeout (90s) for report generation which involves
+      // AI categorization and description normalization for each line
       return apiFetch<ExpenseReport>('/reports/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
+        timeout: 90000, // 90 seconds
       })
     },
     onSuccess: () => {

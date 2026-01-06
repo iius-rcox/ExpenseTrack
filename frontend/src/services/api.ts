@@ -48,43 +48,63 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   }
 }
 
+interface ApiFetchOptions extends RequestInit {
+  /** Request timeout in milliseconds. Default: 30000 (30s) */
+  timeout?: number
+}
+
 export async function apiFetch<T>(
   url: string,
-  options?: RequestInit
+  options?: ApiFetchOptions
 ): Promise<T> {
   const headers = await getAuthHeaders()
+  const { timeout = 30000, ...fetchOptions } = options ?? {}
 
-  const response = await fetch(`${API_BASE_URL}${url}`, {
-    ...options,
-    headers: { ...headers, ...options?.headers },
-  })
+  // Create abort controller for timeout
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
 
-  if (!response.ok) {
-    let errorDetail = response.statusText
-    let errorTitle: string | undefined
+  try {
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      ...fetchOptions,
+      headers: { ...headers, ...fetchOptions?.headers },
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
 
-    try {
-      const problemDetails: ProblemDetails = await response.json()
-      errorDetail = problemDetails.detail
-      errorTitle = problemDetails.title
-    } catch {
-      // If we can't parse the error response, use the status text
+    if (!response.ok) {
+      let errorDetail = response.statusText
+      let errorTitle: string | undefined
+
       try {
-        errorDetail = await response.text()
+        const problemDetails: ProblemDetails = await response.json()
+        errorDetail = problemDetails.detail
+        errorTitle = problemDetails.title
       } catch {
-        // Ignore
+        // If we can't parse the error response, use the status text
+        try {
+          errorDetail = await response.text()
+        } catch {
+          // Ignore
+        }
       }
+
+      throw new ApiError(response.status, errorDetail, errorTitle)
     }
 
-    throw new ApiError(response.status, errorDetail, errorTitle)
-  }
+    // Handle 204 No Content
+    if (response.status === 204) {
+      return undefined as T
+    }
 
-  // Handle 204 No Content
-  if (response.status === 204) {
-    return undefined as T
+    return response.json()
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError(408, 'Request timed out')
+    }
+    throw error
   }
-
-  return response.json()
 }
 
 // File upload with FormData
