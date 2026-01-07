@@ -280,12 +280,37 @@ function MobileTransactionCard({
  * Defensive check verifies required group properties exist at runtime.
  */
 function isGroup(item: TransactionListItem): item is TransactionGroupView {
-  return (
-    item.type === 'group' &&
-    'transactionCount' in item &&
-    'combinedAmount' in item &&
-    'displayDate' in item
-  );
+  const hasType = item.type === 'group';
+  const hasTransactionCount = 'transactionCount' in item;
+  const hasCombinedAmount = 'combinedAmount' in item;
+  const hasDisplayDate = 'displayDate' in item;
+
+  // DIAGNOSTIC: Log when an item has type='group' but fails other checks
+  if (hasType && (!hasTransactionCount || !hasCombinedAmount || !hasDisplayDate)) {
+    console.error('[TransactionGrid] ⚠️ MALFORMED GROUP DETECTED - item has type="group" but missing required properties:', {
+      id: item.id,
+      type: item.type,
+      hasTransactionCount,
+      hasCombinedAmount,
+      hasDisplayDate,
+      itemKeys: Object.keys(item),
+      item,
+    });
+  }
+
+  // DIAGNOSTIC: Log when item.type is an object (could be empty object)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const itemAny = item as any;
+  if (typeof itemAny.type === 'object') {
+    console.error('[TransactionGrid] ⚠️ item.type IS AN OBJECT (not string):', {
+      id: itemAny.id,
+      typeValue: itemAny.type,
+      typeType: typeof itemAny.type,
+      isEmptyObject: typeof itemAny.type === 'object' && Object.keys(itemAny.type as object).length === 0,
+    });
+  }
+
+  return hasType && hasTransactionCount && hasCombinedAmount && hasDisplayDate;
 }
 
 /**
