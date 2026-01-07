@@ -353,16 +353,16 @@ export function BulkActionsBar({
                 <div className="font-medium mb-2">Select Tags</div>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {availableTags.length > 0 ? (
-                    availableTags.map((tag) => (
+                    availableTags.filter((tag) => safeDisplayString(tag)).map((tag, index) => (
                       <label
-                        key={tag}
+                        key={safeDisplayString(tag, `tag-${index}`)}
                         className="flex items-center gap-2 cursor-pointer"
                       >
                         <Checkbox
                           checked={selectedTags.includes(tag)}
                           onCheckedChange={() => handleTagToggle(tag)}
                         />
-                        <span className="text-sm">{tag}</span>
+                        <span className="text-sm">{safeDisplayString(tag)}</span>
                       </label>
                     ))
                   ) : (
