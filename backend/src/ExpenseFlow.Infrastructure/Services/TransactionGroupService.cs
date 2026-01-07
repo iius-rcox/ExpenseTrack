@@ -120,7 +120,10 @@ public class TransactionGroupService : ITransactionGroupService
 
                 _dbContext.TransactionGroups.Add(group);
 
-                // Assign transactions to the group
+                // Save the group first to ensure it exists in DB before FK references
+                await _dbContext.SaveChangesAsync(ct);
+
+                // Now assign transactions to the group (FK constraint is satisfied)
                 foreach (var transaction in transactions)
                 {
                     transaction.GroupId = group.Id;
