@@ -376,7 +376,7 @@ export const TransactionRow = memo(function TransactionRow({
           </SelectTrigger>
           <SelectContent>
             {categories.map((category) => (
-              <SelectItem key={category.id} value={category.id}>
+              <SelectItem key={safeDisplayString(category.id, `cat-${Math.random()}`)} value={safeDisplayString(category.id) || `unknown-${Math.random()}`}>
                 {safeDisplayString(category.name, 'Unknown')}
               </SelectItem>
             ))}
