@@ -258,7 +258,7 @@ public class TransactionGroupService : ITransactionGroupService
 
             if (receipt != null)
             {
-                receipt.MatchStatus = Core.Entities.MatchStatus.Unmatched;
+                receipt.MatchStatus = MatchStatus.Unmatched;
                 _logger.LogInformation(
                     "Resetting receipt {ReceiptId} to unmatched due to group {GroupId} deletion",
                     receipt.Id, groupId);

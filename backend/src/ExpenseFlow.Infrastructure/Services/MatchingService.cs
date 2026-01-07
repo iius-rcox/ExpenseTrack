@@ -127,7 +127,7 @@ public partial class MatchingService : IMatchingService
             {
                 // Look up any alias that might match the extracted vendor pattern
                 var alias = await _context.VendorAliases
-                    .FirstOrDefaultAsync(a => a.UserId == userId && a.CanonicalName == vendorPattern);
+                    .FirstOrDefaultAsync(a => a.CanonicalName == vendorPattern);
                 aliasCache[vendorPattern] = alias;
             }
         }
@@ -1219,7 +1219,7 @@ public partial class MatchingService : IMatchingService
             if (!string.IsNullOrEmpty(vendorPattern) && !aliasCache.ContainsKey(vendorPattern))
             {
                 var alias = await _context.VendorAliases
-                    .FirstOrDefaultAsync(a => a.UserId == userId && a.CanonicalName == vendorPattern);
+                    .FirstOrDefaultAsync(a => a.CanonicalName == vendorPattern);
                 aliasCache[vendorPattern] = alias;
             }
         }
