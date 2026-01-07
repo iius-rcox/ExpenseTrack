@@ -31,6 +31,8 @@ function createMockProposal(
     matchId,
     receiptId: `receipt-${matchId}`,
     transactionId: `txn-${matchId}`,
+    transactionGroupId: null,
+    candidateType: 'transaction' as const,
     confidenceScore,
     amountScore: confidenceScore,
     dateScore: confidenceScore,
@@ -54,6 +56,7 @@ function createMockProposal(
       postDate: null,
       amount: 100,
     },
+    transactionGroup: null,
     createdAt: '2024-03-15T10:00:00Z',
   }
 }

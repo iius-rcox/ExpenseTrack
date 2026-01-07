@@ -154,10 +154,9 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Use splatting for commands with many parameters
 
 ## Recent Changes
+- 028-group-matching: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, FluentValidation
 - 026-missing-receipts-ui: Added .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Router, TanStack Query, shadcn/ui
 - 025-vendor-extraction: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, existing VendorAliasService
-- 024-extraction-editor-training: Added .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Query, shadcn/ui
-- 023-expense-prediction: Added .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Query, shadcn/ui
   - Entities: ImportJob (for tracking cache warming import jobs)
   - Services: CacheWarmingService (historical data import, job management)
   - Jobs: CacheWarmingJob (Hangfire background processing)

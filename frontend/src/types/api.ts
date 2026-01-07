@@ -133,10 +133,36 @@ export interface MatchTransactionSummary {
   amount: number
 }
 
+/**
+ * Transaction group summary for matching context.
+ * Displays group name, combined amount, and transaction count.
+ */
+export interface MatchTransactionGroupSummary {
+  id: string
+  /** Group name (e.g., "TWILIO (3 charges)") */
+  name: string
+  /** Combined amount of all transactions in the group */
+  combinedAmount: number
+  /** Display date for the group */
+  displayDate: string // ISO date
+  /** Number of transactions in the group */
+  transactionCount: number
+}
+
+/**
+ * Type of match candidate - distinguishes individual transactions from groups.
+ */
+export type MatchCandidateType = 'transaction' | 'group'
+
 export interface MatchProposal {
   matchId: string
   receiptId: string
-  transactionId: string
+  /** Transaction ID (null if matched to a group) */
+  transactionId: string | null
+  /** Transaction group ID (null if matched to individual transaction) */
+  transactionGroupId: string | null
+  /** Type of match candidate: 'transaction' or 'group' */
+  candidateType: MatchCandidateType
   confidenceScore: number
   amountScore: number
   dateScore: number
@@ -144,7 +170,10 @@ export interface MatchProposal {
   matchReason: string
   status: string
   receipt: MatchReceiptSummary | null
+  /** Transaction data (null if matched to a group) */
   transaction: MatchTransactionSummary | null
+  /** Transaction group data (null if matched to individual transaction) */
+  transactionGroup: MatchTransactionGroupSummary | null
   createdAt: string
 }
 
@@ -195,9 +224,16 @@ export interface ConfirmMatchRequest {
   defaultDepartment?: string
 }
 
+/**
+ * @deprecated Use ManualMatchRequest from '@/types/match' instead.
+ * This version is kept for backward compatibility.
+ */
 export interface ManualMatchRequest {
   receiptId: string
-  transactionId: string
+  /** Transaction ID (mutually exclusive with transactionGroupId) */
+  transactionId?: string
+  /** Transaction Group ID (mutually exclusive with transactionId) */
+  transactionGroupId?: string
   vendorDisplayName?: string
   defaultGLCode?: string
   defaultDepartment?: string

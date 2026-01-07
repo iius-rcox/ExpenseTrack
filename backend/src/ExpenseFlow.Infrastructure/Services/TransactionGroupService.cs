@@ -250,19 +250,43 @@ public class TransactionGroupService : ITransactionGroupService
             return false;
         }
 
-        // Clear group reference from all transactions (cascade handled by FK, but explicit is clearer)
+        // T046: Handle matched group deletion - return receipt to unmatched status
+        if (group.MatchedReceiptId.HasValue)
+        {
+            var receipt = await _dbContext.Receipts
+                .FirstOrDefaultAsync(r => r.Id == group.MatchedReceiptId.Value, ct);
+
+            if (receipt != null)
+            {
+                receipt.MatchStatus = Core.Entities.MatchStatus.Unmatched;
+                _logger.LogInformation(
+                    "Resetting receipt {ReceiptId} to unmatched due to group {GroupId} deletion",
+                    receipt.Id, groupId);
+            }
+
+            // Remove the match record (FK cascade should handle this, but explicit is clearer)
+            var matchRecord = await _dbContext.ReceiptTransactionMatches
+                .FirstOrDefaultAsync(m => m.TransactionGroupId == groupId, ct);
+            if (matchRecord != null)
+            {
+                _dbContext.ReceiptTransactionMatches.Remove(matchRecord);
+            }
+        }
+
+        // Clear group reference from all transactions
         foreach (var transaction in group.Transactions)
         {
             transaction.GroupId = null;
         }
 
-        // Remove the group (any receipt match is cleared with it)
+        // Remove the group
         _dbContext.TransactionGroups.Remove(group);
         await _dbContext.SaveChangesAsync(ct);
 
         _logger.LogInformation(
-            "Deleted transaction group {GroupId} for user {UserId}, released {Count} transactions",
-            groupId, userId, group.TransactionCount);
+            "Deleted transaction group {GroupId} for user {UserId}, released {Count} transactions{MatchInfo}",
+            groupId, userId, group.TransactionCount,
+            group.MatchedReceiptId.HasValue ? $", unmatched receipt {group.MatchedReceiptId}" : "");
 
         return true;
     }
@@ -450,13 +474,6 @@ public class TransactionGroupService : ITransactionGroupService
                     group.Transactions.Add(tx);
                 }
 
-                // Prevent modification of matched groups
-                if (group.MatchedReceiptId.HasValue)
-                {
-                    throw new InvalidOperationException(
-                        "Cannot remove transactions from a matched group. Remove the receipt match first.");
-                }
-
                 // Step 3: Find the transaction being removed from the already-locked collection
                 // No need for another DB query - we already have all transactions locked
                 var transaction = existingTransactions.FirstOrDefault(t => t.Id == transactionId);
@@ -480,6 +497,28 @@ public class TransactionGroupService : ITransactionGroupService
 
                 // Recalculate aggregates
                 RecalculateGroupAggregates(group);
+
+                // T047: Check for amount mismatch if group is matched
+                string? warning = null;
+                if (group.MatchedReceiptId.HasValue)
+                {
+                    var receipt = await _dbContext.Receipts
+                        .FirstOrDefaultAsync(r => r.Id == group.MatchedReceiptId.Value, ct);
+
+                    if (receipt?.AmountExtracted.HasValue == true)
+                    {
+                        var difference = Math.Abs(group.CombinedAmount - receipt.AmountExtracted.Value);
+                        if (difference > 1.00m)
+                        {
+                            warning = $"Amount mismatch: Group total ({group.CombinedAmount:C}) differs from matched receipt ({receipt.AmountExtracted.Value:C}) by {difference:C}. Consider reviewing this match.";
+                            _logger.LogWarning(
+                                "Transaction removal caused amount mismatch in group {GroupId}: " +
+                                "Group amount {GroupAmount}, Receipt amount {ReceiptAmount}, Difference {Difference}",
+                                groupId, group.CombinedAmount, receipt.AmountExtracted.Value, difference);
+                        }
+                    }
+                }
+
                 await _dbContext.SaveChangesAsync(ct);
                 await dbTransaction.CommitAsync(ct);
 
@@ -487,7 +526,7 @@ public class TransactionGroupService : ITransactionGroupService
                     "Removed transaction {TransactionId} from group {GroupId}, remaining: {Count}",
                     transactionId, groupId, group.TransactionCount);
 
-                return MapToDetailDto(group, group.Transactions.ToList());
+                return MapToDetailDto(group, group.Transactions.ToList(), warning);
             }
             catch (Exception ex) when (ex is not InvalidOperationException)
             {
@@ -698,7 +737,8 @@ public class TransactionGroupService : ITransactionGroupService
     /// </summary>
     private static TransactionGroupDetailDto MapToDetailDto(
         TransactionGroup group,
-        List<Transaction> transactions)
+        List<Transaction> transactions,
+        string? warning = null)
     {
         return new TransactionGroupDetailDto
         {
@@ -711,6 +751,7 @@ public class TransactionGroupService : ITransactionGroupService
             MatchStatus = group.MatchStatus,
             MatchedReceiptId = group.MatchedReceiptId,
             CreatedAt = group.CreatedAt,
+            Warning = warning,
             Transactions = transactions
                 .OrderBy(t => t.TransactionDate)
                 .Select(t => new GroupMemberTransactionDto

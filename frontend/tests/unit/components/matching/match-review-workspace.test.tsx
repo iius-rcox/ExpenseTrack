@@ -62,6 +62,8 @@ function createMockProposal(overrides: Partial<MatchProposal> = {}): MatchPropos
     matchId: 'match-1',
     receiptId: 'receipt-1',
     transactionId: 'txn-1',
+    transactionGroupId: null,
+    candidateType: 'transaction',
     confidenceScore: 0.85,
     amountScore: 0.95,
     dateScore: 0.9,
@@ -85,6 +87,7 @@ function createMockProposal(overrides: Partial<MatchProposal> = {}): MatchPropos
       postDate: '2024-03-16',
       amount: 125.99,
     },
+    transactionGroup: null,
     createdAt: '2024-03-15T10:00:00Z',
     ...overrides,
   }
