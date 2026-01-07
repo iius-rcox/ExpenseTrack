@@ -313,7 +313,7 @@ export function TransactionFilterPanel({
                         checked={filters.categories.includes(category.id)}
                         onCheckedChange={() => handleCategoryToggle(category.id)}
                       />
-                      <span className="text-sm">{category.name}</span>
+                      <span className="text-sm">{safeDisplayString(category.name, 'Unknown')}</span>
                     </label>
                   ))}
                 </div>
@@ -479,7 +479,7 @@ export function TransactionFilterPanel({
                     <div className="flex flex-wrap gap-1">
                       {tags.slice(0, 5).map((tag) => (
                         <Button
-                          key={tag}
+                          key={safeDisplayString(tag, `tag-${Math.random()}`)}
                           variant={filters.tags.includes(tag) ? 'secondary' : 'outline'}
                           size="sm"
                           className="h-7 text-xs"
@@ -492,7 +492,7 @@ export function TransactionFilterPanel({
                             });
                           }}
                         >
-                          {tag}
+                          {safeDisplayString(tag, 'tag')}
                         </Button>
                       ))}
                     </div>
