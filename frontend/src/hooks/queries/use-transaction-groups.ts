@@ -128,6 +128,55 @@ interface TransactionMixedListResponse {
 }
 
 // =============================================================================
+// Defensive Type Coercion Helpers
+// =============================================================================
+
+/**
+ * Check if value is an empty object {} (which would cause React Error #301).
+ * Empty objects are truthy in JS, so `{} || 'default'` returns `{}`.
+ */
+function isEmptyObject(val: unknown): boolean {
+  return (
+    val !== null &&
+    typeof val === 'object' &&
+    !Array.isArray(val) &&
+    !(val instanceof Date) &&
+    Object.keys(val as object).length === 0
+  );
+}
+
+/**
+ * Safely coerce a value to string, protecting against empty objects.
+ */
+function safeString(val: unknown, context?: string): string {
+  if (val === null || val === undefined) return '';
+  if (isEmptyObject(val)) {
+    console.error(`[safeString] Empty object detected${context ? ` in ${context}` : ''}, converting to empty string`);
+    return '';
+  }
+  return String(val);
+}
+
+/**
+ * Safely coerce a value to number, protecting against empty objects.
+ * This prevents React Error #301 when numeric fields become empty objects.
+ */
+function safeNumber(val: unknown, fallback: number = 0, context?: string): number {
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (typeof val === 'string') {
+    const parsed = Number(val);
+    if (!isNaN(parsed)) return parsed;
+  }
+  if (isEmptyObject(val)) {
+    console.error(`[safeNumber] Empty object detected${context ? ` in ${context}` : ''}, converting to ${fallback}`);
+    return fallback;
+  }
+  if (val === null || val === undefined) return fallback;
+  console.warn(`[safeNumber] Unexpected type ${typeof val}${context ? ` in ${context}` : ''}, using fallback ${fallback}`);
+  return fallback;
+}
+
+// =============================================================================
 // Transform Helpers
 // =============================================================================
 
@@ -147,26 +196,28 @@ function mapMatchStatus(status: number): GroupMatchStatus {
 
 /**
  * Transform API TransactionGroupSummaryDto to frontend TransactionGroupView.
+ * Uses defensive coercion to prevent React Error #301 from empty objects.
  */
 function transformToGroupView(
   dto: TransactionGroupSummaryDto
 ): TransactionGroupView {
   return {
-    id: dto.id,
+    id: safeString(dto.id, 'group.id'),
     type: 'group',
-    name: dto.name,
+    name: safeString(dto.name, 'group.name'),
     displayDate: new Date(dto.displayDate),
-    isDateOverridden: dto.isDateOverridden,
-    combinedAmount: dto.combinedAmount,
-    transactionCount: dto.transactionCount,
+    isDateOverridden: Boolean(dto.isDateOverridden),
+    combinedAmount: safeNumber(dto.combinedAmount, 0, 'group.combinedAmount'),
+    transactionCount: safeNumber(dto.transactionCount, 0, 'group.transactionCount'),
     matchStatus: mapMatchStatus(dto.matchStatus),
-    matchedReceiptId: dto.matchedReceiptId,
+    matchedReceiptId: dto.matchedReceiptId ? safeString(dto.matchedReceiptId, 'group.matchedReceiptId') : undefined,
     createdAt: new Date(dto.createdAt),
   };
 }
 
 /**
  * Transform API TransactionGroupDetailDto to frontend TransactionGroupView with transactions.
+ * Uses defensive coercion to prevent React Error #301 from empty objects.
  */
 function transformToGroupDetailView(
   dto: TransactionGroupDetailDto
@@ -174,10 +225,10 @@ function transformToGroupDetailView(
   return {
     ...transformToGroupView(dto),
     transactions: dto.transactions.map((tx) => ({
-      id: tx.id,
+      id: safeString(tx.id, 'group.transaction.id'),
       date: new Date(tx.transactionDate),
-      amount: tx.amount,
-      description: tx.description,
+      amount: safeNumber(tx.amount, 0, 'group.transaction.amount'),
+      description: safeString(tx.description, 'group.transaction.description'),
     })),
   };
 }
@@ -303,23 +354,7 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
         `/transaction-groups/mixed?${searchParams}`
       );
 
-      // Helper to check if value is an empty object {}
-      const isEmptyObject = (val: unknown): boolean =>
-        val !== null &&
-        typeof val === 'object' &&
-        !Array.isArray(val) &&
-        !(val instanceof Date) &&
-        Object.keys(val as object).length === 0;
-
-      // Helper to safely coerce to string, handling empty objects
-      const safeString = (val: unknown): string => {
-        if (val === null || val === undefined) return '';
-        if (isEmptyObject(val)) {
-          console.error('[useMixedTransactionList] Empty object detected, converting to empty string');
-          return '';
-        }
-        return String(val);
-      };
+      // Use module-scope isEmptyObject, safeString, and safeNumber helpers for consistency
 
       // DEBUG: Log raw API response - this ALWAYS runs now to help diagnose production issues
       console.log('[useMixedTransactionList] Raw API response summary:', {
@@ -370,14 +405,22 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
           }
         }
 
+        // Apply defensive coercion to all fields, even the ones that should always be primitives
+        const txDescription = safeString(tx.description, 'tx.description');
+        const txAmount = safeNumber(tx.amount, 0, 'tx.amount');
+
         items.push({
           type: 'transaction',
-          id: tx.id,
+          id: safeString(tx.id, 'tx.id'),
           date: new Date(tx.transactionDate),
-          description: tx.description,
-          merchant: prediction?.vendorName ? safeString(prediction.vendorName) : tx.description.split(' ')[0],
-          amount: tx.amount,
-          category: prediction?.suggestedCategory ? safeString(prediction.suggestedCategory) : '',
+          description: txDescription,
+          merchant: prediction?.vendorName
+            ? safeString(prediction.vendorName, 'prediction.vendorName')
+            : txDescription.split(' ')[0],
+          amount: txAmount,
+          category: prediction?.suggestedCategory
+            ? safeString(prediction.suggestedCategory, 'prediction.suggestedCategory')
+            : '',
           categoryId: '', // Not available in mixed list response
           notes: '',
           tags: [],
@@ -387,23 +430,31 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
             ? {
                 // Map directly from backend PredictionSummaryDto
                 // Ensure all values are primitives to avoid React Error #301
-                // Use safeString helper that handles empty objects
-                id: safeString(prediction.id),
-                transactionId: safeString(prediction.transactionId),
-                patternId: prediction.patternId ? safeString(prediction.patternId) : null,
-                vendorName: safeString(prediction.vendorName ?? ''),
-                confidenceScore: isEmptyObject(prediction.confidenceScore) ? 0 : Number(prediction.confidenceScore),
+                // Use defensive helpers that handle empty objects
+                id: safeString(prediction.id, 'prediction.id'),
+                transactionId: safeString(prediction.transactionId, 'prediction.transactionId'),
+                patternId: prediction.patternId
+                  ? safeString(prediction.patternId, 'prediction.patternId')
+                  : null,
+                vendorName: safeString(prediction.vendorName ?? '', 'prediction.vendorName'),
+                confidenceScore: safeNumber(prediction.confidenceScore, 0, 'prediction.confidenceScore'),
                 // Use backend-provided values directly (already strings via JsonStringEnumConverter)
                 // Handle edge case where these might be empty objects
-                confidenceLevel: (isEmptyObject(prediction.confidenceLevel) ? 'Low' : prediction.confidenceLevel) as 'Low' | 'Medium' | 'High',
-                status: (isEmptyObject(prediction.status) ? 'Pending' : prediction.status) as 'Pending' | 'Confirmed' | 'Rejected' | 'Ignored',
+                confidenceLevel: (isEmptyObject(prediction.confidenceLevel)
+                  ? 'Low'
+                  : prediction.confidenceLevel) as 'Low' | 'Medium' | 'High',
+                status: (isEmptyObject(prediction.status)
+                  ? 'Pending'
+                  : prediction.status) as 'Pending' | 'Confirmed' | 'Rejected' | 'Ignored',
                 suggestedCategory: prediction.suggestedCategory && !isEmptyObject(prediction.suggestedCategory)
-                  ? safeString(prediction.suggestedCategory)
+                  ? safeString(prediction.suggestedCategory, 'prediction.suggestedCategory')
                   : null,
                 suggestedGLCode: prediction.suggestedGLCode && !isEmptyObject(prediction.suggestedGLCode)
-                  ? safeString(prediction.suggestedGLCode)
+                  ? safeString(prediction.suggestedGLCode, 'prediction.suggestedGLCode')
                   : null,
-                isManualOverride: isEmptyObject(prediction.isManualOverride) ? false : Boolean(prediction.isManualOverride),
+                isManualOverride: isEmptyObject(prediction.isManualOverride)
+                  ? false
+                  : Boolean(prediction.isManualOverride),
               }
             : undefined,
         } as TransactionViewWithType);
