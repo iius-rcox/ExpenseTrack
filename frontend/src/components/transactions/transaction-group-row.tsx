@@ -148,7 +148,8 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
 }: TransactionGroupRowProps) {
   // Editing state
   const [isEditingName, setIsEditingName] = useState(false);
-  const [editNameValue, setEditNameValue] = useState(group.name);
+  // DEFENSIVE: Protect against group.name being {} from serialization issues
+  const [editNameValue, setEditNameValue] = useState(safeDisplayString(group.name, '', 'TransactionGroupRow.state.init'));
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -165,7 +166,8 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
   const handleStartEditName = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      setEditNameValue(group.name);
+      // DEFENSIVE: Protect against group.name being {} from serialization issues
+      setEditNameValue(safeDisplayString(group.name, '', 'TransactionGroupRow.handleStartEdit'));
       setIsEditingName(true);
     },
     [group.name]
@@ -173,7 +175,9 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
 
   // Save name edit
   const handleSaveName = useCallback(() => {
-    if (editNameValue !== group.name && editNameValue.trim() && onEditName) {
+    // DEFENSIVE: Protect against group.name being {} from serialization issues
+    const safeName = safeDisplayString(group.name, '', 'TransactionGroupRow.handleSaveName');
+    if (editNameValue !== safeName && editNameValue.trim() && onEditName) {
       onEditName(editNameValue.trim());
     }
     setIsEditingName(false);
@@ -182,7 +186,8 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
   // Cancel editing
   const handleCancelEdit = useCallback(() => {
     setIsEditingName(false);
-    setEditNameValue(group.name);
+    // DEFENSIVE: Protect against group.name being {} from serialization issues
+    setEditNameValue(safeDisplayString(group.name, '', 'TransactionGroupRow.handleCancelEdit'));
   }, [group.name]);
 
   // Keyboard handling for edit mode
