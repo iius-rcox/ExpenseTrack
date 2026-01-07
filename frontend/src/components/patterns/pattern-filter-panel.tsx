@@ -282,8 +282,8 @@ export function PatternFilterPanelCompact({
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
               {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
+                <SelectItem key={safeDisplayString(category, `cat-${Math.random()}`)} value={safeDisplayString(category) || `unknown-${Math.random()}`}>
+                  {safeDisplayString(category, 'Unknown')}
                 </SelectItem>
               ))}
             </SelectContent>
