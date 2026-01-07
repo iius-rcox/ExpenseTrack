@@ -49,24 +49,52 @@ export const transactionKeys = {
 // =============================================================================
 
 /**
+ * DEFENSIVE HELPER: Safely extract a string value, converting empty objects to empty strings.
+ *
+ * This guards against React Error #301 where empty objects {} from cached API responses
+ * or unexpected backend behavior could be passed as React children.
+ *
+ * IMPORTANT: {} is truthy in JavaScript, so `value || ''` DOES NOT catch it!
+ * This helper explicitly checks for empty objects.
+ */
+function safeString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  if (typeof value === 'string') {
+    return value || fallback;
+  }
+  // Empty object {} - the main culprit of React Error #301
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    console.warn('[use-transactions] Empty object detected in API response, using fallback');
+    return fallback;
+  }
+  return String(value);
+}
+
+/**
  * Transform API TransactionDetail to frontend TransactionView.
  *
  * Handles:
  * - Date parsing from ISO strings
  * - Match status computation from hasMatchedReceipt
  * - Default values for optional fields
+ * - Empty object protection (React Error #301)
  */
 export function transformToTransactionView(
   detail: TransactionDetail
 ): TransactionView {
+  // Safely extract category string - guards against {} from cached/malformed API responses
+  const categoryStr = safeString(detail.category);
+
   return {
     id: detail.id,
     date: new Date(detail.transactionDate),
-    description: detail.description,
-    merchant: detail.merchantName || detail.description,
+    description: safeString(detail.description),
+    merchant: safeString(detail.merchantName) || safeString(detail.description),
     amount: detail.amount,
-    category: detail.category || 'Uncategorized',
-    categoryId: detail.category || '',
+    category: categoryStr || 'Uncategorized',
+    categoryId: categoryStr,
     tags: [],
     notes: '',
     matchStatus: detail.hasMatchedReceipt

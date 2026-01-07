@@ -328,49 +328,12 @@ function formatShortDate(date: Date): string {
 }
 
 /**
- * DEBUG: Helper to detect empty objects in props/values
- */
-function findEmptyObjects(obj: unknown, path = ''): string[] {
-  const found: string[] = [];
-  if (obj === null || obj === undefined) return found;
-  if (typeof obj !== 'object') return found;
-  if (Array.isArray(obj)) {
-    obj.forEach((item, i) => {
-      found.push(...findEmptyObjects(item, `${path}[${i}]`));
-    });
-    return found;
-  }
-  if (obj instanceof Date || obj instanceof Set || obj instanceof Map) return found;
-  const keys = Object.keys(obj);
-  if (keys.length === 0) {
-    found.push(path || 'root');
-  } else {
-    for (const key of keys) {
-      found.push(...findEmptyObjects((obj as Record<string, unknown>)[key], path ? `${path}.${key}` : key));
-    }
-  }
-  return found;
-}
-
-/**
  * Virtualized transaction grid component
  *
  * Supports rendering both transactions and transaction groups in a single list.
  * Groups are rendered as expandable accordion rows.
  */
 export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
-  // DEBUG: Log props to detect empty objects
-  const emptyObjectPaths = findEmptyObjects(props);
-  if (emptyObjectPaths.length > 0) {
-    console.error('[TransactionGrid] FOUND EMPTY OBJECTS IN PROPS:', emptyObjectPaths);
-    console.error('[TransactionGrid] Full props:', JSON.stringify(props, (_key, value) => {
-      if (value instanceof Set) return `Set(${value.size})`;
-      if (value instanceof Date) return value.toISOString();
-      return value;
-    }, 2));
-  }
-  console.log('[TransactionGrid] Render cycle - isLoading:', 'isLoading' in props ? props.isLoading : 'default');
-
   // Support legacy 'transactions' prop name for backwards compatibility
   const items: TransactionListItem[] = 'items' in props
     ? props.items

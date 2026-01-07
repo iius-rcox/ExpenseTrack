@@ -367,7 +367,7 @@ export const TransactionRow = memo(function TransactionRow({
       {/* Category (Editable Dropdown) */}
       <TableCell className="w-[150px]" onClick={(e) => e.stopPropagation()}>
         <Select
-          value={transaction.categoryId}
+          value={safeDisplayString(transaction.categoryId) || undefined}
           onValueChange={handleCategoryChange}
           disabled={isSaving}
         >
