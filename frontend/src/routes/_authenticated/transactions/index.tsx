@@ -102,24 +102,60 @@ function TransactionsPage() {
   console.log(`[TransactionsPage] Starting render #${currentRender}...`);
 
   const search = Route.useSearch()
-  console.log(`[TransactionsPage] Render #${currentRender} After useSearch:`, { view: search.view, page: search.page });
+
+  // DIAGNOSTIC: Deep inspection of search params to catch empty objects
+  console.log(`[TransactionsPage] Render #${currentRender} FULL search inspection:`, {
+    view: search.view,
+    viewType: typeof search.view,
+    viewIsEmpty: typeof search.view === 'object' && Object.keys(search.view as object).length === 0,
+    sortBy: search.sortBy,
+    sortByType: typeof search.sortBy,
+    sortByIsEmpty: typeof search.sortBy === 'object' && Object.keys(search.sortBy as object).length === 0,
+    sortOrder: search.sortOrder,
+    sortOrderType: typeof search.sortOrder,
+    sortOrderIsEmpty: typeof search.sortOrder === 'object' && Object.keys(search.sortOrder as object).length === 0,
+    page: search.page,
+    rawSearch: JSON.stringify(search),
+  });
+
+  // DEFENSIVE: Ensure search.view is a valid string, not an empty object
+  const safeView = (typeof search.view === 'string' && (search.view === 'transactions' || search.view === 'patterns'))
+    ? search.view
+    : 'transactions';
+  const safeSortBy = (typeof search.sortBy === 'string' && ['date', 'amount', 'merchant', 'category'].includes(search.sortBy))
+    ? search.sortBy as 'date' | 'amount' | 'merchant' | 'category'
+    : 'date';
+  const safeSortOrder = (typeof search.sortOrder === 'string' && (search.sortOrder === 'asc' || search.sortOrder === 'desc'))
+    ? search.sortOrder
+    : 'desc';
+
+  // Log if we had to fix any values
+  if (safeView !== search.view) {
+    console.error(`[TransactionsPage] ⚠️ FIXED search.view from:`, search.view, 'to:', safeView);
+  }
+  if (safeSortBy !== search.sortBy) {
+    console.error(`[TransactionsPage] ⚠️ FIXED search.sortBy from:`, search.sortBy, 'to:', safeSortBy);
+  }
+  if (safeSortOrder !== search.sortOrder) {
+    console.error(`[TransactionsPage] ⚠️ FIXED search.sortOrder from:`, search.sortOrder, 'to:', safeSortOrder);
+  }
 
   const navigate = Route.useNavigate()
 
   // Filter state (local, not persisted in URL for simplicity)
   const [filters, setFilters] = useState<TransactionFilters>({
     ...DEFAULT_TRANSACTION_FILTERS,
-    search: search.search || '',
+    search: typeof search.search === 'string' ? search.search : '',
     dateRange: {
       start: search.startDate ? new Date(search.startDate) : null,
       end: search.endDate ? new Date(search.endDate) : null,
     },
   })
 
-  // Sort state
+  // Sort state - use defensive safe values
   const [sort, setSort] = useState<TransactionSortConfig>({
-    field: search.sortBy || 'date',
-    direction: search.sortOrder || 'desc',
+    field: safeSortBy,
+    direction: safeSortOrder,
   })
 
   // Selection state
@@ -752,7 +788,7 @@ function TransactionsPage() {
 
       {renderSection('before-tabs')}
       {/* View Toggle Tabs */}
-      <Tabs value={search.view} onValueChange={handleViewChange} className="space-y-6">
+      <Tabs value={safeView} onValueChange={handleViewChange} className="space-y-6">
         {renderSection('inside-tabs')}
         <TabsList>
           <TabsTrigger value="transactions" className="gap-2">
