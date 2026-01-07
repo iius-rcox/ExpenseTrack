@@ -1,5 +1,19 @@
 "use client"
 
+/**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) return fallback;
+    return fallback;
+  }
+  return String(value);
+}
+
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   useReportDetail,
@@ -301,8 +315,8 @@ function ReportDetailPage() {
                   </TableCell>
                   <TableCell>{line.vendor || '-'}</TableCell>
                   <TableCell>
-                    {line.category ? (
-                      <Badge variant="outline">{line.category}</Badge>
+                    {safeDisplayString(line.category) ? (
+                      <Badge variant="outline">{safeDisplayString(line.category)}</Badge>
                     ) : (
                       '-'
                     )}

@@ -8,6 +8,20 @@
  */
 
 import { useMemo, useState } from 'react'
+
+/**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) return fallback;
+    return fallback;
+  }
+  return String(value);
+}
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -178,9 +192,9 @@ function SubscriptionCard({
               <Badge className={cn('text-xs', confidenceStyle.bg, confidenceStyle.text)}>
                 {subscription.confidence} confidence
               </Badge>
-              {subscription.category && (
+              {safeDisplayString(subscription.category) && (
                 <Badge variant="secondary" className="text-xs">
-                  {subscription.category}
+                  {safeDisplayString(subscription.category)}
                 </Badge>
               )}
             </div>
