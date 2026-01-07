@@ -387,8 +387,9 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
   } = props as TransactionGridProps;
 
   // DEFENSIVE: Validate and sanitize props to prevent React Error #301
+  // IMPORTANT: Use useMemo to maintain stable references and prevent infinite re-renders!
   // Sets can become {} when serialized, so ensure they're proper Sets
-  const selection = {
+  const selection = useMemo(() => ({
     selectedIds: rawSelection?.selectedIds instanceof Set
       ? rawSelection.selectedIds
       : new Set<string>(),
@@ -396,20 +397,20 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
       ? rawSelection.lastSelectedId
       : null,
     isSelectAll: rawSelection?.isSelectAll === true,
-  };
+  }), [rawSelection?.selectedIds, rawSelection?.lastSelectedId, rawSelection?.isSelectAll]);
 
   // Validate sort config - empty objects are truthy so explicit type checks needed
-  const sort = {
+  const sort = useMemo(() => ({
     field: (typeof rawSort?.field === 'string' && ['date', 'amount', 'merchant', 'category'].includes(rawSort.field))
       ? rawSort.field as 'date' | 'amount' | 'merchant' | 'category'
       : 'date' as const,
     direction: (typeof rawSort?.direction === 'string' && (rawSort.direction === 'asc' || rawSort.direction === 'desc'))
       ? rawSort.direction
       : 'desc' as const,
-  };
+  }), [rawSort?.field, rawSort?.direction]);
 
   // Validate categories array - filter out any malformed entries
-  const categories = Array.isArray(rawCategories)
+  const categories = useMemo(() => Array.isArray(rawCategories)
     ? rawCategories.filter((cat): cat is { id: string; name: string } =>
         cat !== null &&
         typeof cat === 'object' &&
@@ -417,12 +418,14 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
         typeof cat.name === 'string' &&
         cat.id.length > 0
       )
-    : [];
+    : []
+  , [rawCategories]);
 
   // Validate expandedGroupIds
-  const expandedGroupIds = rawExpandedGroupIds instanceof Set
+  const expandedGroupIds = useMemo(() => rawExpandedGroupIds instanceof Set
     ? rawExpandedGroupIds
-    : new Set<string>();
+    : new Set<string>()
+  , [rawExpandedGroupIds]);
 
   // DIAGNOSTIC: Log if we had to fix any props
   if (rawSelection?.selectedIds && !(rawSelection.selectedIds instanceof Set)) {
@@ -450,6 +453,7 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
   const rowCount = items.length;
 
   // Calculate dynamic row height based on whether group is expanded
+  // IMPORTANT: Must be memoized to prevent infinite re-renders in useVirtualizer
   const getRowHeight = useCallback(
     (index: number): number => {
       const item = items[index];
@@ -467,19 +471,30 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
     [items, expandedGroupIds]
   );
 
-  // Setup virtualizer with dynamic row heights
-  const virtualizer = useVirtualizer({
-    count: rowCount,
-    getScrollElement: () => parentRef.current,
-    estimateSize: getRowHeight,
-    overscan: 5, // Render 5 extra rows above/below viewport
-    // Key by items + expanded state to force recalculation when groups expand/collapse
-    getItemKey: (index) => {
+  // IMPORTANT: Memoize getScrollElement to prevent infinite re-renders
+  // Inline functions in useVirtualizer config cause it to reconfigure on every render
+  const getScrollElement = useCallback(() => parentRef.current, []);
+
+  // IMPORTANT: Memoize getItemKey to prevent infinite re-renders
+  // This function generates stable keys for virtualized rows
+  const getItemKey = useCallback(
+    (index: number) => {
       const item = items[index];
       if (!item) return index;
       const isExpanded = isGroup(item) && expandedGroupIds?.has(item.id);
       return `${item.id}-${isExpanded}`;
     },
+    [items, expandedGroupIds]
+  );
+
+  // Setup virtualizer with dynamic row heights
+  // All config functions MUST be memoized to prevent infinite loop
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement,
+    estimateSize: getRowHeight,
+    overscan: 5, // Render 5 extra rows above/below viewport
+    getItemKey,
   });
 
   // Get visible range
@@ -489,9 +504,12 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
   // Recalculate measurements when expanded groups change
   // Using useLayoutEffect to measure synchronously before paint,
   // preventing visual flickering during expand/collapse
+  // NOTE: Do NOT include virtualizer in deps - it changes on every render
+  // and calling measure() would create an infinite loop
   useLayoutEffect(() => {
     virtualizer.measure();
-  }, [virtualizer, expandedGroupIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedGroupIds]);
 
   // Handle sort column click
   const handleSortClick = useCallback(
