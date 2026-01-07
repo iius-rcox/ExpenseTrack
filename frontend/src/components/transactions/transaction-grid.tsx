@@ -38,7 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { TransactionRow, TransactionRowSkeleton } from './transaction-row';
 import { SwipeActionRow } from '@/components/mobile/swipe-action-row';
-import { cn, safeDisplayString } from '@/lib/utils';
+import { cn, safeDisplayString, safeDisplayNumber } from '@/lib/utils';
 import type {
   TransactionView,
   TransactionListItem,
@@ -678,7 +678,7 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{safeDisplayString(item.name)}</div>
                         <div className="text-xs text-muted-foreground">
-                          {item.transactionCount} items • {formatAmount(item.combinedAmount)}
+                          {safeDisplayNumber(item.transactionCount, 0, 'TransactionGrid.mobile.transactionCount')} items • {formatAmount(safeDisplayNumber(item.combinedAmount, 0, 'TransactionGrid.mobile.combinedAmount'))}
                         </div>
                       </div>
                       <Button

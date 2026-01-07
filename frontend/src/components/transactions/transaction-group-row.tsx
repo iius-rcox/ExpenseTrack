@@ -30,7 +30,7 @@ import {
   MoreVertical,
   Trash2,
 } from 'lucide-react';
-import { cn, safeDisplayString } from '@/lib/utils';
+import { cn, safeDisplayString, safeDisplayNumber } from '@/lib/utils';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -384,7 +384,7 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
                   {safeDisplayString(group.name, '', 'TransactionGroupRow.name.display')}
                 </span>
                 <Badge variant="secondary" className="text-xs px-1.5">
-                  {group.transactionCount} items
+                  {safeDisplayNumber(group.transactionCount, 0, 'TransactionGroupRow.transactionCount')} items
                 </Badge>
                 {onEditName && (
                   <Button
@@ -410,7 +410,7 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
         {/* Combined Amount */}
         <TableCell className="w-[100px] text-right">
           <span className="font-semibold tabular-nums">
-            {formatAmount(group.combinedAmount)}
+            {formatAmount(safeDisplayNumber(group.combinedAmount, 0, 'TransactionGroupRow.combinedAmount'))}
           </span>
         </TableCell>
 
@@ -595,7 +595,7 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
                             <span className="text-sm font-medium tabular-nums w-20 text-right">
                               {formatAmount(tx.amount)}
                             </span>
-                            {onRemoveTransaction && group.transactionCount > 2 && (
+                            {onRemoveTransaction && safeDisplayNumber(group.transactionCount, 0, 'TransactionGroupRow.removeCheck') > 2 && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -623,10 +623,10 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
                   {/* Summary row */}
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
                     <span className="text-xs text-muted-foreground">
-                      {group.transactionCount} transactions combined
+                      {safeDisplayNumber(group.transactionCount, 0, 'TransactionGroupRow.combined.transactionCount')} transactions combined
                     </span>
                     <span className="text-sm font-semibold">
-                      Total: {formatAmount(group.combinedAmount)}
+                      Total: {formatAmount(safeDisplayNumber(group.combinedAmount, 0, 'TransactionGroupRow.total.combinedAmount'))}
                     </span>
                   </div>
                 </div>
@@ -645,7 +645,7 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
               Ungroup "{safeDisplayString(group.name, 'this group', 'TransactionGroupRow.deleteDialog.title')}"?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will dissolve the group and return all {group.transactionCount} transactions
+              This will dissolve the group and return all {safeDisplayNumber(group.transactionCount, 0, 'TransactionGroupRow.deleteDialog.transactionCount')} transactions
               to the main list. Any receipt match on this group will also be removed.
             </AlertDialogDescription>
           </AlertDialogHeader>

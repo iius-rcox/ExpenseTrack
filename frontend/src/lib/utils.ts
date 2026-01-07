@@ -268,3 +268,113 @@ function logSafeDisplayWarning(
 
   console.groupEnd()
 }
+
+/**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable number.
+ * Guards against React Error #301 where objects might be rendered as children.
+ *
+ * This is particularly important for numeric fields that might become {}
+ * due to serialization issues (e.g., transactionCount, combinedAmount).
+ *
+ * @param value - The value to convert to a number for display
+ * @param fallback - Fallback number if value is invalid (default: 0)
+ * @param context - Optional context for debugging (e.g., 'group.transactionCount')
+ * @returns A safe number that can be rendered in React
+ *
+ * @example
+ * // Basic usage
+ * safeDisplayNumber(group.transactionCount) // 5
+ * safeDisplayNumber(undefined) // 0
+ * safeDisplayNumber({}) // 0 (logs warning)
+ *
+ * // With context for debugging
+ * safeDisplayNumber(group.transactionCount, 0, 'TransactionGroupRow.transactionCount')
+ */
+export function safeDisplayNumber(
+  value: unknown,
+  fallback: number = 0,
+  context?: string
+): number {
+  // Fast path for valid numbers
+  if (typeof value === 'number' && !isNaN(value)) return value
+
+  // Handle string numbers
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (!isNaN(parsed)) return parsed
+    logSafeNumberWarning('invalid_string', value, fallback, context)
+    return fallback
+  }
+
+  // Handle null/undefined
+  if (value === null || value === undefined) {
+    if (context) {
+      logSafeNumberWarning('null_undefined', value, fallback, context)
+    }
+    return fallback
+  }
+
+  // Handle NaN
+  if (typeof value === 'number' && isNaN(value)) {
+    logSafeNumberWarning('nan', value, fallback, context)
+    return fallback
+  }
+
+  // Handle objects (the main source of React Error #301)
+  if (typeof value === 'object') {
+    const keys = Object.keys(value as object)
+    if (keys.length === 0) {
+      logSafeNumberWarning('empty_object', value, fallback, context)
+    } else {
+      logSafeNumberWarning('non_empty_object', value, fallback, context)
+    }
+    return fallback
+  }
+
+  // Handle boolean
+  if (typeof value === 'boolean') {
+    return value ? 1 : 0
+  }
+
+  // Fallback for any other type
+  logSafeNumberWarning('unknown_type', value, fallback, context)
+  return fallback
+}
+
+/**
+ * Detailed warning logger for safeDisplayNumber.
+ * Provides comprehensive debugging information for React Error #301.
+ */
+function logSafeNumberWarning(
+  type: 'null_undefined' | 'empty_object' | 'non_empty_object' | 'nan' | 'invalid_string' | 'unknown_type',
+  value: unknown,
+  fallback: number,
+  context?: string
+): void {
+  // Skip logging for expected null/undefined without context (not unusual)
+  if (type === 'null_undefined' && !context) return
+
+  const contextLabel = context ? ` [${context}]` : ''
+
+  const typeLabels: Record<typeof type, string> = {
+    null_undefined: '⚠️ Null/Undefined Number',
+    empty_object: '🔴 EMPTY OBJECT AS NUMBER (React Error #301 source)',
+    non_empty_object: '🟠 Non-Empty Object as Number',
+    nan: '🟡 NaN Value',
+    invalid_string: '🔵 Invalid String Number',
+    unknown_type: '🟣 Unknown Type for Number',
+  }
+
+  console.group(`${typeLabels[type]}${contextLabel}`)
+  console.warn(`Context: ${context || 'Not provided'}`)
+  console.warn(`Value Type: ${typeof value}`)
+  console.warn(`Value:`, value)
+  console.warn(`Fallback Used: ${fallback}`)
+
+  if (type === 'empty_object' || type === 'non_empty_object') {
+    console.warn(`Stack Trace:`)
+    console.trace()
+  }
+
+  console.groupEnd()
+}
