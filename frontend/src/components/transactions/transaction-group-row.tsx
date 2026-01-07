@@ -654,7 +654,7 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <Trash2 className="h-5 w-5 text-destructive" />
-              Ungroup "{group.name}"?
+              Ungroup "{safeDisplayString(group.name, 'this group')}"?
             </AlertDialogTitle>
             <AlertDialogDescription>
               This will dissolve the group and return all {group.transactionCount} transactions
