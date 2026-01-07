@@ -341,7 +341,19 @@ function formatShortDate(date: Date): string {
  * Supports rendering both transactions and transaction groups in a single list.
  * Groups are rendered as expandable accordion rows.
  */
+// DIAGNOSTIC: Render counter for TransactionGrid
+let gridRenderCount = 0;
+
 export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
+  gridRenderCount++;
+  const gridRender = gridRenderCount;
+  console.log(`[TransactionGrid] Starting render #${gridRender}`, {
+    hasItems: 'items' in props,
+    itemCount: ('items' in props ? props.items : props.transactions)?.length ?? 0,
+    isLoading: props.isLoading,
+    categoriesCount: props.categories?.length ?? 0,
+  });
+
   // Support legacy 'transactions' prop name for backwards compatibility
   const items: TransactionListItem[] = 'items' in props
     ? props.items
@@ -813,6 +825,32 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
               {virtualRows.map((virtualRow) => {
                 const item = items[virtualRow.index];
 
+                // DIAGNOSTIC: Check for undefined or empty object items
+                if (!item) {
+                  console.error(`[TransactionGrid] ⚠️ UNDEFINED ITEM at index ${virtualRow.index}`, {
+                    itemsLength: items.length,
+                    virtualRowIndex: virtualRow.index,
+                  });
+                  return null; // Skip rendering to prevent crash
+                }
+                if (typeof item === 'object' && Object.keys(item).length === 0) {
+                  console.error(`[TransactionGrid] ⚠️ EMPTY OBJECT ITEM at index ${virtualRow.index}`, {
+                    itemsLength: items.length,
+                    virtualRowIndex: virtualRow.index,
+                    item,
+                  });
+                  return null; // Skip rendering to prevent crash
+                }
+                // Also check if item has no id (malformed data)
+                if (!item.id) {
+                  console.error(`[TransactionGrid] ⚠️ ITEM WITHOUT ID at index ${virtualRow.index}`, {
+                    item,
+                    itemType: typeof item,
+                    itemKeys: Object.keys(item),
+                  });
+                  return null; // Skip rendering to prevent crash
+                }
+
                 // Render group row (Feature 028)
                 if (isGroup(item)) {
                   return (
@@ -849,6 +887,20 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
 
                 // Render transaction row
                 const transaction = item as TransactionView;
+
+                // DIAGNOSTIC: Check transaction fields that could cause React Error #301
+                const txFields = ['id', 'description', 'merchant', 'category', 'notes'];
+                for (const field of txFields) {
+                  const value = (transaction as unknown as Record<string, unknown>)[field];
+                  if (typeof value === 'object' && value !== null && !(value instanceof Date) && Object.keys(value as object).length === 0) {
+                    console.error(`[TransactionGrid] ⚠️ EMPTY OBJECT in transaction.${field}`, {
+                      transactionId: transaction.id,
+                      field,
+                      value,
+                    });
+                  }
+                }
+
                 return (
                   <div
                     key={transaction.id}

@@ -83,6 +83,9 @@ function getPresetDateRange(preset: typeof DATE_PRESETS[number]['days']): {
   return { start, end };
 }
 
+// DIAGNOSTIC: Render counter for TransactionFilterPanel
+let filterPanelRenderCount = 0;
+
 export function TransactionFilterPanel({
   filters,
   categories,
@@ -90,6 +93,25 @@ export function TransactionFilterPanel({
   onChange,
   onReset,
 }: TransactionFilterPanelProps) {
+  filterPanelRenderCount++;
+  const filterRender = filterPanelRenderCount;
+  console.log(`[TransactionFilterPanel] Starting render #${filterRender}`, {
+    categoriesCount: categories?.length ?? 0,
+    tagsCount: tags?.length ?? 0,
+    hasFilters: filters?.search || filters?.categories?.length > 0,
+  });
+
+  // DIAGNOSTIC: Check categories for problems
+  if (categories?.length > 0) {
+    categories.forEach((cat, idx) => {
+      if (typeof cat !== 'object' || cat === null) {
+        console.error(`[TransactionFilterPanel] ⚠️ BAD CATEGORY at index ${idx}:`, cat);
+      } else if (typeof cat.id !== 'string' || typeof cat.name !== 'string') {
+        console.error(`[TransactionFilterPanel] ⚠️ CATEGORY WITH BAD FIELDS at index ${idx}:`, cat);
+      }
+    });
+  }
+
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [localSearch, setLocalSearch] = useState(filters.search);
 
