@@ -152,6 +152,40 @@ export const TransactionRow = memo(function TransactionRow({
   onMarkNotReimbursable,
   onClearReimbursabilityOverride,
 }: TransactionRowComponentProps) {
+  // DIAGNOSTIC: Scan for empty objects that could cause React Error #301
+  // This helps identify which property is malformed in cached data
+  if (process.env.NODE_ENV !== 'production' || true) { // Always run in staging
+    const checkForEmptyObjects = (obj: unknown, path: string): void => {
+      if (obj === null || obj === undefined) return;
+      if (typeof obj === 'object' && !Array.isArray(obj) && !(obj instanceof Date)) {
+        const keys = Object.keys(obj as object);
+        if (keys.length === 0) {
+          console.error(`[TransactionRow] EMPTY OBJECT DETECTED at ${path}`, {
+            transactionId: transaction.id,
+            path,
+            value: obj,
+          });
+        }
+      }
+    };
+
+    // Check all transaction properties that could be rendered
+    checkForEmptyObjects(transaction.merchant, 'transaction.merchant');
+    checkForEmptyObjects(transaction.description, 'transaction.description');
+    checkForEmptyObjects(transaction.notes, 'transaction.notes');
+    checkForEmptyObjects(transaction.category, 'transaction.category');
+    checkForEmptyObjects(transaction.categoryId, 'transaction.categoryId');
+    checkForEmptyObjects(transaction.prediction, 'transaction.prediction');
+    if (transaction.prediction) {
+      checkForEmptyObjects(transaction.prediction.suggestedCategory, 'transaction.prediction.suggestedCategory');
+      checkForEmptyObjects(transaction.prediction.status, 'transaction.prediction.status');
+      checkForEmptyObjects(transaction.prediction.confidenceLevel, 'transaction.prediction.confidenceLevel');
+    }
+    if (Array.isArray(transaction.tags)) {
+      transaction.tags.forEach((tag, idx) => checkForEmptyObjects(tag, `transaction.tags[${idx}]`));
+    }
+  }
+
   // Editing state
   const [editingField, setEditingField] = useState<'notes' | null>(null);
   const [editValue, setEditValue] = useState('');
