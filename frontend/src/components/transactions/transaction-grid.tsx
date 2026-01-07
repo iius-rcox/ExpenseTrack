@@ -361,9 +361,9 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
 
   const {
     isLoading = false,
-    sort,
-    selection,
-    categories,
+    sort: rawSort,
+    selection: rawSelection,
+    categories: rawCategories,
     onSortChange,
     onSelectionChange,
     onTransactionEdit,
@@ -377,7 +377,7 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
     onClearReimbursabilityOverride,
     isPredictionProcessing = false,
     // Group-specific props (Feature 028)
-    expandedGroupIds = new Set(),
+    expandedGroupIds: rawExpandedGroupIds = new Set(),
     onGroupToggle,
     onGroupEditName,
     onGroupEditDate,
@@ -385,6 +385,55 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
     onGroupDelete,
     isGroupProcessing = false,
   } = props as TransactionGridProps;
+
+  // DEFENSIVE: Validate and sanitize props to prevent React Error #301
+  // Sets can become {} when serialized, so ensure they're proper Sets
+  const selection = {
+    selectedIds: rawSelection?.selectedIds instanceof Set
+      ? rawSelection.selectedIds
+      : new Set<string>(),
+    lastSelectedId: typeof rawSelection?.lastSelectedId === 'string'
+      ? rawSelection.lastSelectedId
+      : null,
+    isSelectAll: rawSelection?.isSelectAll === true,
+  };
+
+  // Validate sort config - empty objects are truthy so explicit type checks needed
+  const sort = {
+    field: (typeof rawSort?.field === 'string' && ['date', 'amount', 'merchant', 'category'].includes(rawSort.field))
+      ? rawSort.field as 'date' | 'amount' | 'merchant' | 'category'
+      : 'date' as const,
+    direction: (typeof rawSort?.direction === 'string' && (rawSort.direction === 'asc' || rawSort.direction === 'desc'))
+      ? rawSort.direction
+      : 'desc' as const,
+  };
+
+  // Validate categories array - filter out any malformed entries
+  const categories = Array.isArray(rawCategories)
+    ? rawCategories.filter((cat): cat is { id: string; name: string } =>
+        cat !== null &&
+        typeof cat === 'object' &&
+        typeof cat.id === 'string' &&
+        typeof cat.name === 'string' &&
+        cat.id.length > 0
+      )
+    : [];
+
+  // Validate expandedGroupIds
+  const expandedGroupIds = rawExpandedGroupIds instanceof Set
+    ? rawExpandedGroupIds
+    : new Set<string>();
+
+  // DIAGNOSTIC: Log if we had to fix any props
+  if (rawSelection?.selectedIds && !(rawSelection.selectedIds instanceof Set)) {
+    console.error(`[TransactionGrid] ⚠️ FIXED selection.selectedIds - was not a Set:`, rawSelection.selectedIds);
+  }
+  if (rawSort && (typeof rawSort.field !== 'string' || typeof rawSort.direction !== 'string')) {
+    console.error(`[TransactionGrid] ⚠️ FIXED sort config:`, rawSort);
+  }
+  if (rawCategories && rawCategories.length !== categories.length) {
+    console.error(`[TransactionGrid] ⚠️ Filtered ${rawCategories.length - categories.length} malformed categories`);
+  }
 
   const parentRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
