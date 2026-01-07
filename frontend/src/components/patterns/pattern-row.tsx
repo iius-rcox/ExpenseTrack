@@ -33,6 +33,20 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { PatternSummary } from '@/types/prediction'
 
+/**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) return fallback;
+    return fallback;
+  }
+  return String(value);
+}
+
 export interface PatternRowProps {
   /** Pattern data */
   pattern: PatternSummary
@@ -193,9 +207,9 @@ export const PatternRow = memo(function PatternRow({
 
         {/* Category */}
         <TableCell>
-          {pattern.category ? (
+          {safeDisplayString(pattern.category) ? (
             <Badge variant="secondary" className="text-xs">
-              {pattern.category}
+              {safeDisplayString(pattern.category)}
             </Badge>
           ) : (
             <span className="text-muted-foreground text-sm">—</span>

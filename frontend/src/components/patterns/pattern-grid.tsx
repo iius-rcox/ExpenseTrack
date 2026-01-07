@@ -44,6 +44,20 @@ import type {
 import { ConfidenceIndicator } from '@/components/design-system/confidence-indicator'
 
 /**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) return fallback;
+    return fallback;
+  }
+  return String(value);
+}
+
+/**
  * Sort field type for patterns
  */
 export type PatternSortField = PatternSortConfig['field']
@@ -184,9 +198,9 @@ function MobilePatternCard({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <h4 className="font-medium truncate">{pattern.displayName}</h4>
-                {pattern.category && (
+                {safeDisplayString(pattern.category) && (
                   <Badge variant="secondary" className="text-xs mt-1">
-                    {pattern.category}
+                    {safeDisplayString(pattern.category)}
                   </Badge>
                 )}
               </div>
