@@ -38,7 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { TransactionRow, TransactionRowSkeleton } from './transaction-row';
 import { SwipeActionRow } from '@/components/mobile/swipe-action-row';
-import { cn } from '@/lib/utils';
+import { cn, safeDisplayString } from '@/lib/utils';
 import type {
   TransactionView,
   TransactionListItem,
@@ -119,24 +119,6 @@ type TransactionGridPropsWithLegacy = TransactionGridProps | (Omit<TransactionGr
 const ROW_HEIGHT = 56;
 const CHILD_ROW_HEIGHT = 36; // Height of each child transaction in expanded group
 const GROUP_HEADER_PADDING = 48; // Extra padding for group summary row when expanded
-
-/**
- * DEFENSIVE HELPER: Safely convert any value to a displayable string.
- * Guards against React Error #301 where empty objects {} might be in cached data.
- */
-function safeDisplayString(value: unknown, fallback = ''): string {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
-    const keys = Object.keys(value as object);
-    if (keys.length === 0) {
-      console.warn('[TransactionGrid] Empty object detected, using fallback');
-      return fallback;
-    }
-    console.error('[TransactionGrid] Unexpected object in render:', value);
-    return fallback;
-  }
-  return String(value);
-}
 
 /**
  * Empty state component

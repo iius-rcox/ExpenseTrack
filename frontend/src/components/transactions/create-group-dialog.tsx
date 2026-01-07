@@ -14,7 +14,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Layers, Calendar, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, safeDisplayString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,23 +59,6 @@ function formatDate(date: Date): string {
     day: 'numeric',
     year: 'numeric',
   });
-}
-
-/**
- * DEFENSIVE HELPER: Safely convert any value to a displayable string.
- * Guards against React Error #301 where empty objects {} might be in cached data.
- */
-function safeDisplayString(value: unknown, fallback = ''): string {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
-    const keys = Object.keys(value as object);
-    if (keys.length === 0) {
-      console.warn('[CreateGroupDialog] Empty object detected, using fallback');
-      return fallback;
-    }
-    return fallback;
-  }
-  return String(value);
 }
 
 /**

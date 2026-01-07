@@ -22,7 +22,7 @@ import {
   Clock,
   ExternalLink,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, safeDisplayString } from '@/lib/utils';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -135,35 +135,6 @@ function formatDate(date: Date): string {
 }
 
 /**
- * DEFENSIVE HELPER: Safely convert any value to a displayable string.
- *
- * This guards against React Error #301 where objects (especially empty objects {})
- * might sneak into the data from cached API responses or unexpected backend behavior.
- *
- * TanStack Query's keepPreviousData can show old cached data during refetch,
- * so component-level validation is critical.
- */
-function safeDisplayString(value: unknown, fallback = ''): string {
-  // Handle null/undefined
-  if (value === null || value === undefined) {
-    return fallback;
-  }
-  // Handle empty objects {} - the main culprit of React Error #301
-  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
-    const keys = Object.keys(value as object);
-    if (keys.length === 0) {
-      console.warn('[TransactionRow] Empty object detected, using fallback:', fallback);
-      return fallback;
-    }
-    // Non-empty object - stringify for debugging but still use fallback
-    console.error('[TransactionRow] Unexpected object in render:', value);
-    return fallback;
-  }
-  // Convert to string
-  return String(value);
-}
-
-/**
  * Individual transaction row with inline editing
  */
 export const TransactionRow = memo(function TransactionRow({
@@ -199,7 +170,7 @@ export const TransactionRow = memo(function TransactionRow({
     (e: React.MouseEvent) => {
       e.stopPropagation();
       // Use safeDisplayString to handle empty objects in cached data
-      setEditValue(safeDisplayString(transaction.notes));
+      setEditValue(safeDisplayString(transaction.notes, '', 'TransactionRow.notes.edit'));
       setEditingField('notes');
     },
     [transaction.notes]
@@ -207,7 +178,7 @@ export const TransactionRow = memo(function TransactionRow({
 
   // Save notes edit
   const handleSaveNotes = useCallback(() => {
-    const safeNotes = safeDisplayString(transaction.notes);
+    const safeNotes = safeDisplayString(transaction.notes, '', 'TransactionRow.notes.save');
     if (editValue !== safeNotes) {
       onEdit({ notes: editValue });
     }
@@ -296,7 +267,7 @@ export const TransactionRow = memo(function TransactionRow({
           <Checkbox
             checked={isSelected}
             onCheckedChange={() => {}}
-            aria-label={`Select transaction ${safeDisplayString(transaction.description, 'unknown')}`}
+            aria-label={`Select transaction ${safeDisplayString(transaction.description, 'unknown', 'TransactionRow.checkbox.ariaLabel')}`}
           />
         </div>
       </TableCell>
@@ -311,16 +282,16 @@ export const TransactionRow = memo(function TransactionRow({
       {/* Description / Merchant */}
       <TableCell className="min-w-[200px] max-w-[300px]">
         <div className="space-y-0.5">
-          <div className="font-medium truncate" title={safeDisplayString(transaction.description)}>
-            {safeDisplayString(transaction.merchant) || safeDisplayString(transaction.description)}
+          <div className="font-medium truncate" title={safeDisplayString(transaction.description, '', 'TransactionRow.description.title')}>
+            {safeDisplayString(transaction.merchant, '', 'TransactionRow.merchant.display') || safeDisplayString(transaction.description, '', 'TransactionRow.description.display')}
           </div>
-          {safeDisplayString(transaction.merchant) &&
-           safeDisplayString(transaction.merchant) !== safeDisplayString(transaction.description) && (
+          {safeDisplayString(transaction.merchant, '', 'TransactionRow.merchant.check') &&
+           safeDisplayString(transaction.merchant, '', 'TransactionRow.merchant.compare') !== safeDisplayString(transaction.description, '', 'TransactionRow.description.compare') && (
             <div
               className="text-xs text-muted-foreground truncate"
-              title={safeDisplayString(transaction.description)}
+              title={safeDisplayString(transaction.description, '', 'TransactionRow.description.subTitle')}
             >
-              {safeDisplayString(transaction.description)}
+              {safeDisplayString(transaction.description, '', 'TransactionRow.description.sub')}
             </div>
           )}
         </div>
@@ -367,7 +338,7 @@ export const TransactionRow = memo(function TransactionRow({
       {/* Category (Editable Dropdown) */}
       <TableCell className="w-[150px]" onClick={(e) => e.stopPropagation()}>
         <Select
-          value={safeDisplayString(transaction.categoryId) || undefined}
+          value={safeDisplayString(transaction.categoryId, '', 'TransactionRow.categoryId.value') || undefined}
           onValueChange={handleCategoryChange}
           disabled={isSaving}
         >
@@ -375,9 +346,9 @@ export const TransactionRow = memo(function TransactionRow({
             <SelectValue placeholder="Select category" />
           </SelectTrigger>
           <SelectContent>
-            {categories.map((category) => (
-              <SelectItem key={safeDisplayString(category.id, `cat-${Math.random()}`)} value={safeDisplayString(category.id) || `unknown-${Math.random()}`}>
-                {safeDisplayString(category.name, 'Unknown')}
+            {categories.map((category, index) => (
+              <SelectItem key={safeDisplayString(category.id, `cat-${index}`, 'TransactionRow.category.key')} value={safeDisplayString(category.id, `unknown-${index}`, 'TransactionRow.category.value')}>
+                {safeDisplayString(category.name, 'Unknown', 'TransactionRow.category.name')}
               </SelectItem>
             ))}
           </SelectContent>
@@ -437,13 +408,13 @@ export const TransactionRow = memo(function TransactionRow({
               <span
                 className={cn(
                   'text-xs truncate flex-1',
-                  safeDisplayString(transaction.notes)
+                  safeDisplayString(transaction.notes, '', 'TransactionRow.notes.check')
                     ? 'text-foreground'
                     : 'text-muted-foreground italic'
                 )}
-                title={safeDisplayString(transaction.notes) || 'No notes'}
+                title={safeDisplayString(transaction.notes, '', 'TransactionRow.notes.title') || 'No notes'}
               >
-                {safeDisplayString(transaction.notes) || 'Add notes...'}
+                {safeDisplayString(transaction.notes, '', 'TransactionRow.notes.display') || 'Add notes...'}
               </span>
               <Button
                 size="icon"
@@ -501,11 +472,11 @@ export const TransactionRow = memo(function TransactionRow({
           <div className="flex flex-wrap gap-1">
             {transaction.tags.slice(0, 2).map((tag, idx) => (
               <Badge
-                key={safeDisplayString(tag) || idx}
+                key={safeDisplayString(tag, `tag-${idx}`, 'TransactionRow.tag.key')}
                 variant="secondary"
                 className="text-xs px-1.5 py-0"
               >
-                {safeDisplayString(tag)}
+                {safeDisplayString(tag, '', 'TransactionRow.tag.display')}
               </Badge>
             ))}
             {transaction.tags.length > 2 && (
