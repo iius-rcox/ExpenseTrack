@@ -152,38 +152,37 @@ export const TransactionRow = memo(function TransactionRow({
   onMarkNotReimbursable,
   onClearReimbursabilityOverride,
 }: TransactionRowComponentProps) {
-  // DIAGNOSTIC: Scan for empty objects that could cause React Error #301
-  // This helps identify which property is malformed in cached data
+  // DIAGNOSTIC: Deep scan for empty objects that could cause React Error #301
+  // This recursively checks ALL properties to identify malformed cached data
   if (process.env.NODE_ENV !== 'production' || true) { // Always run in staging
-    const checkForEmptyObjects = (obj: unknown, path: string): void => {
+    const checkForEmptyObjects = (obj: unknown, path: string, depth = 0): void => {
+      if (depth > 5) return; // Prevent infinite recursion
       if (obj === null || obj === undefined) return;
       if (typeof obj === 'object' && !Array.isArray(obj) && !(obj instanceof Date)) {
         const keys = Object.keys(obj as object);
         if (keys.length === 0) {
-          console.error(`[TransactionRow] EMPTY OBJECT DETECTED at ${path}`, {
+          console.error(`[TransactionRow] ⚠️ EMPTY OBJECT at ${path}`, {
             transactionId: transaction.id,
             path,
-            value: obj,
+            valueType: typeof obj,
+            isEmptyObject: true,
+          });
+        } else {
+          // Recursively check nested properties
+          keys.forEach(key => {
+            checkForEmptyObjects((obj as Record<string, unknown>)[key], `${path}.${key}`, depth + 1);
           });
         }
+      } else if (Array.isArray(obj)) {
+        obj.forEach((item, idx) => checkForEmptyObjects(item, `${path}[${idx}]`, depth + 1));
       }
     };
 
-    // Check all transaction properties that could be rendered
-    checkForEmptyObjects(transaction.merchant, 'transaction.merchant');
-    checkForEmptyObjects(transaction.description, 'transaction.description');
-    checkForEmptyObjects(transaction.notes, 'transaction.notes');
-    checkForEmptyObjects(transaction.category, 'transaction.category');
-    checkForEmptyObjects(transaction.categoryId, 'transaction.categoryId');
-    checkForEmptyObjects(transaction.prediction, 'transaction.prediction');
-    if (transaction.prediction) {
-      checkForEmptyObjects(transaction.prediction.suggestedCategory, 'transaction.prediction.suggestedCategory');
-      checkForEmptyObjects(transaction.prediction.status, 'transaction.prediction.status');
-      checkForEmptyObjects(transaction.prediction.confidenceLevel, 'transaction.prediction.confidenceLevel');
-    }
-    if (Array.isArray(transaction.tags)) {
-      transaction.tags.forEach((tag, idx) => checkForEmptyObjects(tag, `transaction.tags[${idx}]`));
-    }
+    // Check the ENTIRE transaction object recursively
+    checkForEmptyObjects(transaction, 'transaction');
+
+    // Also check categories prop
+    categories.forEach((cat, idx) => checkForEmptyObjects(cat, `categories[${idx}]`));
   }
 
   // Editing state
