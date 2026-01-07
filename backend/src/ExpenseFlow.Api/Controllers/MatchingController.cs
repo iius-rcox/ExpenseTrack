@@ -50,6 +50,8 @@ public class MatchingController : ApiControllerBase
         var response = new AutoMatchResponseDto
         {
             ProposedCount = result.ProposedCount,
+            TransactionMatchCount = result.TransactionMatchCount,
+            GroupMatchCount = result.GroupMatchCount,
             ProcessedCount = result.ProcessedCount,
             AmbiguousCount = result.AmbiguousCount,
             DurationMs = result.DurationMs,
@@ -481,6 +483,7 @@ public class MatchingController : ApiControllerBase
             ReceiptId = match.ReceiptId,
             TransactionId = match.TransactionId,
             TransactionGroupId = match.TransactionGroupId,
+            CandidateType = match.TransactionGroupId.HasValue ? "group" : "transaction",
             ConfidenceScore = match.ConfidenceScore,
             AmountScore = match.AmountScore,
             DateScore = match.DateScore,
@@ -505,6 +508,14 @@ public class MatchingController : ApiControllerBase
                 TransactionDate = match.Transaction.TransactionDate,
                 PostDate = match.Transaction.PostDate,
                 Amount = match.Transaction.Amount
+            } : null,
+            TransactionGroup = match.TransactionGroup != null ? new MatchTransactionGroupSummaryDto
+            {
+                Id = match.TransactionGroup.Id,
+                Name = match.TransactionGroup.Name,
+                CombinedAmount = match.TransactionGroup.CombinedAmount,
+                DisplayDate = match.TransactionGroup.DisplayDate,
+                TransactionCount = match.TransactionGroup.TransactionCount
             } : null,
             CreatedAt = match.CreatedAt
         };
@@ -518,6 +529,7 @@ public class MatchingController : ApiControllerBase
             ReceiptId = match.ReceiptId,
             TransactionId = match.TransactionId,
             TransactionGroupId = match.TransactionGroupId,
+            CandidateType = match.TransactionGroupId.HasValue ? "group" : "transaction",
             ConfidenceScore = match.ConfidenceScore,
             AmountScore = match.AmountScore,
             DateScore = match.DateScore,
@@ -542,6 +554,14 @@ public class MatchingController : ApiControllerBase
                 TransactionDate = match.Transaction.TransactionDate,
                 PostDate = match.Transaction.PostDate,
                 Amount = match.Transaction.Amount
+            } : null,
+            TransactionGroup = match.TransactionGroup != null ? new MatchTransactionGroupSummaryDto
+            {
+                Id = match.TransactionGroup.Id,
+                Name = match.TransactionGroup.Name,
+                CombinedAmount = match.TransactionGroup.CombinedAmount,
+                DisplayDate = match.TransactionGroup.DisplayDate,
+                TransactionCount = match.TransactionGroup.TransactionCount
             } : null,
             CreatedAt = match.CreatedAt,
             ConfirmedAt = match.ConfirmedAt,

@@ -35,6 +35,7 @@ vi.mock('sonner', () => ({
 vi.mock('@/hooks/queries/use-matching', () => ({
   useUnmatchedReceipts: () => ({ data: [], isLoading: false }),
   useUnmatchedTransactions: () => ({ data: [], isLoading: false }),
+  useMatchCandidates: () => ({ data: [], isLoading: false }),
   useManualMatch: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 

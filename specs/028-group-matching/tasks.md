@@ -159,11 +159,11 @@
 
 **Purpose**: Edge cases, performance verification, documentation
 
-- [ ] T046 [P] Handle group deletion cascade (return receipt to unmatched) in `backend/src/ExpenseFlow.Infrastructure/Services/TransactionGroupService.cs`
-- [ ] T047 [P] Add warning toast notification when transaction removed from matched group causes amount mismatch (>$1.00 tolerance) in `backend/src/ExpenseFlow.Infrastructure/Services/TransactionGroupService.cs` - return warning message in response DTO
-- [ ] T048 Performance test: Verify <2 second auto-match with 1000 transactions and 50 groups
-- [ ] T049 [P] Update OpenAPI documentation to reflect group matching capabilities
-- [ ] T050 Run quickstart.md validation to verify all manual test scenarios pass
+- [X] T046 [P] Handle group deletion cascade (return receipt to unmatched) in `backend/src/ExpenseFlow.Infrastructure/Services/TransactionGroupService.cs`
+- [X] T047 [P] Add warning toast notification when transaction removed from matched group causes amount mismatch (>$1.00 tolerance) in `backend/src/ExpenseFlow.Infrastructure/Services/TransactionGroupService.cs` - return warning message in response DTO
+- [X] T048 Performance test: Verify <2 second auto-match with 1000 transactions and 50 groups
+- [X] T049 [P] Update OpenAPI documentation to reflect group matching capabilities
+- [X] T050 Run quickstart.md validation to verify all manual test scenarios pass
 
 ---
 
