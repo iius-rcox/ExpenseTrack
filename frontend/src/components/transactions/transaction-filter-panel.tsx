@@ -43,6 +43,24 @@ import type {
 } from '@/types/transaction';
 import { getActiveFilterCount } from '@/hooks/queries/use-transactions';
 
+/**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ * Empty objects are truthy in JS, so `value && <span>{value}</span>` will fail!
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) {
+      console.warn('[TransactionFilterPanel] Empty object detected, using fallback');
+      return fallback;
+    }
+    return fallback;
+  }
+  return String(value);
+}
+
 // Match status options for the filter
 const MATCH_STATUS_OPTIONS: { value: TransactionMatchStatus; label: string }[] = [
   { value: 'matched', label: 'Matched' },
@@ -501,9 +519,9 @@ export function TransactionFilterPanel({
               </button>
             </Badge>
           )}
-          {filters.search && (
+          {safeDisplayString(filters.search) && (
             <Badge variant="secondary" className="gap-1">
-              Search: &quot;{filters.search}&quot;
+              Search: &quot;{safeDisplayString(filters.search)}&quot;
               <button
                 onClick={() => {
                   setLocalSearch('');

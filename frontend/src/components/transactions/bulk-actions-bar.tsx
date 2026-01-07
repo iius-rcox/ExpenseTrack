@@ -59,6 +59,23 @@ import { Checkbox } from '@/components/ui/checkbox';
 import type { BulkActionsBarProps } from '@/types/transaction';
 
 /**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) {
+      console.warn('[BulkActionsBar] Empty object detected, using fallback');
+      return fallback;
+    }
+    return fallback;
+  }
+  return String(value);
+}
+
+/**
  * Selection composition for mixed lists (Feature 028)
  */
 export interface SelectionComposition {
@@ -224,7 +241,7 @@ export function BulkActionsBar({
                     <SelectContent>
                       {categories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
-                          {category.name}
+                          {safeDisplayString(category.name, 'Unknown')}
                         </SelectItem>
                       ))}
                     </SelectContent>

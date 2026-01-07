@@ -377,7 +377,7 @@ export const TransactionRow = memo(function TransactionRow({
           <SelectContent>
             {categories.map((category) => (
               <SelectItem key={category.id} value={category.id}>
-                {category.name}
+                {safeDisplayString(category.name, 'Unknown')}
               </SelectItem>
             ))}
           </SelectContent>
