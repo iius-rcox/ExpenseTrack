@@ -24,7 +24,7 @@ import {
   CircleX,
   Layers,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, safeDisplayString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -57,23 +57,6 @@ import {
 } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { BulkActionsBarProps } from '@/types/transaction';
-
-/**
- * DEFENSIVE HELPER: Safely convert any value to a displayable string.
- * Guards against React Error #301 where empty objects {} might be in cached data.
- */
-function safeDisplayString(value: unknown, fallback = ''): string {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
-    const keys = Object.keys(value as object);
-    if (keys.length === 0) {
-      console.warn('[BulkActionsBar] Empty object detected, using fallback');
-      return fallback;
-    }
-    return fallback;
-  }
-  return String(value);
-}
 
 /**
  * Selection composition for mixed lists (Feature 028)
@@ -239,9 +222,12 @@ export function BulkActionsBar({
                       <SelectValue placeholder="Set category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={safeDisplayString(category.id, `cat-${Math.random()}`)} value={safeDisplayString(category.id) || `unknown-${Math.random()}`}>
-                          {safeDisplayString(category.name, 'Unknown')}
+                      {categories.map((category, index) => (
+                        <SelectItem
+                          key={safeDisplayString(category.id, `cat-${index}`, 'BulkActionsBar.category.id')}
+                          value={safeDisplayString(category.id, `unknown-${index}`, 'BulkActionsBar.category.id')}
+                        >
+                          {safeDisplayString(category.name, 'Unknown', 'BulkActionsBar.category.name')}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -353,16 +339,16 @@ export function BulkActionsBar({
                 <div className="font-medium mb-2">Select Tags</div>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {availableTags.length > 0 ? (
-                    availableTags.filter((tag) => safeDisplayString(tag)).map((tag, index) => (
+                    availableTags.filter((tag) => safeDisplayString(tag, '', 'BulkActionsBar.tag.filter')).map((tag, index) => (
                       <label
-                        key={safeDisplayString(tag, `tag-${index}`)}
+                        key={safeDisplayString(tag, `tag-${index}`, 'BulkActionsBar.tag.key')}
                         className="flex items-center gap-2 cursor-pointer"
                       >
                         <Checkbox
                           checked={selectedTags.includes(tag)}
                           onCheckedChange={() => handleTagToggle(tag)}
                         />
-                        <span className="text-sm">{safeDisplayString(tag)}</span>
+                        <span className="text-sm">{safeDisplayString(tag, '', 'BulkActionsBar.tag.display')}</span>
                       </label>
                     ))
                   ) : (
