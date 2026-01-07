@@ -196,10 +196,14 @@ function TransactionsPage() {
   const generatePredictions = useGeneratePredictions()
 
   // Extract unique categories from patterns for filter dropdown
+  // Filters out empty objects {} which are truthy but can't be rendered
   const patternCategories = useMemo(() => {
     const cats = new Set<string>()
     patternWorkspace.patterns.forEach((p) => {
-      if (p.category) cats.add(p.category)
+      // Guard against empty objects {} - they are truthy but not valid strings
+      if (p.category && typeof p.category === 'string' && p.category.length > 0) {
+        cats.add(p.category)
+      }
     })
     return Array.from(cats).sort()
   }, [patternWorkspace.patterns])

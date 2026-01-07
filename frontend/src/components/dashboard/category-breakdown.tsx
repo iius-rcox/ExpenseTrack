@@ -41,6 +41,20 @@ import { fadeIn } from '@/lib/animations';
 import type { CategoryBreakdownData, CategoryBreakdownProps } from '@/types/dashboard';
 
 /**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) return fallback;
+    return fallback;
+  }
+  return String(value);
+}
+
+/**
  * Default category colors for the design system.
  * These work well in both light and dark modes.
  */
@@ -232,13 +246,13 @@ function ListView({
   return (
     <div className="space-y-3">
       {categories.map((category, index) => {
-        const Icon = getCategoryIcon(category.category);
+        const Icon = getCategoryIcon(safeDisplayString(category.category));
         const color = category.color || CATEGORY_COLORS[index % CATEGORY_COLORS.length];
         const percentage = total > 0 ? (category.amount / total) * 100 : 0;
 
         return (
           <div
-            key={category.category}
+            key={safeDisplayString(category.category, `cat-${index}`)}
             className={cn(
               'group flex items-center gap-3 rounded-lg p-2 transition-colors',
               'hover:bg-muted/50 cursor-pointer'
@@ -257,7 +271,7 @@ function ListView({
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-sm truncate">
-                  {category.category}
+                  {safeDisplayString(category.category, 'Unknown')}
                 </span>
                 <span className="shrink-0 font-semibold tabular-nums">
                   {formatCurrency(category.amount)}
@@ -413,12 +427,12 @@ export function CategoryBreakdownCompact({
       {topCategories.map((category, index) => {
         const color = category.color || CATEGORY_COLORS[index % CATEGORY_COLORS.length];
         return (
-          <div key={category.category} className="flex items-center gap-2">
+          <div key={safeDisplayString(category.category, `legend-${index}`)} className="flex items-center gap-2">
             <div
               className="h-2 w-2 rounded-full"
               style={{ backgroundColor: color }}
             />
-            <span className="flex-1 truncate text-sm">{category.category}</span>
+            <span className="flex-1 truncate text-sm">{safeDisplayString(category.category, 'Unknown')}</span>
             <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
               {formatCurrency(category.amount)}
             </span>
