@@ -549,7 +549,7 @@ export function TransactionFilterPanel({
             const category = categories.find((c) => c.id === categoryId);
             return (
               <Badge key={categoryId} variant="secondary" className="gap-1">
-                {category?.name || categoryId}
+                {safeDisplayString(category?.name) || categoryId}
                 <button
                   onClick={() => handleCategoryToggle(categoryId)}
                   className="ml-1 hover:text-destructive"

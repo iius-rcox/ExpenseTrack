@@ -22,6 +22,24 @@ import {
 import { cn } from '@/lib/utils'
 import type { PatternGridFilters, PatternStatusFilter } from '@/types/prediction'
 
+/**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ * Empty objects are truthy in JS, so `value && <span>{value}</span>` will fail!
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) {
+      console.warn('[PatternFilterPanel] Empty object detected, using fallback');
+      return fallback;
+    }
+    return fallback;
+  }
+  return String(value);
+}
+
 export interface PatternFilterPanelProps {
   /** Current filter state */
   filters: PatternGridFilters
@@ -168,8 +186,8 @@ export function PatternFilterPanel({
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {categories.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
+              <SelectItem key={safeDisplayString(category, `cat-${Math.random()}`)} value={safeDisplayString(category) || `unknown-${Math.random()}`}>
+                {safeDisplayString(category, 'Unknown')}
               </SelectItem>
             ))}
           </SelectContent>
