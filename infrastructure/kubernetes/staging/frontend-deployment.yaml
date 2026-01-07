@@ -28,7 +28,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: frontend
-          image: iiusacr.azurecr.io/expenseflow-frontend:v1.4.30-4a00bf2
+          image: iiusacr.azurecr.io/expenseflow-frontend:v1.4.31-d4af09e
           ports:
             - containerPort: 80
               protocol: TCP
