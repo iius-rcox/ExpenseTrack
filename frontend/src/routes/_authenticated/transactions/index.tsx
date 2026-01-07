@@ -93,7 +93,12 @@ export const Route = createFileRoute('/_authenticated/transactions/')({
 })
 
 function TransactionsPage() {
+  // DIAGNOSTIC: Log at the very start of the component to track render progress
+  console.log('[TransactionsPage] Starting render...');
+
   const search = Route.useSearch()
+  console.log('[TransactionsPage] After useSearch:', { view: search.view, page: search.page });
+
   const navigate = Route.useNavigate()
 
   // Filter state (local, not persisted in URL for simplicity)
@@ -178,6 +183,16 @@ function TransactionsPage() {
   // Reference data
   const { data: categories = [] } = useTransactionCategories()
   const { data: tags = [] } = useTransactionTags()
+
+  // DIAGNOSTIC: Log after data hooks to check data structure
+  console.log('[TransactionsPage] After data hooks:', {
+    mixedListDataExists: !!mixedListData,
+    itemCount: mixedListData?.items?.length ?? 0,
+    isLoading,
+    hasError: !!error,
+    categoriesCount: categories?.length ?? 0,
+    tagsCount: tags?.length ?? 0,
+  });
 
   // Pattern data (only fetch when on patterns tab)
   const patternWorkspace = usePatternWorkspace({
@@ -687,6 +702,9 @@ function TransactionsPage() {
     () => computeSelectionComposition(items, selection.selectedIds),
     [items, selection.selectedIds]
   )
+
+  // DIAGNOSTIC: Log right before render to confirm we reach this point
+  console.log('[TransactionsPage] About to render JSX, items count:', items.length);
 
   return (
     <div className="space-y-6">
