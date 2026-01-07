@@ -8,6 +8,20 @@
  */
 
 import { useMemo, useState } from 'react'
+
+/**
+ * DEFENSIVE HELPER: Safely convert any value to a displayable string.
+ * Guards against React Error #301 where empty objects {} might be in cached data.
+ */
+function safeDisplayString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) return fallback;
+    return fallback;
+  }
+  return String(value);
+}
 import {
   Cell,
   Legend,
@@ -150,7 +164,7 @@ function CategoryList({
 
         return (
           <motion.div
-            key={category.category}
+            key={safeDisplayString(category.category, `cat-${index}`)}
             variants={staggerChild}
             className={cn(
               'flex items-center gap-3 rounded-lg border p-3 transition-colors',
@@ -171,7 +185,7 @@ function CategoryList({
             {/* Category name and percentage bar */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-1">
-                <span className="font-medium truncate">{category.category}</span>
+                <span className="font-medium truncate">{safeDisplayString(category.category, 'Unknown')}</span>
                 <span className="font-mono text-sm">{category.percentage.toFixed(1)}%</span>
               </div>
               <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -323,9 +337,9 @@ export function CategoryBreakdown({
                 onClick={(_, index) => onCategorySelect?.(processedData[index])}
                 style={{ cursor: onCategorySelect ? 'pointer' : 'default' }}
               >
-                {processedData.map((entry) => (
+                {processedData.map((entry, index) => (
                   <Cell
-                    key={entry.category}
+                    key={safeDisplayString(entry.category, `pie-cell-${index}`)}
                     fill={entry.color}
                     stroke={
                       selectedCategory === entry.category ? STROKE_COLOR : 'transparent'
@@ -382,9 +396,9 @@ export function CategoryBreakdown({
                 onClick={(data) => onCategorySelect?.(data as unknown as CategoryData)}
                 style={{ cursor: onCategorySelect ? 'pointer' : 'default' }}
               >
-                {processedData.map((entry) => (
+                {processedData.map((entry, index) => (
                   <Cell
-                    key={entry.category}
+                    key={safeDisplayString(entry.category, `bar-cell-${index}`)}
                     fill={entry.color}
                     opacity={
                       selectedCategory && selectedCategory !== entry.category ? 0.5 : 1
