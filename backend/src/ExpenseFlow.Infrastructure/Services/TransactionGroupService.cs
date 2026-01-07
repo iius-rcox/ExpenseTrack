@@ -38,104 +38,111 @@ public class TransactionGroupService : ITransactionGroupService
             "Creating transaction group for user {UserId} with {Count} transactions",
             userId, request.TransactionIds.Count);
 
-        // Use a database transaction with row-level locking to prevent race conditions
-        // where concurrent requests could group the same transactions
-        await using var dbTransaction = await _dbContext.Database.BeginTransactionAsync(
-            System.Data.IsolationLevel.ReadCommitted, ct);
+        // Use execution strategy to support NpgsqlRetryingExecutionStrategy with transactions
+        // The strategy wraps the entire transaction so it can retry on transient failures
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
 
-        try
+        return await strategy.ExecuteAsync(async () =>
         {
-            // Fetch transactions with row locks (FOR UPDATE prevents concurrent modifications)
-            // This ensures no other transaction can modify these rows until we commit
-            var transactionIdsList = request.TransactionIds.ToList();
-            var transactions = await _dbContext.Transactions
-                .FromSqlRaw(
-                    @"SELECT * FROM transactions
-                      WHERE user_id = {0} AND id = ANY({1})
-                      FOR UPDATE",
-                    userId, transactionIdsList)
-                .ToListAsync(ct);
+            // Use a database transaction with row-level locking to prevent race conditions
+            // where concurrent requests could group the same transactions
+            await using var dbTransaction = await _dbContext.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.ReadCommitted, ct);
 
-            // Validate all requested transactions exist and belong to user
-            if (transactions.Count != request.TransactionIds.Count)
+            try
             {
-                var foundIds = transactions.Select(t => t.Id).ToHashSet();
-                var missingIds = request.TransactionIds.Where(id => !foundIds.Contains(id)).ToList();
-                throw new InvalidOperationException(
-                    $"Transaction(s) not found: {string.Join(", ", missingIds)}");
+                // Fetch transactions with row locks (FOR UPDATE prevents concurrent modifications)
+                // This ensures no other transaction can modify these rows until we commit
+                var transactionIdsList = request.TransactionIds.ToList();
+                var transactions = await _dbContext.Transactions
+                    .FromSqlRaw(
+                        @"SELECT * FROM transactions
+                          WHERE user_id = {0} AND id = ANY({1})
+                          FOR UPDATE",
+                        userId, transactionIdsList)
+                    .ToListAsync(ct);
+
+                // Validate all requested transactions exist and belong to user
+                if (transactions.Count != request.TransactionIds.Count)
+                {
+                    var foundIds = transactions.Select(t => t.Id).ToHashSet();
+                    var missingIds = request.TransactionIds.Where(id => !foundIds.Contains(id)).ToList();
+                    throw new InvalidOperationException(
+                        $"Transaction(s) not found: {string.Join(", ", missingIds)}");
+                }
+
+                // Validate none are already grouped
+                var alreadyGrouped = transactions.Where(t => t.GroupId.HasValue).ToList();
+                if (alreadyGrouped.Any())
+                {
+                    var groupedIds = string.Join(", ", alreadyGrouped.Select(t => t.Id));
+                    throw new InvalidOperationException(
+                        $"Transaction(s) already in a group: {groupedIds}");
+                }
+
+                // Validate none already have matched receipts
+                var alreadyMatched = transactions.Where(t => t.MatchedReceiptId.HasValue).ToList();
+                if (alreadyMatched.Any())
+                {
+                    var matchedIds = string.Join(", ", alreadyMatched.Select(t => t.Id));
+                    throw new InvalidOperationException(
+                        $"Transaction(s) already have matched receipts: {matchedIds}");
+                }
+
+                // Calculate group properties
+                var combinedAmount = transactions.Sum(t => t.Amount);
+                var maxDate = transactions.Max(t => t.TransactionDate);
+                var transactionCount = transactions.Count;
+
+                // Generate name if not provided
+                var name = request.Name;
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    name = GenerateGroupName(transactions);
+                }
+
+                // Use provided display date or max date
+                var displayDate = request.DisplayDate ?? maxDate;
+                var isDateOverridden = request.DisplayDate.HasValue;
+
+                // Create the group
+                var group = new TransactionGroup
+                {
+                    UserId = userId,
+                    Name = name,
+                    DisplayDate = displayDate,
+                    IsDateOverridden = isDateOverridden,
+                    CombinedAmount = combinedAmount,
+                    TransactionCount = transactionCount,
+                    MatchStatus = MatchStatus.Unmatched,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _dbContext.TransactionGroups.Add(group);
+
+                // Assign transactions to the group
+                foreach (var transaction in transactions)
+                {
+                    transaction.GroupId = group.Id;
+                }
+
+                await _dbContext.SaveChangesAsync(ct);
+                await dbTransaction.CommitAsync(ct);
+
+                _logger.LogInformation(
+                    "Created transaction group {GroupId} '{Name}' with {Count} transactions, amount {Amount}",
+                    group.Id, group.Name, group.TransactionCount, group.CombinedAmount);
+
+                return MapToDetailDto(group, transactions);
             }
-
-            // Validate none are already grouped
-            var alreadyGrouped = transactions.Where(t => t.GroupId.HasValue).ToList();
-            if (alreadyGrouped.Any())
+            catch (Exception ex) when (ex is not InvalidOperationException)
             {
-                var groupedIds = string.Join(", ", alreadyGrouped.Select(t => t.Id));
-                throw new InvalidOperationException(
-                    $"Transaction(s) already in a group: {groupedIds}");
+                // Rollback on any unexpected error (InvalidOperationException is validation, not DB error)
+                await dbTransaction.RollbackAsync(ct);
+                _logger.LogError(ex, "Failed to create transaction group for user {UserId}", userId);
+                throw;
             }
-
-            // Validate none already have matched receipts
-            var alreadyMatched = transactions.Where(t => t.MatchedReceiptId.HasValue).ToList();
-            if (alreadyMatched.Any())
-            {
-                var matchedIds = string.Join(", ", alreadyMatched.Select(t => t.Id));
-                throw new InvalidOperationException(
-                    $"Transaction(s) already have matched receipts: {matchedIds}");
-            }
-
-            // Calculate group properties
-            var combinedAmount = transactions.Sum(t => t.Amount);
-            var maxDate = transactions.Max(t => t.TransactionDate);
-            var transactionCount = transactions.Count;
-
-            // Generate name if not provided
-            var name = request.Name;
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                name = GenerateGroupName(transactions);
-            }
-
-            // Use provided display date or max date
-            var displayDate = request.DisplayDate ?? maxDate;
-            var isDateOverridden = request.DisplayDate.HasValue;
-
-            // Create the group
-            var group = new TransactionGroup
-            {
-                UserId = userId,
-                Name = name,
-                DisplayDate = displayDate,
-                IsDateOverridden = isDateOverridden,
-                CombinedAmount = combinedAmount,
-                TransactionCount = transactionCount,
-                MatchStatus = MatchStatus.Unmatched,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _dbContext.TransactionGroups.Add(group);
-
-            // Assign transactions to the group
-            foreach (var transaction in transactions)
-            {
-                transaction.GroupId = group.Id;
-            }
-
-            await _dbContext.SaveChangesAsync(ct);
-            await dbTransaction.CommitAsync(ct);
-
-            _logger.LogInformation(
-                "Created transaction group {GroupId} '{Name}' with {Count} transactions, amount {Amount}",
-                group.Id, group.Name, group.TransactionCount, group.CombinedAmount);
-
-            return MapToDetailDto(group, transactions);
-        }
-        catch (Exception ex) when (ex is not InvalidOperationException)
-        {
-            // Rollback on any unexpected error (InvalidOperationException is validation, not DB error)
-            await dbTransaction.RollbackAsync(ct);
-            _logger.LogError(ex, "Failed to create transaction group for user {UserId}", userId);
-            throw;
-        }
+        });
     }
 
     /// <inheritdoc />
@@ -268,114 +275,120 @@ public class TransactionGroupService : ITransactionGroupService
             "Adding {Count} transactions to group {GroupId} for user {UserId}",
             request.TransactionIds.Count, groupId, userId);
 
-        // Use a database transaction with row-level locking to prevent race conditions
-        // where concurrent requests could add the same transactions to multiple groups
-        await using var dbTransaction = await _dbContext.Database.BeginTransactionAsync(
-            System.Data.IsolationLevel.ReadCommitted, ct);
+        // Use execution strategy to support NpgsqlRetryingExecutionStrategy with transactions
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
 
-        try
+        return await strategy.ExecuteAsync(async () =>
         {
-            // Step 1: Lock the group row to prevent concurrent modifications
-            // Note: We DON'T use Include() here because it generates a separate query
-            // without FOR UPDATE, which would leave child transactions unlocked
-            var group = await _dbContext.TransactionGroups
-                .FromSqlRaw(
-                    @"SELECT * FROM transaction_groups
-                      WHERE id = {0} AND user_id = {1}
-                      FOR UPDATE",
-                    groupId, userId)
-                .FirstOrDefaultAsync(ct);
+            // Use a database transaction with row-level locking to prevent race conditions
+            // where concurrent requests could add the same transactions to multiple groups
+            await using var dbTransaction = await _dbContext.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.ReadCommitted, ct);
 
-            if (group == null)
+            try
             {
-                return null;
+                // Step 1: Lock the group row to prevent concurrent modifications
+                // Note: We DON'T use Include() here because it generates a separate query
+                // without FOR UPDATE, which would leave child transactions unlocked
+                var group = await _dbContext.TransactionGroups
+                    .FromSqlRaw(
+                        @"SELECT * FROM transaction_groups
+                          WHERE id = {0} AND user_id = {1}
+                          FOR UPDATE",
+                        groupId, userId)
+                    .FirstOrDefaultAsync(ct);
+
+                if (group == null)
+                {
+                    return null;
+                }
+
+                // Step 2: Lock and load existing transactions in the group
+                // This ensures no concurrent operation can modify group membership
+                var existingTransactions = await _dbContext.Transactions
+                    .FromSqlRaw(
+                        @"SELECT * FROM transactions
+                          WHERE group_id = {0}
+                          FOR UPDATE",
+                        group.Id)
+                    .ToListAsync(ct);
+
+                // Populate the navigation collection with locked transactions
+                foreach (var tx in existingTransactions)
+                {
+                    group.Transactions.Add(tx);
+                }
+
+                // Prevent modification of matched groups
+                if (group.MatchedReceiptId.HasValue)
+                {
+                    throw new InvalidOperationException(
+                        "Cannot add transactions to a matched group. Remove the receipt match first.");
+                }
+
+                // Step 3: Fetch and lock new transactions (FOR UPDATE prevents concurrent modifications)
+                var transactionIdsList = request.TransactionIds.ToList();
+                var newTransactions = await _dbContext.Transactions
+                    .FromSqlRaw(
+                        @"SELECT * FROM transactions
+                          WHERE user_id = {0} AND id = ANY({1})
+                          FOR UPDATE",
+                        userId, transactionIdsList)
+                    .ToListAsync(ct);
+
+                // Validate all requested transactions exist
+                if (newTransactions.Count != request.TransactionIds.Count)
+                {
+                    var foundIds = newTransactions.Select(t => t.Id).ToHashSet();
+                    var missingIds = request.TransactionIds.Where(id => !foundIds.Contains(id)).ToList();
+                    throw new InvalidOperationException(
+                        $"Transaction(s) not found: {string.Join(", ", missingIds)}");
+                }
+
+                // Validate none are already grouped
+                var alreadyGrouped = newTransactions.Where(t => t.GroupId.HasValue).ToList();
+                if (alreadyGrouped.Any())
+                {
+                    var groupedIds = string.Join(", ", alreadyGrouped.Select(t => t.Id));
+                    throw new InvalidOperationException(
+                        $"Transaction(s) already in a group: {groupedIds}");
+                }
+
+                // Validate none already have matched receipts
+                var alreadyMatched = newTransactions.Where(t => t.MatchedReceiptId.HasValue).ToList();
+                if (alreadyMatched.Any())
+                {
+                    var matchedIds = string.Join(", ", alreadyMatched.Select(t => t.Id));
+                    throw new InvalidOperationException(
+                        $"Transaction(s) already have matched receipts: {matchedIds}");
+                }
+
+                // Add transactions to group
+                foreach (var transaction in newTransactions)
+                {
+                    transaction.GroupId = group.Id;
+                    group.Transactions.Add(transaction);
+                }
+
+                // Recalculate aggregates
+                RecalculateGroupAggregates(group);
+                await _dbContext.SaveChangesAsync(ct);
+                await dbTransaction.CommitAsync(ct);
+
+                _logger.LogInformation(
+                    "Added {Count} transactions to group {GroupId}, new total: {Total}",
+                    newTransactions.Count, groupId, group.TransactionCount);
+
+                return MapToDetailDto(group, group.Transactions.ToList());
             }
-
-            // Step 2: Lock and load existing transactions in the group
-            // This ensures no concurrent operation can modify group membership
-            var existingTransactions = await _dbContext.Transactions
-                .FromSqlRaw(
-                    @"SELECT * FROM transactions
-                      WHERE group_id = {0}
-                      FOR UPDATE",
-                    group.Id)
-                .ToListAsync(ct);
-
-            // Populate the navigation collection with locked transactions
-            foreach (var tx in existingTransactions)
+            catch (Exception ex) when (ex is not InvalidOperationException)
             {
-                group.Transactions.Add(tx);
+                // Rollback on any unexpected error (InvalidOperationException is validation, not DB error)
+                await dbTransaction.RollbackAsync(ct);
+                _logger.LogError(ex, "Failed to add transactions to group {GroupId}", groupId);
+                throw;
             }
-
-            // Prevent modification of matched groups
-            if (group.MatchedReceiptId.HasValue)
-            {
-                throw new InvalidOperationException(
-                    "Cannot add transactions to a matched group. Remove the receipt match first.");
-            }
-
-            // Step 3: Fetch and lock new transactions (FOR UPDATE prevents concurrent modifications)
-            var transactionIdsList = request.TransactionIds.ToList();
-            var newTransactions = await _dbContext.Transactions
-                .FromSqlRaw(
-                    @"SELECT * FROM transactions
-                      WHERE user_id = {0} AND id = ANY({1})
-                      FOR UPDATE",
-                    userId, transactionIdsList)
-                .ToListAsync(ct);
-
-            // Validate all requested transactions exist
-            if (newTransactions.Count != request.TransactionIds.Count)
-            {
-                var foundIds = newTransactions.Select(t => t.Id).ToHashSet();
-                var missingIds = request.TransactionIds.Where(id => !foundIds.Contains(id)).ToList();
-                throw new InvalidOperationException(
-                    $"Transaction(s) not found: {string.Join(", ", missingIds)}");
-            }
-
-            // Validate none are already grouped
-            var alreadyGrouped = newTransactions.Where(t => t.GroupId.HasValue).ToList();
-            if (alreadyGrouped.Any())
-            {
-                var groupedIds = string.Join(", ", alreadyGrouped.Select(t => t.Id));
-                throw new InvalidOperationException(
-                    $"Transaction(s) already in a group: {groupedIds}");
-            }
-
-            // Validate none already have matched receipts
-            var alreadyMatched = newTransactions.Where(t => t.MatchedReceiptId.HasValue).ToList();
-            if (alreadyMatched.Any())
-            {
-                var matchedIds = string.Join(", ", alreadyMatched.Select(t => t.Id));
-                throw new InvalidOperationException(
-                    $"Transaction(s) already have matched receipts: {matchedIds}");
-            }
-
-            // Add transactions to group
-            foreach (var transaction in newTransactions)
-            {
-                transaction.GroupId = group.Id;
-                group.Transactions.Add(transaction);
-            }
-
-            // Recalculate aggregates
-            RecalculateGroupAggregates(group);
-            await _dbContext.SaveChangesAsync(ct);
-            await dbTransaction.CommitAsync(ct);
-
-            _logger.LogInformation(
-                "Added {Count} transactions to group {GroupId}, new total: {Total}",
-                newTransactions.Count, groupId, group.TransactionCount);
-
-            return MapToDetailDto(group, group.Transactions.ToList());
-        }
-        catch (Exception ex) when (ex is not InvalidOperationException)
-        {
-            // Rollback on any unexpected error (InvalidOperationException is validation, not DB error)
-            await dbTransaction.RollbackAsync(ct);
-            _logger.LogError(ex, "Failed to add transactions to group {GroupId}", groupId);
-            throw;
-        }
+        });
     }
 
     /// <inheritdoc />
@@ -389,93 +402,99 @@ public class TransactionGroupService : ITransactionGroupService
             "Removing transaction {TransactionId} from group {GroupId} for user {UserId}",
             transactionId, groupId, userId);
 
-        // Use a database transaction with row-level locking to prevent race conditions
-        // where concurrent removals could cause inconsistent group state
-        await using var dbTransaction = await _dbContext.Database.BeginTransactionAsync(
-            System.Data.IsolationLevel.ReadCommitted, ct);
+        // Use execution strategy to support NpgsqlRetryingExecutionStrategy with transactions
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
 
-        try
+        return await strategy.ExecuteAsync(async () =>
         {
-            // Step 1: Lock the group row to prevent concurrent modifications
-            // Note: We DON'T use Include() here because it generates a separate query
-            // without FOR UPDATE, which would leave child transactions unlocked
-            var group = await _dbContext.TransactionGroups
-                .FromSqlRaw(
-                    @"SELECT * FROM transaction_groups
-                      WHERE id = {0} AND user_id = {1}
-                      FOR UPDATE",
-                    groupId, userId)
-                .FirstOrDefaultAsync(ct);
+            // Use a database transaction with row-level locking to prevent race conditions
+            // where concurrent removals could cause inconsistent group state
+            await using var dbTransaction = await _dbContext.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.ReadCommitted, ct);
 
-            if (group == null)
+            try
             {
-                return null;
+                // Step 1: Lock the group row to prevent concurrent modifications
+                // Note: We DON'T use Include() here because it generates a separate query
+                // without FOR UPDATE, which would leave child transactions unlocked
+                var group = await _dbContext.TransactionGroups
+                    .FromSqlRaw(
+                        @"SELECT * FROM transaction_groups
+                          WHERE id = {0} AND user_id = {1}
+                          FOR UPDATE",
+                        groupId, userId)
+                    .FirstOrDefaultAsync(ct);
+
+                if (group == null)
+                {
+                    return null;
+                }
+
+                // Step 2: Lock and load ALL transactions in the group
+                // This ensures no concurrent operation can modify group membership
+                // and we get an accurate count for the "minimum 2 transactions" validation
+                var existingTransactions = await _dbContext.Transactions
+                    .FromSqlRaw(
+                        @"SELECT * FROM transactions
+                          WHERE group_id = {0}
+                          FOR UPDATE",
+                        group.Id)
+                    .ToListAsync(ct);
+
+                // Populate the navigation collection with locked transactions
+                foreach (var tx in existingTransactions)
+                {
+                    group.Transactions.Add(tx);
+                }
+
+                // Prevent modification of matched groups
+                if (group.MatchedReceiptId.HasValue)
+                {
+                    throw new InvalidOperationException(
+                        "Cannot remove transactions from a matched group. Remove the receipt match first.");
+                }
+
+                // Step 3: Find the transaction being removed from the already-locked collection
+                // No need for another DB query - we already have all transactions locked
+                var transaction = existingTransactions.FirstOrDefault(t => t.Id == transactionId);
+
+                if (transaction == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Transaction {transactionId} is not in group {groupId}");
+                }
+
+                // Validate removal won't leave fewer than 2 transactions
+                if (group.Transactions.Count <= 2)
+                {
+                    throw new InvalidOperationException(
+                        "Groups must have at least 2 transactions. Use ungroup (DELETE) to dissolve the group.");
+                }
+
+                // Remove from group
+                transaction.GroupId = null;
+                group.Transactions.Remove(transaction);
+
+                // Recalculate aggregates
+                RecalculateGroupAggregates(group);
+                await _dbContext.SaveChangesAsync(ct);
+                await dbTransaction.CommitAsync(ct);
+
+                _logger.LogInformation(
+                    "Removed transaction {TransactionId} from group {GroupId}, remaining: {Count}",
+                    transactionId, groupId, group.TransactionCount);
+
+                return MapToDetailDto(group, group.Transactions.ToList());
             }
-
-            // Step 2: Lock and load ALL transactions in the group
-            // This ensures no concurrent operation can modify group membership
-            // and we get an accurate count for the "minimum 2 transactions" validation
-            var existingTransactions = await _dbContext.Transactions
-                .FromSqlRaw(
-                    @"SELECT * FROM transactions
-                      WHERE group_id = {0}
-                      FOR UPDATE",
-                    group.Id)
-                .ToListAsync(ct);
-
-            // Populate the navigation collection with locked transactions
-            foreach (var tx in existingTransactions)
+            catch (Exception ex) when (ex is not InvalidOperationException)
             {
-                group.Transactions.Add(tx);
+                // Rollback on any unexpected error (InvalidOperationException is validation, not DB error)
+                await dbTransaction.RollbackAsync(ct);
+                _logger.LogError(ex, "Failed to remove transaction {TransactionId} from group {GroupId}",
+                    transactionId, groupId);
+                throw;
             }
-
-            // Prevent modification of matched groups
-            if (group.MatchedReceiptId.HasValue)
-            {
-                throw new InvalidOperationException(
-                    "Cannot remove transactions from a matched group. Remove the receipt match first.");
-            }
-
-            // Step 3: Find the transaction being removed from the already-locked collection
-            // No need for another DB query - we already have all transactions locked
-            var transaction = existingTransactions.FirstOrDefault(t => t.Id == transactionId);
-
-            if (transaction == null)
-            {
-                throw new InvalidOperationException(
-                    $"Transaction {transactionId} is not in group {groupId}");
-            }
-
-            // Validate removal won't leave fewer than 2 transactions
-            if (group.Transactions.Count <= 2)
-            {
-                throw new InvalidOperationException(
-                    "Groups must have at least 2 transactions. Use ungroup (DELETE) to dissolve the group.");
-            }
-
-            // Remove from group
-            transaction.GroupId = null;
-            group.Transactions.Remove(transaction);
-
-            // Recalculate aggregates
-            RecalculateGroupAggregates(group);
-            await _dbContext.SaveChangesAsync(ct);
-            await dbTransaction.CommitAsync(ct);
-
-            _logger.LogInformation(
-                "Removed transaction {TransactionId} from group {GroupId}, remaining: {Count}",
-                transactionId, groupId, group.TransactionCount);
-
-            return MapToDetailDto(group, group.Transactions.ToList());
-        }
-        catch (Exception ex) when (ex is not InvalidOperationException)
-        {
-            // Rollback on any unexpected error (InvalidOperationException is validation, not DB error)
-            await dbTransaction.RollbackAsync(ct);
-            _logger.LogError(ex, "Failed to remove transaction {TransactionId} from group {GroupId}",
-                transactionId, groupId);
-            throw;
-        }
+        });
     }
 
     /// <inheritdoc />
