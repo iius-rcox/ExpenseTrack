@@ -16,6 +16,7 @@ const ACCEPTED_FILE_TYPES = {
   'image/webp': ['.webp'],
   'image/heic': ['.heic'],
   'application/pdf': ['.pdf'],
+  'text/html': ['.html', '.htm'],
 }
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB per spec
@@ -140,7 +141,7 @@ export function ReceiptUploadDropzone({ onUploadComplete }: ReceiptUploadDropzon
             </div>
           </div>
           <p className="text-xs text-muted-foreground text-center">
-            Supports JPG, PNG, WebP, HEIC, PDF (max 20MB each)
+            Supports JPG, PNG, WebP, HEIC, PDF, HTML (max 20MB each)
           </p>
         </div>
       ) : (
@@ -161,7 +162,7 @@ export function ReceiptUploadDropzone({ onUploadComplete }: ReceiptUploadDropzon
             {isDragActive ? 'Drop files here' : 'Drag & drop receipts here'}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            or click to browse. Supports JPG, PNG, WebP, HEIC, PDF (max 20MB each)
+            or click to browse. Supports JPG, PNG, WebP, HEIC, PDF, HTML (max 20MB each)
           </p>
         </div>
       )}
