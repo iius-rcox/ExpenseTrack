@@ -104,59 +104,82 @@ public class ReportService : IReportService
         // Process confirmed matches (has receipt)
         foreach (var match in confirmedMatches)
         {
-            var transaction = match.Transaction;
             var receipt = match.Receipt;
 
-            // Get categorization suggestions for the transaction
-            var categorization = await GetCategorizationSafeAsync(transaction.Id, userId, ct);
+            // Collect transactions to process - either single transaction or group members
+            var transactionsToProcess = new List<(Transaction transaction, string? vendorName)>();
 
-            // Normalize the description
-            var normalizedDesc = await NormalizeDescriptionSafeAsync(transaction.OriginalDescription, userId, ct);
-
-            // Feature 023: Check if this transaction has a prediction
-            var hasPrediction = predictedTransactionLookup.TryGetValue(transaction.Id, out var prediction);
-
-            var line = new ExpenseLine
+            if (match.TransactionId != null && match.Transaction != null)
             {
-                // ReportId will be set automatically by EF Core via navigation property
-                ReceiptId = receipt.Id,
-                TransactionId = transaction.Id,
-                LineOrder = lineOrder++,
-                ExpenseDate = transaction.TransactionDate,
-                Amount = transaction.Amount,
-                OriginalDescription = transaction.OriginalDescription,
-                NormalizedDescription = normalizedDesc,
-                VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName,
-                HasReceipt = true,
-                CreatedAt = DateTime.UtcNow,
-                // Feature 023: Mark as auto-suggested if prediction exists
-                IsAutoSuggested = hasPrediction,
-                PredictionId = hasPrediction ? prediction!.PredictionId : null
-            };
-
-            // Apply GL code suggestion
-            if (categorization?.GL?.TopSuggestion != null)
+                // Individual transaction match
+                transactionsToProcess.Add((match.Transaction, receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName));
+            }
+            else if (match.TransactionGroupId != null && match.TransactionGroup != null)
             {
-                var glSuggestion = categorization.GL.TopSuggestion;
-                line.GLCodeSuggested = glSuggestion.Code;
-                line.GLCode = glSuggestion.Code; // Pre-fill with suggestion
-                line.GLCodeTier = glSuggestion.Tier;
-                line.GLCodeSource = glSuggestion.Source;
-                UpdateTierCounts(glSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
+                // Group match - expand to all transactions in the group
+                var group = match.TransactionGroup;
+                var groupVendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName ?? group.Name;
+
+                foreach (var groupTransaction in group.Transactions.OrderBy(t => t.TransactionDate).ThenBy(t => t.CreatedAt))
+                {
+                    transactionsToProcess.Add((groupTransaction, groupVendorName));
+                }
             }
 
-            // Apply department suggestion
-            if (categorization?.Department?.TopSuggestion != null)
+            // Process each transaction
+            foreach (var (transaction, vendorName) in transactionsToProcess)
             {
-                var deptSuggestion = categorization.Department.TopSuggestion;
-                line.DepartmentSuggested = deptSuggestion.Code;
-                line.DepartmentCode = deptSuggestion.Code; // Pre-fill with suggestion
-                line.DepartmentTier = deptSuggestion.Tier;
-                line.DepartmentSource = deptSuggestion.Source;
-                UpdateTierCounts(deptSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
-            }
+                // Get categorization suggestions for the transaction
+                var categorization = await GetCategorizationSafeAsync(transaction.Id, userId, ct);
 
-            lines.Add(line);
+                // Normalize the description
+                var normalizedDesc = await NormalizeDescriptionSafeAsync(transaction.OriginalDescription, userId, ct);
+
+                // Feature 023: Check if this transaction has a prediction
+                var hasPrediction = predictedTransactionLookup.TryGetValue(transaction.Id, out var prediction);
+
+                var line = new ExpenseLine
+                {
+                    // ReportId will be set automatically by EF Core via navigation property
+                    ReceiptId = receipt.Id,
+                    TransactionId = transaction.Id,
+                    LineOrder = lineOrder++,
+                    ExpenseDate = transaction.TransactionDate,
+                    Amount = transaction.Amount,
+                    OriginalDescription = transaction.OriginalDescription,
+                    NormalizedDescription = normalizedDesc,
+                    VendorName = vendorName,
+                    HasReceipt = true,
+                    CreatedAt = DateTime.UtcNow,
+                    // Feature 023: Mark as auto-suggested if prediction exists
+                    IsAutoSuggested = hasPrediction,
+                    PredictionId = hasPrediction ? prediction!.PredictionId : null
+                };
+
+                // Apply GL code suggestion
+                if (categorization?.GL?.TopSuggestion != null)
+                {
+                    var glSuggestion = categorization.GL.TopSuggestion;
+                    line.GLCodeSuggested = glSuggestion.Code;
+                    line.GLCode = glSuggestion.Code; // Pre-fill with suggestion
+                    line.GLCodeTier = glSuggestion.Tier;
+                    line.GLCodeSource = glSuggestion.Source;
+                    UpdateTierCounts(glSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
+                }
+
+                // Apply department suggestion
+                if (categorization?.Department?.TopSuggestion != null)
+                {
+                    var deptSuggestion = categorization.Department.TopSuggestion;
+                    line.DepartmentSuggested = deptSuggestion.Code;
+                    line.DepartmentCode = deptSuggestion.Code; // Pre-fill with suggestion
+                    line.DepartmentTier = deptSuggestion.Tier;
+                    line.DepartmentSource = deptSuggestion.Source;
+                    UpdateTierCounts(deptSuggestion.Tier, ref tier1Hits, ref tier2Hits, ref tier3Hits);
+                }
+
+                lines.Add(line);
+            }
         }
 
         // Process unmatched transactions (missing receipt)
@@ -586,24 +609,54 @@ public class ReportService : IReportService
         // Create preview lines from confirmed matches
         foreach (var match in confirmedMatches)
         {
-            var transaction = match.Transaction;
             var receipt = match.Receipt;
 
-            previewLines.Add(new ExpenseLineDto
+            // Handle individual transaction matches
+            if (match.TransactionId != null && match.Transaction != null)
             {
-                Id = Guid.Empty, // No ID yet - this is just a preview
-                ReportId = Guid.Empty,
-                ReceiptId = receipt.Id,
-                TransactionId = transaction.Id,
-                LineOrder = lineOrder++,
-                ExpenseDate = transaction.TransactionDate,
-                Amount = Math.Abs(transaction.Amount), // Use absolute value for display
-                OriginalDescription = transaction.OriginalDescription,
-                NormalizedDescription = transaction.Description,
-                VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName,
-                HasReceipt = true,
-                CreatedAt = DateTime.UtcNow
-            });
+                var transaction = match.Transaction;
+
+                previewLines.Add(new ExpenseLineDto
+                {
+                    Id = Guid.Empty, // No ID yet - this is just a preview
+                    ReportId = Guid.Empty,
+                    ReceiptId = receipt.Id,
+                    TransactionId = transaction.Id,
+                    LineOrder = lineOrder++,
+                    ExpenseDate = transaction.TransactionDate,
+                    Amount = Math.Abs(transaction.Amount), // Use absolute value for display
+                    OriginalDescription = transaction.OriginalDescription,
+                    NormalizedDescription = transaction.Description,
+                    VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName,
+                    HasReceipt = true,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+            // Handle group matches - expand to individual transactions
+            else if (match.TransactionGroupId != null && match.TransactionGroup != null)
+            {
+                var group = match.TransactionGroup;
+                var groupTransactions = group.Transactions.OrderBy(t => t.TransactionDate).ThenBy(t => t.CreatedAt);
+
+                foreach (var transaction in groupTransactions)
+                {
+                    previewLines.Add(new ExpenseLineDto
+                    {
+                        Id = Guid.Empty,
+                        ReportId = Guid.Empty,
+                        ReceiptId = receipt.Id,
+                        TransactionId = transaction.Id,
+                        LineOrder = lineOrder++,
+                        ExpenseDate = transaction.TransactionDate,
+                        Amount = Math.Abs(transaction.Amount),
+                        OriginalDescription = transaction.OriginalDescription,
+                        NormalizedDescription = transaction.Description,
+                        VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName ?? group.Name,
+                        HasReceipt = true,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
         }
 
         _logger.LogInformation(

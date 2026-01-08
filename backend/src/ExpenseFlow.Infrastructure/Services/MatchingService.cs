@@ -1346,8 +1346,9 @@ public partial class MatchingService : IMatchingService
     /// <inheritdoc />
     public async Task<(List<Transaction> Items, int TotalCount)> GetUnmatchedTransactionsAsync(Guid userId, int page = 1, int pageSize = 20)
     {
+        // Exclude grouped transactions - their matching is handled at group level
         var query = _context.Transactions
-            .Where(t => t.UserId == userId && t.MatchStatus == MatchStatus.Unmatched);
+            .Where(t => t.UserId == userId && t.MatchStatus == MatchStatus.Unmatched && t.GroupId == null);
 
         var totalCount = await query.CountAsync();
 
@@ -1389,8 +1390,9 @@ public partial class MatchingService : IMatchingService
         var unmatchedReceiptsCount = await _context.Receipts
             .CountAsync(r => r.UserId == userId && r.MatchStatus == MatchStatus.Unmatched);
 
+        // Exclude grouped transactions - their matching is handled at group level
         var unmatchedTransactionsCount = await _context.Transactions
-            .CountAsync(t => t.UserId == userId && t.MatchStatus == MatchStatus.Unmatched);
+            .CountAsync(t => t.UserId == userId && t.MatchStatus == MatchStatus.Unmatched && t.GroupId == null);
 
         var totalReceipts = matchedCount + proposedCount + unmatchedReceiptsCount;
         var autoMatchRate = totalReceipts > 0

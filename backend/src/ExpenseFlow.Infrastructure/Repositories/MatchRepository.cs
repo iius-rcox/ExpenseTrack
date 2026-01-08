@@ -171,6 +171,7 @@ public class MatchRepository : IMatchRepository
             .Include(m => m.Receipt)
             .Include(m => m.Transaction)
             .Include(m => m.TransactionGroup)
+                .ThenInclude(g => g!.Transactions)
             .Include(m => m.MatchedVendorAlias)
             .Where(m => m.UserId == userId && m.Status == MatchProposalStatus.Confirmed)
             .Where(m =>
