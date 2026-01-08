@@ -315,7 +315,7 @@ public class ReceiptService : IReceiptService
             "image/png" => buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47,
             "application/pdf" => buffer[0] == 0x25 && buffer[1] == 0x50 && buffer[2] == 0x44 && buffer[3] == 0x46,
             "image/heic" or "image/heif" => ValidateHeicMagicBytes(buffer),
-            "text/html" => ValidateHtmlMagicBytes(stream),
+            "text/html" or "application/xhtml+xml" or "application/x-html" => ValidateHtmlMagicBytes(stream),
             _ => true // Allow unknown types to pass through
         };
     }

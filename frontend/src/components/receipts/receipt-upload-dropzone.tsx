@@ -17,6 +17,9 @@ const ACCEPTED_FILE_TYPES = {
   'image/heic': ['.heic'],
   'application/pdf': ['.pdf'],
   'text/html': ['.html', '.htm'],
+  // Additional HTML-related MIME types that browsers may report for saved emails/web pages
+  'application/xhtml+xml': ['.xhtml'],
+  'application/x-html': ['.html', '.htm'],
 }
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB per spec
@@ -40,13 +43,31 @@ export function ReceiptUploadDropzone({ onUploadComplete }: ReceiptUploadDropzon
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: unknown[]) => {
-    if (rejectedFiles.length > 0) {
+  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: File[] | { file: File }[]) => {
+    // Rescue HTML files that may have been rejected due to browser reporting wrong MIME type
+    const htmlExtensions = ['.html', '.htm', '.xhtml']
+    const rescuedFiles: File[] = []
+    const trulyRejectedFiles: (File | { file: File })[] = []
+
+    for (const rejected of rejectedFiles) {
+      const file = 'file' in rejected ? rejected.file : rejected
+      const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'))
+      if (htmlExtensions.includes(ext) && file.size <= MAX_FILE_SIZE) {
+        // Rescue HTML file that was rejected due to MIME type mismatch
+        rescuedFiles.push(file)
+      } else {
+        trulyRejectedFiles.push(rejected)
+      }
+    }
+
+    if (trulyRejectedFiles.length > 0) {
       toast.error('Some files were rejected. Please check file type and size.')
     }
 
+    const allAcceptedFiles = [...acceptedFiles, ...rescuedFiles]
+
     setFiles(prev => {
-      const newFiles = [...prev, ...acceptedFiles]
+      const newFiles = [...prev, ...allAcceptedFiles]
       if (newFiles.length > MAX_FILES) {
         toast.error(`Maximum ${MAX_FILES} files allowed`)
         return prev
