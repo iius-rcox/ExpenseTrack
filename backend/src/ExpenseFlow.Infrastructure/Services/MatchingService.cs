@@ -219,7 +219,8 @@ public partial class MatchingService : IMatchingService
 
             if (match != null && bestCandidate != null)
             {
-                proposals.Add(match);
+                // Attach receipt navigation property for API response
+                match.Receipt = receipt;
 
                 // Update receipt status to Proposed
                 receipt.MatchStatus = MatchStatus.Proposed;
@@ -229,6 +230,9 @@ public partial class MatchingService : IMatchingService
                 {
                     transactionMatchCount++;
                     consumedTransactionIds.Add(bestCandidate.Id);
+
+                    // Attach transaction navigation property for API response
+                    match.Transaction = transactions.First(t => t.Id == bestCandidate.Id);
 
                     _logger.LogDebug(
                         "Receipt {ReceiptId} matched to transaction {TransactionId} with score {Score}",
@@ -243,10 +247,15 @@ public partial class MatchingService : IMatchingService
                     var matchedGroup = groups.First(g => g.Id == bestCandidate.Id);
                     matchedGroup.MatchStatus = MatchStatus.Proposed;
 
+                    // Attach group navigation property for API response
+                    match.TransactionGroup = matchedGroup;
+
                     _logger.LogDebug(
                         "Receipt {ReceiptId} matched to group {GroupId} ({GroupName}) with score {Score}",
                         receipt.Id, bestCandidate.Id, bestCandidate.DisplayName, match.ConfidenceScore);
                 }
+
+                proposals.Add(match);
             }
         }
 

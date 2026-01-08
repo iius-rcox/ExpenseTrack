@@ -39,6 +39,7 @@ public class MatchRepository : IMatchRepository
         return await _context.ReceiptTransactionMatches
             .Include(m => m.Receipt)
             .Include(m => m.Transaction)
+            .Include(m => m.TransactionGroup)
             .Include(m => m.MatchedVendorAlias)
             .FirstOrDefaultAsync(m => m.Id == id && m.UserId == userId);
     }
@@ -48,6 +49,7 @@ public class MatchRepository : IMatchRepository
         return await _context.ReceiptTransactionMatches
             .Include(m => m.Receipt)
             .Include(m => m.Transaction)
+            .Include(m => m.TransactionGroup)
             .Include(m => m.MatchedVendorAlias)
             .FirstOrDefaultAsync(m => m.ReceiptId == receiptId && m.UserId == userId);
     }
@@ -57,6 +59,7 @@ public class MatchRepository : IMatchRepository
         return await _context.ReceiptTransactionMatches
             .Include(m => m.Receipt)
             .Include(m => m.Transaction)
+            .Include(m => m.TransactionGroup)
             .Include(m => m.MatchedVendorAlias)
             .FirstOrDefaultAsync(m => m.TransactionId == transactionId && m.UserId == userId);
     }
@@ -69,6 +72,7 @@ public class MatchRepository : IMatchRepository
         var query = _context.ReceiptTransactionMatches
             .Include(m => m.Receipt)
             .Include(m => m.Transaction)
+            .Include(m => m.TransactionGroup)
             .Include(m => m.MatchedVendorAlias)
             .Where(m => m.UserId == userId && m.Status == MatchProposalStatus.Proposed);
 
