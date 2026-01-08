@@ -119,6 +119,7 @@ public interface ITransactionGroupService
     /// <param name="startDate">Optional start date filter.</param>
     /// <param name="endDate">Optional end date filter.</param>
     /// <param name="matchStatus">Optional filter by match status (matched, pending, unmatched). Supports multiple values.</param>
+    /// <param name="reimbursability">Optional filter by reimbursability (business, personal, uncategorized). Supports multiple values.</param>
     /// <param name="search">Optional text search on description.</param>
     /// <param name="sortBy">Sort field: "date" (default), "amount".</param>
     /// <param name="sortOrder">Sort order: "desc" (default), "asc".</param>
@@ -131,6 +132,7 @@ public interface ITransactionGroupService
         DateOnly? startDate = null,
         DateOnly? endDate = null,
         List<string>? matchStatus = null,
+        List<string>? reimbursability = null,
         string? search = null,
         string sortBy = "date",
         string sortOrder = "desc",

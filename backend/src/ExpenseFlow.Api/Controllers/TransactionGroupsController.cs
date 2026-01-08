@@ -278,6 +278,7 @@ public class TransactionGroupsController : ApiControllerBase
     /// <param name="startDate">Optional start date filter.</param>
     /// <param name="endDate">Optional end date filter.</param>
     /// <param name="matchStatus">Optional filter by match status (matched, pending, unmatched). Supports multiple values.</param>
+    /// <param name="reimbursability">Optional filter by reimbursability (business, personal, uncategorized). Supports multiple values.</param>
     /// <param name="search">Optional text search on description.</param>
     /// <param name="sortBy">Sort field: "date" (default), "amount".</param>
     /// <param name="sortOrder">Sort order: "desc" (default), "asc".</param>
@@ -290,6 +291,7 @@ public class TransactionGroupsController : ApiControllerBase
         [FromQuery] DateOnly? startDate = null,
         [FromQuery] DateOnly? endDate = null,
         [FromQuery] List<string>? matchStatus = null,
+        [FromQuery] List<string>? reimbursability = null,
         [FromQuery] string? search = null,
         [FromQuery] string sortBy = "date",
         [FromQuery] string sortOrder = "desc")
@@ -308,6 +310,7 @@ public class TransactionGroupsController : ApiControllerBase
             startDate,
             endDate,
             matchStatus,
+            reimbursability,
             search,
             sortBy,
             sortOrder);

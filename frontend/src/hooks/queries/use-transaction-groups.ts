@@ -301,6 +301,7 @@ export interface MixedListParams {
   maxAmount?: number;
   // Multi-select filters
   matchStatus?: string[];  // 'matched' | 'pending' | 'unmatched'
+  reimbursability?: string[];  // 'business' | 'personal' | 'uncategorized'
   categories?: string[];
   // Boolean filters
   hasPendingPrediction?: boolean;
@@ -336,6 +337,7 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
     minAmount,
     maxAmount,
     matchStatus,
+    reimbursability,
     categories,
     hasPendingPrediction,
     sortBy = 'date',
@@ -352,6 +354,7 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
       minAmount,
       maxAmount,
       matchStatus,
+      reimbursability,
       categories,
       hasPendingPrediction,
       sortBy,
@@ -374,6 +377,7 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
       if (maxAmount !== undefined) searchParams.set('maxAmount', String(maxAmount));
       // Multi-select filters (array params)
       matchStatus?.forEach((status) => searchParams.append('matchStatus', status));
+      reimbursability?.forEach((r) => searchParams.append('reimbursability', r));
       categories?.forEach((cat) => searchParams.append('categories', cat));
       // Boolean filters
       if (hasPendingPrediction) searchParams.set('hasPendingPrediction', 'true');

@@ -248,6 +248,7 @@ function TransactionsPage() {
     maxAmount: filters.amountRange.max ?? undefined,
     // Multi-select filters
     matchStatus: filters.matchStatus.length > 0 ? filters.matchStatus : undefined,
+    reimbursability: filters.reimbursability.length > 0 ? filters.reimbursability : undefined,
     categories: filters.categories.length > 0 ? filters.categories : undefined,
     // Boolean filters
     hasPendingPrediction: filters.hasPendingPrediction || undefined,

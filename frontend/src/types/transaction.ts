@@ -27,6 +27,16 @@ import type { PredictionSummary } from './prediction';
 export type TransactionMatchStatus = 'matched' | 'pending' | 'unmatched' | 'manual';
 
 /**
+ * Transaction reimbursability status for expense filtering.
+ *
+ * Based on TransactionPrediction.Status:
+ * - 'business': Confirmed prediction (user marked as reimbursable)
+ * - 'personal': Rejected prediction (user marked as not reimbursable)
+ * - 'uncategorized': No prediction or pending status (not yet classified)
+ */
+export type TransactionReimbursability = 'business' | 'personal' | 'uncategorized';
+
+/**
  * Transaction source type.
  */
 export type TransactionSource = 'import' | 'manual' | 'api';
@@ -106,6 +116,8 @@ export interface TransactionFilters {
   };
   /** Filter by match status (OR logic) */
   matchStatus: TransactionMatchStatus[];
+  /** Filter by reimbursability status (OR logic): business, personal, uncategorized */
+  reimbursability: TransactionReimbursability[];
   /** Filter by tags (AND logic - must have all) */
   tags: string[];
   /** Filter to show only transactions with pending expense predictions (Feature 023) */
@@ -121,6 +133,7 @@ export const DEFAULT_TRANSACTION_FILTERS: TransactionFilters = {
   categories: [],
   amountRange: { min: null, max: null },
   matchStatus: [],
+  reimbursability: [],
   tags: [],
   hasPendingPrediction: false,
 };

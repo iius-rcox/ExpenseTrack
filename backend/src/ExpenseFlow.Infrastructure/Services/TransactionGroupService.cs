@@ -547,14 +547,17 @@ public class TransactionGroupService : ITransactionGroupService
         DateOnly? startDate = null,
         DateOnly? endDate = null,
         List<string>? matchStatus = null,
+        List<string>? reimbursability = null,
         string? search = null,
         string sortBy = "date",
         string sortOrder = "desc",
         CancellationToken ct = default)
     {
         _logger.LogDebug(
-            "Getting mixed list for user {UserId}, page {Page}, pageSize {PageSize}, matchStatus {MatchStatus}",
-            userId, page, pageSize, matchStatus != null ? string.Join(",", matchStatus) : "all");
+            "Getting mixed list for user {UserId}, page {Page}, pageSize {PageSize}, matchStatus {MatchStatus}, reimbursability {Reimbursability}",
+            userId, page, pageSize,
+            matchStatus != null ? string.Join(",", matchStatus) : "all",
+            reimbursability != null ? string.Join(",", reimbursability) : "all");
 
         // Query ungrouped transactions
         var transactionsQuery = _dbContext.Transactions
@@ -584,18 +587,52 @@ public class TransactionGroupService : ITransactionGroupService
             var hasPending = matchStatus.Contains("pending", StringComparer.OrdinalIgnoreCase);
             var hasUnmatched = matchStatus.Contains("unmatched", StringComparer.OrdinalIgnoreCase);
 
-            // For transactions: filter based on MatchedReceiptId presence
-            // "matched" = has a MatchedReceiptId, "unmatched" = no MatchedReceiptId
-            // "pending" for transactions is treated as unmatched (pending matches are in ReceiptTransactionMatch table)
+            // For transactions: filter based on MatchStatus enum
+            // "matched" = MatchStatus.Matched, "pending" = MatchStatus.Proposed, "unmatched" = MatchStatus.Unmatched
             transactionsQuery = transactionsQuery.Where(t =>
-                (hasMatched && t.MatchedReceiptId != null) ||
-                ((hasUnmatched || hasPending) && t.MatchedReceiptId == null));
+                (hasMatched && t.MatchStatus == MatchStatus.Matched) ||
+                (hasPending && t.MatchStatus == MatchStatus.Proposed) ||
+                (hasUnmatched && t.MatchStatus == MatchStatus.Unmatched));
 
-            // For groups: filter based on MatchStatus enum
+            // For groups: filter based on MatchStatus enum (same pattern)
             groupsQuery = groupsQuery.Where(g =>
                 (hasMatched && g.MatchStatus == MatchStatus.Matched) ||
                 (hasPending && g.MatchStatus == MatchStatus.Proposed) ||
                 (hasUnmatched && g.MatchStatus == MatchStatus.Unmatched));
+        }
+
+        // Apply reimbursability filter (business, personal, uncategorized)
+        // Based on TransactionPrediction.Status:
+        // - "business" = Confirmed (user confirmed as reimbursable)
+        // - "personal" = Rejected (user marked as not reimbursable)
+        // - "uncategorized" = No prediction OR Pending status
+        if (reimbursability != null && reimbursability.Count > 0)
+        {
+            var wantBusiness = reimbursability.Contains("business", StringComparer.OrdinalIgnoreCase);
+            var wantPersonal = reimbursability.Contains("personal", StringComparer.OrdinalIgnoreCase);
+            var wantUncategorized = reimbursability.Contains("uncategorized", StringComparer.OrdinalIgnoreCase);
+
+            // Get transaction IDs that have predictions with specific statuses
+            var businessTransactionIds = _dbContext.Set<TransactionPrediction>()
+                .Where(p => p.UserId == userId && p.Status == PredictionStatus.Confirmed)
+                .Select(p => p.TransactionId);
+
+            var personalTransactionIds = _dbContext.Set<TransactionPrediction>()
+                .Where(p => p.UserId == userId && p.Status == PredictionStatus.Rejected)
+                .Select(p => p.TransactionId);
+
+            // Filter transactions based on reimbursability
+            transactionsQuery = transactionsQuery.Where(t =>
+                (wantBusiness && businessTransactionIds.Contains(t.Id)) ||
+                (wantPersonal && personalTransactionIds.Contains(t.Id)) ||
+                (wantUncategorized && !businessTransactionIds.Contains(t.Id) && !personalTransactionIds.Contains(t.Id)));
+
+            // Note: Groups don't have predictions yet - include all if uncategorized is selected
+            if (!wantUncategorized)
+            {
+                // If only looking for business/personal, exclude all groups (they don't have predictions)
+                groupsQuery = groupsQuery.Where(g => false);
+            }
         }
 
         // Apply search filter

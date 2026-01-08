@@ -185,6 +185,7 @@ const DEFAULT_FILTERS: TransactionFilters = {
   categories: [],
   amountRange: { min: null, max: null },
   matchStatus: [],
+  reimbursability: [],
   tags: [],
   hasPendingPrediction: false,
 }
@@ -512,6 +513,7 @@ export function getActiveFilterCount(filters: TransactionFilters): number {
   if (filters.categories.length > 0) count++
   if (filters.amountRange.min !== null || filters.amountRange.max !== null) count++
   if (filters.matchStatus.length > 0) count++
+  if (filters.reimbursability.length > 0) count++
   if (filters.tags.length > 0) count++
   if (filters.hasPendingPrediction) count++
 
@@ -535,6 +537,7 @@ export function getDefaultFilters(): TransactionFilters {
     categories: [],
     amountRange: { min: null, max: null },
     matchStatus: [],
+    reimbursability: [],
     tags: [],
     hasPendingPrediction: false,
   }

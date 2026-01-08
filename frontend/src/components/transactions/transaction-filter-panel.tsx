@@ -26,6 +26,7 @@ import {
   ChevronUp,
   Filter,
   Lightbulb,
+  Briefcase,
 } from 'lucide-react';
 import { FilterPresetSelector } from './filter-preset-selector';
 import { QuickFilterChips } from './quick-filter-chips';
@@ -43,6 +44,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import type {
   TransactionFilterPanelProps,
   TransactionMatchStatus,
+  TransactionReimbursability,
 } from '@/types/transaction';
 import { getActiveFilterCount } from '@/hooks/queries/use-transactions';
 import { safeDisplayString } from '@/lib/utils';
@@ -53,6 +55,13 @@ const MATCH_STATUS_OPTIONS: { value: TransactionMatchStatus; label: string }[] =
   { value: 'pending', label: 'Pending Review' },
   { value: 'unmatched', label: 'Unmatched' },
   { value: 'manual', label: 'Manual Match' },
+];
+
+// Reimbursability status options for the filter
+const REIMBURSABILITY_OPTIONS: { value: TransactionReimbursability; label: string }[] = [
+  { value: 'business', label: 'Business' },
+  { value: 'personal', label: 'Personal' },
+  { value: 'uncategorized', label: 'Uncategorized' },
 ];
 
 /**
@@ -168,6 +177,17 @@ export function TransactionFilterPanel({
         ? filters.matchStatus.filter((s) => s !== status)
         : [...filters.matchStatus, status];
       onChange({ ...filters, matchStatus: newStatus });
+    },
+    [filters, onChange]
+  );
+
+  // Handle reimbursability toggle
+  const handleReimbursabilityToggle = useCallback(
+    (status: TransactionReimbursability) => {
+      const newStatus = filters.reimbursability.includes(status)
+        ? filters.reimbursability.filter((s) => s !== status)
+        : [...filters.reimbursability, status];
+      onChange({ ...filters, reimbursability: newStatus });
     },
     [filters, onChange]
   );
@@ -359,6 +379,46 @@ export function TransactionFilterPanel({
                         checked={filters.matchStatus.includes(option.value)}
                         onCheckedChange={() =>
                           handleMatchStatusToggle(option.value)
+                        }
+                      />
+                      <span className="text-sm">{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Reimbursability Filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant={filters.reimbursability.length > 0 ? 'secondary' : 'outline'}
+                size="sm"
+                className="gap-2"
+              >
+                <Briefcase className="h-4 w-4" />
+                <span className="hidden sm:inline">Expense</span>
+                {filters.reimbursability.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {filters.reimbursability.length}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-48" align="end">
+              <div className="space-y-3 p-2">
+                <div className="font-medium">Expense Type</div>
+                <div className="space-y-2">
+                  {REIMBURSABILITY_OPTIONS.map((option) => (
+                    <label
+                      key={option.value}
+                      className="flex cursor-pointer items-center gap-2"
+                    >
+                      <Checkbox
+                        checked={filters.reimbursability.includes(option.value)}
+                        onCheckedChange={() =>
+                          handleReimbursabilityToggle(option.value)
                         }
                       />
                       <span className="text-sm">{option.label}</span>
@@ -587,6 +647,21 @@ export function TransactionFilterPanel({
                 {option?.label || status}
                 <button
                   onClick={() => handleMatchStatusToggle(status)}
+                  className="ml-1 hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            );
+          })}
+          {filters.reimbursability.map((status) => {
+            const option = REIMBURSABILITY_OPTIONS.find((o) => o.value === status);
+            return (
+              <Badge key={status} variant="secondary" className="gap-1">
+                <Briefcase className="h-3 w-3" />
+                {option?.label || status}
+                <button
+                  onClick={() => handleReimbursabilityToggle(status)}
                   className="ml-1 hover:text-destructive"
                 >
                   <X className="h-3 w-3" />
