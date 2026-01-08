@@ -100,6 +100,18 @@ public class MatchingController : ApiControllerBase
             PageSize = pageSize
         };
 
+        // Debug: Log mapped DTOs to verify transactionGroup is present
+        foreach (var dto in response.Items)
+        {
+            _logger.LogInformation(
+                "DTO {MatchId}: CandidateType={CandidateType}, TransactionGroup={TransactionGroup}",
+                dto.MatchId,
+                dto.CandidateType,
+                dto.TransactionGroup != null
+                    ? $"{{Id={dto.TransactionGroup.Id}, Name={dto.TransactionGroup.Name}, Amount={dto.TransactionGroup.CombinedAmount}}}"
+                    : "null");
+        }
+
         return Ok(response);
     }
 
