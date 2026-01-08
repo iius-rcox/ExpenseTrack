@@ -42,6 +42,7 @@ export const transactionKeys = {
   imports: () => [...transactionKeys.all, 'imports'] as const,
   categories: () => [...transactionKeys.all, 'categories'] as const,
   tags: () => [...transactionKeys.all, 'tags'] as const,
+  filterSuggestions: () => [...transactionKeys.all, 'filter-suggestions'] as const,
 }
 
 // =============================================================================
@@ -433,6 +434,63 @@ export function useTransactionTags() {
       }
     },
     staleTime: 5 * 60 * 1000,
+  })
+}
+
+/**
+ * A smart filter suggestion from the API.
+ */
+export interface FilterSuggestion {
+  /** Suggestion type (merchant, match_status, amount_range, date_range) */
+  type: string
+  /** Human-readable label */
+  label: string
+  /** Description explaining the suggestion */
+  description: string
+  /** The filter value to apply */
+  filterValue: unknown
+  /** Number of matching transactions */
+  transactionCount: number
+  /** Relevance score (0-100) */
+  relevanceScore: number
+}
+
+/**
+ * Response from the filter suggestions API.
+ */
+export interface FilterSuggestionsResponse {
+  suggestions: FilterSuggestion[]
+  totalTransactions: number
+  earliestDate?: string
+  latestDate?: string
+}
+
+/**
+ * Hook for fetching smart filter suggestions.
+ * Analyzes the user's transaction data and suggests relevant filters
+ * based on patterns like top merchants, date ranges, and match status.
+ */
+export function useFilterSuggestions() {
+  return useQuery({
+    queryKey: transactionKeys.filterSuggestions(),
+    queryFn: async () => {
+      try {
+        const response = await apiFetch<FilterSuggestionsResponse>(
+          '/transactions/filter-suggestions'
+        )
+        return response
+      } catch {
+        // Return empty suggestions if endpoint doesn't exist
+        return {
+          suggestions: [],
+          totalTransactions: 0,
+        } as FilterSuggestionsResponse
+      }
+    },
+    // Suggestions don't change frequently - cache for 10 minutes
+    staleTime: 10 * 60 * 1000,
+    // Only fetch when user interacts with filters, not on initial load
+    enabled: true,
   })
 }
 

@@ -60,6 +60,13 @@ public interface IExpensePatternRepository
     Task<(int ActiveCount, int SuppressedCount)> GetCountsAsync(Guid userId);
 
     /// <summary>
+    /// Gets distinct categories from expense patterns for a user.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>List of unique category names.</returns>
+    Task<List<string>> GetDistinctCategoriesAsync(Guid userId);
+
+    /// <summary>
     /// Checks if a pattern exists for a specific vendor.
     /// </summary>
     /// <param name="userId">User ID.</param>

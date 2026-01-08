@@ -27,6 +27,9 @@ import {
   Filter,
   Lightbulb,
 } from 'lucide-react';
+import { FilterPresetSelector } from './filter-preset-selector';
+import { QuickFilterChips } from './quick-filter-chips';
+import { DEFAULT_TRANSACTION_FILTERS } from '@/types/transaction';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -381,6 +384,12 @@ export function TransactionFilterPanel({
             )}
           </Button>
 
+          {/* Filter Presets (save, load, delete filter configurations) */}
+          <FilterPresetSelector
+            filters={filters}
+            onLoadPreset={onChange}
+          />
+
           {/* Clear All Filters */}
           {activeFilterCount > 0 && (
             <Button
@@ -395,6 +404,13 @@ export function TransactionFilterPanel({
           )}
         </div>
       </div>
+
+      {/* Quick Filter Chips */}
+      <QuickFilterChips
+        filters={filters}
+        onApplyFilter={onChange}
+        defaultFilters={DEFAULT_TRANSACTION_FILTERS}
+      />
 
       {/* Advanced Filters Panel */}
       <AnimatePresence>

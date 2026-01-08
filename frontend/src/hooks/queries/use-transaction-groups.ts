@@ -286,15 +286,26 @@ export function useTransactionGroup(id: string, options: { enabled?: boolean } =
 
 /**
  * Parameters for the mixed transaction/group list query.
+ * Supports all transaction filter types for comprehensive filtering.
  */
 export interface MixedListParams {
   page?: number;
   pageSize?: number;
+  // Date range
   startDate?: string;
   endDate?: string;
-  matched?: boolean;
+  // Text search
   search?: string;
-  sortBy?: 'date' | 'amount';
+  // Amount range
+  minAmount?: number;
+  maxAmount?: number;
+  // Multi-select filters
+  matchStatus?: string[];  // 'matched' | 'pending' | 'unmatched'
+  categories?: string[];
+  // Boolean filters
+  hasPendingPrediction?: boolean;
+  // Sort
+  sortBy?: 'date' | 'amount' | 'merchant' | 'category';
   sortOrder?: 'asc' | 'desc';
 }
 
@@ -321,8 +332,12 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
     pageSize = 50,
     startDate,
     endDate,
-    matched,
     search,
+    minAmount,
+    maxAmount,
+    matchStatus,
+    categories,
+    hasPendingPrediction,
     sortBy = 'date',
     sortOrder = 'desc',
   } = params;
@@ -333,8 +348,12 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
       pageSize,
       startDate,
       endDate,
-      matched,
       search,
+      minAmount,
+      maxAmount,
+      matchStatus,
+      categories,
+      hasPendingPrediction,
       sortBy,
       sortOrder,
     }),
@@ -345,10 +364,19 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
       searchParams.set('sortBy', sortBy);
       searchParams.set('sortOrder', sortOrder);
 
+      // Date range
       if (startDate) searchParams.set('startDate', startDate);
       if (endDate) searchParams.set('endDate', endDate);
-      if (matched !== undefined) searchParams.set('matched', String(matched));
+      // Text search
       if (search) searchParams.set('search', search);
+      // Amount range
+      if (minAmount !== undefined) searchParams.set('minAmount', String(minAmount));
+      if (maxAmount !== undefined) searchParams.set('maxAmount', String(maxAmount));
+      // Multi-select filters (array params)
+      matchStatus?.forEach((status) => searchParams.append('matchStatus', status));
+      categories?.forEach((cat) => searchParams.append('categories', cat));
+      // Boolean filters
+      if (hasPendingPrediction) searchParams.set('hasPendingPrediction', 'true');
 
       const response = await apiFetch<TransactionMixedListResponse>(
         `/transaction-groups/mixed?${searchParams}`

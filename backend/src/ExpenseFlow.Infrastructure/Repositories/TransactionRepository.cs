@@ -31,7 +31,7 @@ public class TransactionRepository : ITransactionRepository
         int pageSize,
         DateOnly? startDate = null,
         DateOnly? endDate = null,
-        bool? matched = null,
+        List<string>? matchStatus = null,
         Guid? importId = null,
         string? search = null,
         string? sortBy = null,
@@ -53,12 +53,24 @@ public class TransactionRepository : ITransactionRepository
             query = query.Where(t => t.TransactionDate <= endDate.Value);
         }
 
-        if (matched.HasValue)
+        // Apply match status filter (supports multiple values with OR logic)
+        if (matchStatus is { Count: > 0 })
         {
-            query = matched.Value
-                ? query.Where(t => t.MatchedReceiptId != null)
-                // Exclude grouped transactions - their matching is handled at group level
-                : query.Where(t => t.MatchedReceiptId == null && t.GroupId == null);
+            // Map frontend status strings to query conditions
+            var hasMatched = matchStatus.Contains("matched", StringComparer.OrdinalIgnoreCase);
+            var hasPending = matchStatus.Contains("pending", StringComparer.OrdinalIgnoreCase);
+            var hasUnmatched = matchStatus.Contains("unmatched", StringComparer.OrdinalIgnoreCase);
+
+            if (hasMatched || hasPending || hasUnmatched)
+            {
+                query = query.Where(t =>
+                    // Matched: MatchStatus == Matched (2)
+                    (hasMatched && t.MatchStatus == Shared.Enums.MatchStatus.Matched) ||
+                    // Pending/Proposed: MatchStatus == Proposed (1)
+                    (hasPending && t.MatchStatus == Shared.Enums.MatchStatus.Proposed) ||
+                    // Unmatched: MatchStatus == Unmatched (0) AND not in a group
+                    (hasUnmatched && t.MatchStatus == Shared.Enums.MatchStatus.Unmatched && t.GroupId == null));
+            }
         }
 
         if (importId.HasValue)
@@ -87,7 +99,7 @@ public class TransactionRepository : ITransactionRepository
         if (hasPendingPrediction == true)
         {
             var transactionIdsWithPendingPredictions = _context.TransactionPredictions
-                .Where(p => p.UserId == userId && p.Status == ExpenseFlow.Shared.Enums.PredictionStatus.Pending)
+                .Where(p => p.UserId == userId && p.Status == Shared.Enums.PredictionStatus.Pending)
                 .Select(p => p.TransactionId);
             query = query.Where(t => transactionIdsWithPendingPredictions.Contains(t.Id));
         }
@@ -100,14 +112,14 @@ public class TransactionRepository : ITransactionRepository
             .Where(t => t.UserId == userId && t.MatchedReceiptId == null && t.GroupId == null)
             .CountAsync();
 
-        // Apply sorting
+        // Apply sorting - map frontend field names to entity properties
         var isDescending = string.Equals(sortOrder, "desc", StringComparison.OrdinalIgnoreCase);
         IOrderedQueryable<Transaction> orderedQuery = sortBy?.ToLowerInvariant() switch
         {
             "amount" => isDescending
                 ? query.OrderByDescending(t => t.Amount)
                 : query.OrderBy(t => t.Amount),
-            "description" => isDescending
+            "description" or "merchant" => isDescending  // Map 'merchant' to Description (Fix #2)
                 ? query.OrderByDescending(t => t.Description)
                 : query.OrderBy(t => t.Description),
             _ => isDescending
@@ -164,5 +176,113 @@ public class TransactionRepository : ITransactionRepository
             .OrderBy(t => t.TransactionDate)
             .ThenBy(t => t.CreatedAt)
             .ToListAsync();
+    }
+
+    public async Task<TransactionStatistics> GetFilterSuggestionsDataAsync(Guid userId)
+    {
+        var userTransactions = _context.Transactions.Where(t => t.UserId == userId);
+
+        // Get total count and date range
+        var totalCount = await userTransactions.CountAsync();
+
+        if (totalCount == 0)
+        {
+            return new TransactionStatistics { TotalTransactions = 0 };
+        }
+
+        // Get date range
+        var earliestDate = await userTransactions.MinAsync(t => t.TransactionDate);
+        var latestDate = await userTransactions.MaxAsync(t => t.TransactionDate);
+
+        // Get top merchants by transaction count (normalize description to extract merchant-like patterns)
+        var topMerchants = await userTransactions
+            .GroupBy(t => t.Description)
+            .Select(g => new MerchantStats
+            {
+                Merchant = g.Key,
+                TransactionCount = g.Count(),
+                TotalAmount = g.Sum(t => t.Amount)
+            })
+            .OrderByDescending(m => m.TransactionCount)
+            .Take(10)
+            .ToListAsync();
+
+        // Get match status breakdown
+        var matchStats = new MatchStatusStats
+        {
+            MatchedCount = await userTransactions.CountAsync(t => t.MatchStatus == Shared.Enums.MatchStatus.Matched),
+            PendingCount = await userTransactions.CountAsync(t => t.MatchStatus == Shared.Enums.MatchStatus.Proposed),
+            UnmatchedCount = await userTransactions.CountAsync(t => t.MatchStatus == Shared.Enums.MatchStatus.Unmatched && t.GroupId == null)
+        };
+
+        // Get amount statistics
+        var amountStats = new AmountStats
+        {
+            MinAmount = await userTransactions.MinAsync(t => t.Amount),
+            MaxAmount = await userTransactions.MaxAsync(t => t.Amount),
+            AverageAmount = await userTransactions.AverageAsync(t => t.Amount),
+            HighValueCount = await userTransactions.CountAsync(t => t.Amount >= 100),
+            LowValueCount = await userTransactions.CountAsync(t => t.Amount < 25)
+        };
+
+        // Calculate recent periods for suggestions
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var periods = new List<DateRangeStats>();
+
+        // This week
+        var weekStart = today.AddDays(-(int)today.DayOfWeek);
+        var thisWeekCount = await userTransactions
+            .CountAsync(t => t.TransactionDate >= weekStart && t.TransactionDate <= today);
+        if (thisWeekCount > 0)
+        {
+            periods.Add(new DateRangeStats
+            {
+                PeriodName = "This Week",
+                StartDate = weekStart,
+                EndDate = today,
+                TransactionCount = thisWeekCount
+            });
+        }
+
+        // This month
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        var thisMonthCount = await userTransactions
+            .CountAsync(t => t.TransactionDate >= monthStart && t.TransactionDate <= today);
+        if (thisMonthCount > 0)
+        {
+            periods.Add(new DateRangeStats
+            {
+                PeriodName = "This Month",
+                StartDate = monthStart,
+                EndDate = today,
+                TransactionCount = thisMonthCount
+            });
+        }
+
+        // Last 30 days
+        var thirtyDaysAgo = today.AddDays(-30);
+        var last30DaysCount = await userTransactions
+            .CountAsync(t => t.TransactionDate >= thirtyDaysAgo && t.TransactionDate <= today);
+        if (last30DaysCount > 0)
+        {
+            periods.Add(new DateRangeStats
+            {
+                PeriodName = "Last 30 Days",
+                StartDate = thirtyDaysAgo,
+                EndDate = today,
+                TransactionCount = last30DaysCount
+            });
+        }
+
+        return new TransactionStatistics
+        {
+            TotalTransactions = totalCount,
+            EarliestDate = earliestDate,
+            LatestDate = latestDate,
+            TopMerchants = topMerchants,
+            MatchStats = matchStats,
+            AmountStats = amountStats,
+            RecentPeriods = periods
+        };
     }
 }

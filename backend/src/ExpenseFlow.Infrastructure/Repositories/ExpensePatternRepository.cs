@@ -89,6 +89,16 @@ public class ExpensePatternRepository : IExpensePatternRepository
         return (activeCount, suppressedCount);
     }
 
+    public async Task<List<string>> GetDistinctCategoriesAsync(Guid userId)
+    {
+        return await _context.ExpensePatterns
+            .Where(p => p.UserId == userId && p.Category != null && p.Category != "")
+            .Select(p => p.Category!)
+            .Distinct()
+            .OrderBy(c => c)
+            .ToListAsync();
+    }
+
     public async Task<bool> ExistsAsync(Guid userId, string normalizedVendor)
     {
         return await _context.ExpensePatterns

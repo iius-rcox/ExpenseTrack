@@ -127,3 +127,96 @@ public class TransactionListResponse
     /// </summary>
     public int UnmatchedCount { get; set; }
 }
+
+/// <summary>
+/// Category for transaction filtering.
+/// </summary>
+public class CategoryDto
+{
+    /// <summary>
+    /// Unique identifier for the category (kebab-case).
+    /// </summary>
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Display name for the category.
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response containing available categories for transaction filtering.
+/// </summary>
+public class TransactionCategoriesResponse
+{
+    /// <summary>
+    /// List of available categories.
+    /// </summary>
+    public List<CategoryDto> Categories { get; set; } = new();
+}
+
+/// <summary>
+/// A suggested filter based on transaction data analysis.
+/// </summary>
+public class FilterSuggestionDto
+{
+    /// <summary>
+    /// Type of suggestion (e.g., "category", "date_range", "merchant", "amount_range").
+    /// </summary>
+    public string Type { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Human-readable label for the suggestion.
+    /// </summary>
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Brief description explaining the suggestion.
+    /// </summary>
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The filter value to apply (JSON-serializable).
+    /// For categories: category ID string.
+    /// For date ranges: object with startDate and endDate.
+    /// For merchants: search string.
+    /// For amount ranges: object with min and max.
+    /// </summary>
+    public object? FilterValue { get; set; }
+
+    /// <summary>
+    /// Number of transactions that match this filter suggestion.
+    /// </summary>
+    public int TransactionCount { get; set; }
+
+    /// <summary>
+    /// Relevance score (0-100, higher = more relevant suggestion).
+    /// </summary>
+    public int RelevanceScore { get; set; }
+}
+
+/// <summary>
+/// Response containing smart filter suggestions based on transaction data.
+/// </summary>
+public class FilterSuggestionsResponse
+{
+    /// <summary>
+    /// List of suggested filters.
+    /// </summary>
+    public List<FilterSuggestionDto> Suggestions { get; set; } = new();
+
+    /// <summary>
+    /// Total number of transactions analyzed.
+    /// </summary>
+    public int TotalTransactions { get; set; }
+
+    /// <summary>
+    /// Date range of the transactions analyzed.
+    /// </summary>
+    public DateOnly? EarliestDate { get; set; }
+
+    /// <summary>
+    /// Most recent transaction date.
+    /// </summary>
+    public DateOnly? LatestDate { get; set; }
+}
