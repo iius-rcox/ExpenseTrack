@@ -90,8 +90,8 @@ public partial class MatchingService : IMatchingService
         var minDate = receiptDates.Min().AddDays(-7);
         var maxDate = receiptDates.Max().AddDays(7);
 
-        // T017: Query transactions and groups in parallel for performance
-        var transactionsTask = _context.Transactions
+        // T017: Query transactions and groups sequentially (DbContext is not thread-safe)
+        var transactions = await _context.Transactions
             .Where(t => t.UserId == userId
                 && t.MatchStatus == MatchStatus.Unmatched
                 && t.GroupId == null  // T018: Exclude grouped transactions
@@ -99,12 +99,7 @@ public partial class MatchingService : IMatchingService
                 && t.TransactionDate <= maxDate)
             .ToListAsync();
 
-        var groupsTask = GetUnmatchedGroupsAsync(userId, minDate, maxDate);
-
-        await Task.WhenAll(transactionsTask, groupsTask);
-
-        var transactions = await transactionsTask;
-        var groups = await groupsTask;
+        var groups = await GetUnmatchedGroupsAsync(userId, minDate, maxDate);
 
         _logger.LogInformation(
             "Found {ReceiptCount} receipts, {TransactionCount} transactions, and {GroupCount} groups to match (date range: {MinDate} to {MaxDate})",
@@ -1227,8 +1222,8 @@ public partial class MatchingService : IMatchingService
         var minDate = receipt.DateExtracted.Value.AddDays(-7);
         var maxDate = receipt.DateExtracted.Value.AddDays(7);
 
-        // Query transactions and groups in parallel (T035: exclude grouped transactions)
-        var transactionsTask = _context.Transactions
+        // Query transactions and groups sequentially (DbContext is not thread-safe)
+        var transactions = await _context.Transactions
             .Where(t => t.UserId == userId
                 && t.MatchStatus == MatchStatus.Unmatched
                 && t.GroupId == null  // Exclude grouped transactions
@@ -1236,12 +1231,7 @@ public partial class MatchingService : IMatchingService
                 && t.TransactionDate <= maxDate)
             .ToListAsync();
 
-        var groupsTask = GetUnmatchedGroupsAsync(userId, minDate, maxDate);
-
-        await Task.WhenAll(transactionsTask, groupsTask);
-
-        var transactions = await transactionsTask;
-        var groups = await groupsTask;
+        var groups = await GetUnmatchedGroupsAsync(userId, minDate, maxDate);
 
         // Build alias cache for vendor scoring
         var aliasCache = await BuildAliasCacheAsync(transactions);
