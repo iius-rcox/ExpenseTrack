@@ -3,13 +3,15 @@
 /**
  * DocumentViewer Component
  *
- * A universal document viewer that handles both images and PDFs.
+ * A universal document viewer that handles images, PDFs, and HTML receipts.
  * Uses native browser capabilities for PDF rendering via iframe.
+ * HTML receipts are rendered in a sandboxed iframe with security headers.
  *
  * Features:
  * - Automatic format detection via contentType or file extension
  * - Zoom and rotation controls for images
  * - Native PDF viewing with browser's built-in viewer
+ * - Secure HTML rendering in sandboxed iframe (Feature 029)
  * - Fallback state for unsupported formats
  */
 
@@ -24,6 +26,8 @@ import {
   AlertTriangle,
   ExternalLink,
   RefreshCw,
+  FileCode,
+  Loader2,
 } from 'lucide-react';
 import { Button } from './button';
 import { Separator } from './separator';
@@ -45,9 +49,15 @@ interface DocumentViewerProps {
   documentClassName?: string;
   /** Callback when external link is clicked */
   onOpenExternal?: () => void;
+  /** Pre-fetched HTML content for HTML receipts (Feature 029) */
+  htmlContent?: string | null;
+  /** Loading state for HTML content fetch */
+  htmlLoading?: boolean;
+  /** Error from HTML content fetch */
+  htmlError?: Error | null;
 }
 
-type DocumentType = 'image' | 'pdf' | 'unknown';
+type DocumentType = 'image' | 'pdf' | 'html' | 'unknown';
 
 /**
  * Determines the document type from contentType or filename.
@@ -57,6 +67,7 @@ function getDocumentType(contentType?: string | null, filename?: string | null):
   if (contentType) {
     if (contentType.startsWith('image/')) return 'image';
     if (contentType === 'application/pdf') return 'pdf';
+    if (contentType === 'text/html') return 'html';
   }
 
   // Fallback to filename extension
@@ -66,6 +77,7 @@ function getDocumentType(contentType?: string | null, filename?: string | null):
       return 'image';
     }
     if (ext === 'pdf') return 'pdf';
+    if (['html', 'htm'].includes(ext || '')) return 'html';
   }
 
   return 'unknown';
@@ -80,6 +92,9 @@ export function DocumentViewer({
   className,
   documentClassName,
   onOpenExternal,
+  htmlContent,
+  htmlLoading,
+  htmlError,
 }: DocumentViewerProps) {
   // Image viewer state
   const [zoom, setZoom] = useState(1);
@@ -147,6 +162,89 @@ export function DocumentViewer({
           <iframe
             src={src}
             title={alt}
+            className={cn('w-full h-full border-0', documentClassName)}
+            style={{ minHeight: '500px' }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // HTML receipt rendering (Feature 029)
+  // Uses sandboxed iframe with srcdoc for security
+  if (documentType === 'html') {
+    // Loading state
+    if (htmlLoading) {
+      return (
+        <div className={cn('flex flex-col items-center justify-center h-full text-muted-foreground', className)}>
+          <Loader2 className="h-12 w-12 mb-3 animate-spin text-primary/50" />
+          <span className="text-sm font-medium">Loading HTML receipt...</span>
+        </div>
+      );
+    }
+
+    // Error state
+    if (htmlError) {
+      return (
+        <div className={cn('flex flex-col items-center justify-center h-full text-muted-foreground', className)}>
+          <AlertTriangle className="h-12 w-12 mb-3 text-amber-500" />
+          <span className="text-sm font-medium mb-1">Failed to load HTML content</span>
+          <span className="text-xs text-muted-foreground mb-4">
+            {htmlError.message || 'An error occurred while loading the receipt.'}
+          </span>
+        </div>
+      );
+    }
+
+    // No content yet
+    if (!htmlContent) {
+      return (
+        <div className={cn('flex flex-col items-center justify-center h-full text-muted-foreground', className)}>
+          <FileCode className="h-16 w-16 mb-2 opacity-50" />
+          <span className="text-sm">HTML receipt content not loaded</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className={cn('flex flex-col h-full', className)}>
+        {showControls && (
+          <div className="flex items-center justify-between gap-1 p-2 border-b bg-muted/30">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <FileCode className="h-4 w-4" />
+              <span>HTML Receipt (sanitized, scripts blocked)</span>
+            </div>
+            {src && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={() => {
+                  window.open(src, '_blank', 'noopener,noreferrer');
+                  onOpenExternal?.();
+                }}
+              >
+                <ExternalLink className="h-4 w-4 mr-1" />
+                Open Original
+              </Button>
+            )}
+          </div>
+        )}
+        <div className="flex-1 min-h-0 bg-white">
+          {/*
+           * Security: The iframe uses sandbox with minimal permissions:
+           * - allow-same-origin: Required for styles to work properly
+           * - NO allow-scripts: Prevents any JavaScript execution
+           * - NO allow-forms: Prevents form submissions
+           * - NO allow-popups: Prevents new windows/tabs
+           *
+           * Even if malicious content bypassed server-side sanitization,
+           * it cannot execute scripts or submit forms in this iframe.
+           */}
+          <iframe
+            srcDoc={htmlContent}
+            title={alt}
+            sandbox="allow-same-origin"
             className={cn('w-full h-full border-0', documentClassName)}
             style={{ minHeight: '500px' }}
           />

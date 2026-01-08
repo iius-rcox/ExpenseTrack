@@ -1,0 +1,201 @@
+# API Contract Changes: HTML Receipt Parsing
+# Feature: 029-html-receipt-parsing
+# Date: 2026-01-08
+#
+# This document describes changes to existing API endpoints.
+# No new endpoints are required - HTML receipts use the existing receipt upload flow.
+
+openapi: 3.0.3
+info:
+  title: ExpenseFlow API - HTML Receipt Changes
+  version: 1.0.0
+
+paths:
+  /api/receipts:
+    post:
+      summary: Upload Receipt (Extended for HTML)
+      description: |
+        Uploads a receipt file for processing. Now accepts HTML files in addition
+        to existing image and PDF formats.
+
+        **New in 029-html-receipt-parsing:**
+        - Accepts `text/html` content type
+        - Accepts `.html` and `.htm` file extensions
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: |
+                    Receipt file. Supported formats:
+                    - image/jpeg (.jpg, .jpeg)
+                    - image/png (.png)
+                    - image/heic (.heic)
+                    - image/heif (.heif)
+                    - application/pdf (.pdf)
+                    - text/html (.html, .htm) **NEW**
+            encoding:
+              file:
+                contentType: >-
+                  image/jpeg, image/png, image/heic, image/heif,
+                  application/pdf, text/html
+      responses:
+        '201':
+          description: Receipt uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptDto'
+        '400':
+          description: Invalid file (wrong type, too large, malformed)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /api/receipts/{id}:
+    get:
+      summary: Get Receipt Details (Extended for HTML)
+      description: |
+        Returns receipt details including extracted data.
+
+        **New in 029-html-receipt-parsing:**
+        - For HTML receipts, `sanitizedHtmlUrl` provides safe-to-render content
+        - `contentType` will be `text/html` for HTML receipts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Receipt details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ReceiptDto'
+                  - type: object
+                    properties:
+                      sanitizedHtmlUrl:
+                        type: string
+                        format: uri
+                        nullable: true
+                        description: |
+                          **NEW** For HTML receipts only. URL to fetch sanitized
+                          HTML content safe for browser rendering. Null for
+                          non-HTML receipts.
+
+  /api/receipts/{id}/html:
+    get:
+      summary: Get Sanitized HTML Content (NEW)
+      description: |
+        **NEW in 029-html-receipt-parsing**
+
+        Returns sanitized HTML content for browser rendering.
+        Only available for receipts with contentType `text/html`.
+
+        The returned HTML has been sanitized to remove:
+        - Script tags and event handlers
+        - External resource references (stylesheets, fonts)
+        - Form elements
+        - Iframes and embeds
+
+        Inline styles and images with data URIs are preserved.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Sanitized HTML content
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Receipt is not an HTML receipt
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Receipt not found
+
+components:
+  schemas:
+    ReceiptDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        originalFilename:
+          type: string
+        contentType:
+          type: string
+          description: |
+            MIME type. Now includes `text/html` for HTML receipts.
+          enum:
+            - image/jpeg
+            - image/png
+            - image/heic
+            - image/heif
+            - application/pdf
+            - text/html
+        status:
+          type: string
+          enum: [Uploaded, Processing, Ready, ReviewRequired, Error]
+        thumbnailUrl:
+          type: string
+          format: uri
+          nullable: true
+        vendorExtracted:
+          type: string
+          nullable: true
+        dateExtracted:
+          type: string
+          format: date
+          nullable: true
+        amountExtracted:
+          type: number
+          format: decimal
+          nullable: true
+        confidenceScore:
+          type: number
+          format: double
+          nullable: true
+        sanitizedHtmlUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: "NEW: URL for sanitized HTML (HTML receipts only)"
+        createdAt:
+          type: string
+          format: date-time
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
