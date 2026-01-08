@@ -97,14 +97,7 @@ export async function apiFetch<T>(
       return undefined as T
     }
 
-    const json = await response.json()
-
-    // DEBUG: Log raw API response for proposals endpoint
-    if (url.includes('/matching/proposals')) {
-      console.log('[apiFetch] Raw proposals response:', JSON.stringify(json, null, 2))
-    }
-
-    return json
+    return response.json()
   } catch (error) {
     clearTimeout(timeoutId)
     if (error instanceof Error && error.name === 'AbortError') {

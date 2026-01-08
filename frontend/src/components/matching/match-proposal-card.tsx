@@ -34,16 +34,6 @@ interface MatchProposalCardProps {
 }
 
 export function MatchProposalCard({ proposal, onConfirmed, onRejected }: MatchProposalCardProps) {
-  // DEBUG: Log proposal data to trace why group values aren't showing
-  console.log('[MatchProposalCard] Proposal received:', {
-    matchId: proposal.matchId,
-    candidateType: proposal.candidateType,
-    transactionGroupId: proposal.transactionGroupId,
-    transactionGroup: proposal.transactionGroup,
-    transactionId: proposal.transactionId,
-    transaction: proposal.transaction,
-  })
-
   const [isExpanded, setIsExpanded] = useState(false)
   const { mutate: confirmMatch, isPending: isConfirming } = useConfirmMatch()
   const { mutate: rejectMatch, isPending: isRejecting } = useRejectMatch()
