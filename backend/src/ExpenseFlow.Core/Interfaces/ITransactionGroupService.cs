@@ -118,7 +118,7 @@ public interface ITransactionGroupService
     /// <param name="pageSize">Items per page.</param>
     /// <param name="startDate">Optional start date filter.</param>
     /// <param name="endDate">Optional end date filter.</param>
-    /// <param name="matched">Optional filter by receipt match status.</param>
+    /// <param name="matchStatus">Optional filter by match status (matched, pending, unmatched). Supports multiple values.</param>
     /// <param name="search">Optional text search on description.</param>
     /// <param name="sortBy">Sort field: "date" (default), "amount".</param>
     /// <param name="sortOrder">Sort order: "desc" (default), "asc".</param>
@@ -130,7 +130,7 @@ public interface ITransactionGroupService
         int pageSize = 50,
         DateOnly? startDate = null,
         DateOnly? endDate = null,
-        bool? matched = null,
+        List<string>? matchStatus = null,
         string? search = null,
         string sortBy = "date",
         string sortOrder = "desc",

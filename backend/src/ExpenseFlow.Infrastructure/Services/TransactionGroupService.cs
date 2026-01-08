@@ -546,15 +546,15 @@ public class TransactionGroupService : ITransactionGroupService
         int pageSize = 50,
         DateOnly? startDate = null,
         DateOnly? endDate = null,
-        bool? matched = null,
+        List<string>? matchStatus = null,
         string? search = null,
         string sortBy = "date",
         string sortOrder = "desc",
         CancellationToken ct = default)
     {
         _logger.LogDebug(
-            "Getting mixed list for user {UserId}, page {Page}, pageSize {PageSize}",
-            userId, page, pageSize);
+            "Getting mixed list for user {UserId}, page {Page}, pageSize {PageSize}, matchStatus {MatchStatus}",
+            userId, page, pageSize, matchStatus != null ? string.Join(",", matchStatus) : "all");
 
         // Query ungrouped transactions
         var transactionsQuery = _dbContext.Transactions
@@ -577,19 +577,25 @@ public class TransactionGroupService : ITransactionGroupService
             groupsQuery = groupsQuery.Where(g => g.DisplayDate <= endDate.Value);
         }
 
-        // Apply match status filter
-        if (matched.HasValue)
+        // Apply match status filter (supports multiple values like: matched, pending, unmatched)
+        if (matchStatus != null && matchStatus.Count > 0)
         {
-            if (matched.Value)
-            {
-                transactionsQuery = transactionsQuery.Where(t => t.MatchedReceiptId != null);
-                groupsQuery = groupsQuery.Where(g => g.MatchedReceiptId != null);
-            }
-            else
-            {
-                transactionsQuery = transactionsQuery.Where(t => t.MatchedReceiptId == null);
-                groupsQuery = groupsQuery.Where(g => g.MatchedReceiptId == null);
-            }
+            var hasMatched = matchStatus.Contains("matched", StringComparer.OrdinalIgnoreCase);
+            var hasPending = matchStatus.Contains("pending", StringComparer.OrdinalIgnoreCase);
+            var hasUnmatched = matchStatus.Contains("unmatched", StringComparer.OrdinalIgnoreCase);
+
+            // For transactions: filter based on MatchedReceiptId presence
+            // "matched" = has a MatchedReceiptId, "unmatched" = no MatchedReceiptId
+            // "pending" for transactions is treated as unmatched (pending matches are in ReceiptTransactionMatch table)
+            transactionsQuery = transactionsQuery.Where(t =>
+                (hasMatched && t.MatchedReceiptId != null) ||
+                ((hasUnmatched || hasPending) && t.MatchedReceiptId == null));
+
+            // For groups: filter based on MatchStatus enum
+            groupsQuery = groupsQuery.Where(g =>
+                (hasMatched && g.MatchStatus == MatchStatus.Matched) ||
+                (hasPending && g.MatchStatus == MatchStatus.Proposed) ||
+                (hasUnmatched && g.MatchStatus == MatchStatus.Unmatched));
         }
 
         // Apply search filter
