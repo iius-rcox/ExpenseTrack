@@ -110,6 +110,14 @@ public partial class MatchingService : IMatchingService
             "Found {ReceiptCount} receipts, {TransactionCount} transactions, and {GroupCount} groups to match (date range: {MinDate} to {MaxDate})",
             receipts.Count, transactions.Count, groups.Count, minDate, maxDate);
 
+        // Log group details for debugging
+        foreach (var g in groups)
+        {
+            _logger.LogInformation(
+                "Group candidate: {GroupId} '{GroupName}' Amount=${Amount} Date={Date} Status={Status}",
+                g.Id, g.Name, g.CombinedAmount, g.DisplayDate, g.MatchStatus);
+        }
+
         if (!transactions.Any() && !groups.Any())
         {
             _logger.LogInformation("No transactions or groups in date range for user {UserId}", userId);
@@ -186,12 +194,26 @@ public partial class MatchingService : IMatchingService
 
             if (!candidates.Any())
             {
+                _logger.LogInformation(
+                    "Receipt {ReceiptId} (${Amount}, {Vendor}) has no candidates within amount tolerance",
+                    receipt.Id, receipt.AmountExtracted, receipt.VendorExtracted);
                 continue;
             }
+
+            _logger.LogInformation(
+                "Receipt {ReceiptId} (${Amount}) has {CandidateCount} candidates",
+                receipt.Id, receipt.AmountExtracted, candidates.Count);
 
             // T020: Find best match from unified candidate pool
             var (match, isAmbiguous, bestCandidate) = FindBestMatchFromCandidates(
                 receipt, candidates, userId, aliasCache);
+
+            if (match == null && !isAmbiguous)
+            {
+                _logger.LogInformation(
+                    "Receipt {ReceiptId} candidates all scored below threshold ({Threshold})",
+                    receipt.Id, MinimumConfidenceThreshold);
+            }
 
             if (isAmbiguous)
             {
@@ -378,6 +400,14 @@ public partial class MatchingService : IMatchingService
 
         var totalScore = amountScore + dateScore + vendorScore;
 
+        _logger.LogDebug(
+            "Score breakdown for {CandidateType} '{Name}': Amount={AmountScore} (${ReceiptAmt} vs ${CandidateAmt}), " +
+            "Date={DateScore} ({ReceiptDate} vs {CandidateDate}), Vendor={VendorScore} ('{ReceiptVendor}' vs '{CandidateVendor}')",
+            candidate.Type, candidate.DisplayName,
+            amountScore, receipt.AmountExtracted, candidate.Amount,
+            dateScore, receipt.DateExtracted, candidate.Date,
+            vendorScore, receipt.VendorExtracted, candidate.VendorPattern);
+
         // Build match reason based on candidate type
         var reason = candidate.Type == MatchCandidateType.Group
             ? BuildGroupMatchReason(receipt, candidate, amountScore, dateScore, vendorScore)
@@ -484,6 +514,10 @@ public partial class MatchingService : IMatchingService
         foreach (var candidate in candidates)
         {
             var (score, reason, aliasId) = ScoreCandidate(receipt, candidate, aliasCache);
+
+            _logger.LogInformation(
+                "Candidate {CandidateType} {CandidateId} '{Name}' scored {Score} (threshold: {Threshold}) - {Reason}",
+                candidate.Type, candidate.Id, candidate.DisplayName, score, MinimumConfidenceThreshold, reason);
 
             if (score >= MinimumConfidenceThreshold)
             {
