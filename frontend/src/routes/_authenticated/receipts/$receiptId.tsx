@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useReceiptDetail, useDeleteReceipt, useRetryReceipt, useProcessReceipt, useUpdateReceipt } from '@/hooks/queries/use-receipts'
+import { useReceiptDetail, useDeleteReceipt, useRetryReceipt, useProcessReceipt, useUpdateReceipt, useReceiptHtmlContent } from '@/hooks/queries/use-receipts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -63,6 +63,14 @@ function ReceiptDetailPage() {
   const { mutate: retryReceipt, isPending: isRetrying } = useRetryReceipt()
   const { mutate: processReceipt, isPending: isProcessing } = useProcessReceipt()
   const { mutate: updateReceipt, isPending: isSaving } = useUpdateReceipt()
+
+  // Feature 029: Fetch HTML content for HTML receipts
+  const isHtmlReceipt = receipt?.contentType === 'text/html'
+  const {
+    data: htmlContent,
+    isLoading: htmlLoading,
+    error: htmlError,
+  } = useReceiptHtmlContent(receiptId, { enabled: isHtmlReceipt })
 
   // Track field edits with undo support (Feature 024)
   const {
@@ -397,6 +405,9 @@ function ReceiptDetailPage() {
                 filename={receipt.originalFilename}
                 alt={receipt.originalFilename}
                 showControls={true}
+                htmlContent={htmlContent}
+                htmlLoading={htmlLoading}
+                htmlError={htmlError as Error | null}
               />
             </div>
             {receipt.blobUrl && (

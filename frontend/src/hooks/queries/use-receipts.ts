@@ -18,6 +18,7 @@ export const receiptKeys = {
   list: (filters: Record<string, unknown>) => [...receiptKeys.lists(), filters] as const,
   details: () => [...receiptKeys.all, 'detail'] as const,
   detail: (id: string) => [...receiptKeys.details(), id] as const,
+  htmlContent: (id: string) => [...receiptKeys.all, 'html', id] as const,
   statusCounts: () => [...receiptKeys.all, 'status-counts'] as const,
 }
 
@@ -452,5 +453,58 @@ export function useUpdateReceipt() {
       // Invalidate list in case summary fields changed
       queryClient.invalidateQueries({ queryKey: receiptKeys.lists() })
     },
+  })
+}
+
+/**
+ * Hook for fetching sanitized HTML content of an HTML receipt.
+ * Feature 029: HTML Receipt Parsing
+ *
+ * The HTML is sanitized server-side to remove scripts, forms, and other
+ * potentially dangerous elements. The content is suitable for rendering
+ * in a sandboxed iframe.
+ *
+ * @param id - Receipt ID
+ * @param options - Query options including enabled flag
+ * @returns Query result containing sanitized HTML string
+ *
+ * @example
+ * const { data: htmlContent, isLoading, error } = useReceiptHtmlContent(receiptId, {
+ *   enabled: receipt?.contentType === 'text/html'
+ * })
+ */
+export function useReceiptHtmlContent(
+  id: string,
+  options: { enabled?: boolean } = {}
+) {
+  const { enabled = true } = options
+
+  return useQuery({
+    queryKey: receiptKeys.htmlContent(id),
+    queryFn: async () => {
+      // Fetch raw HTML content (returns text, not JSON)
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/receipts/${id}/html`, {
+        credentials: 'include',
+        headers: {
+          'Accept': 'text/html',
+        },
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        let errorMessage = 'Failed to fetch HTML content'
+        try {
+          const errorJson = JSON.parse(errorText)
+          errorMessage = errorJson.detail || errorJson.title || errorMessage
+        } catch {
+          // Not JSON, use default message
+        }
+        throw new Error(errorMessage)
+      }
+
+      return response.text()
+    },
+    enabled: enabled && !!id,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   })
 }

@@ -163,6 +163,11 @@ public static class ServiceCollectionExtensions
         // Feature 028: Transaction Grouping
         services.AddScoped<ITransactionGroupService, TransactionGroupService>();
 
+        // Feature 029: HTML Receipt Parsing
+        services.AddScoped<IHtmlSanitizationService, HtmlSanitizationService>();
+        services.AddScoped<IHtmlReceiptExtractionService, HtmlReceiptExtractionService>();
+        services.AddScoped<IHtmlThumbnailService, HtmlThumbnailService>();
+
         return services;
     }
 }
