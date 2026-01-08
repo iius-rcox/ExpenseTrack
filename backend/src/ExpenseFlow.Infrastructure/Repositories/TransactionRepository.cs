@@ -57,7 +57,8 @@ public class TransactionRepository : ITransactionRepository
         {
             query = matched.Value
                 ? query.Where(t => t.MatchedReceiptId != null)
-                : query.Where(t => t.MatchedReceiptId == null);
+                // Exclude grouped transactions - their matching is handled at group level
+                : query.Where(t => t.MatchedReceiptId == null && t.GroupId == null);
         }
 
         if (importId.HasValue)
@@ -94,8 +95,9 @@ public class TransactionRepository : ITransactionRepository
         var totalCount = await query.CountAsync();
 
         // Get unmatched count (for all user transactions, not filtered)
+        // Exclude grouped transactions - their matching is handled at group level
         var unmatchedCount = await _context.Transactions
-            .Where(t => t.UserId == userId && t.MatchedReceiptId == null)
+            .Where(t => t.UserId == userId && t.MatchedReceiptId == null && t.GroupId == null)
             .CountAsync();
 
         // Apply sorting
@@ -156,6 +158,8 @@ public class TransactionRepository : ITransactionRepository
         return await _context.Transactions
             .Where(t => t.UserId == userId)
             .Where(t => t.MatchedReceiptId == null)
+            // Exclude transactions that are part of a group - their matching is handled at group level
+            .Where(t => t.GroupId == null)
             .Where(t => t.TransactionDate >= startDate && t.TransactionDate <= endDate)
             .OrderBy(t => t.TransactionDate)
             .ThenBy(t => t.CreatedAt)

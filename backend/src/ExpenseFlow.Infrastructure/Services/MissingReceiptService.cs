@@ -206,6 +206,7 @@ public class MissingReceiptService : IMissingReceiptService
                join bp in bestPredictions on t.Id equals bp.TransactionId
                where t.UserId == userId
                   && t.MatchedReceiptId == null
+                  && t.GroupId == null  // Exclude grouped transactions - their matching is handled at group level
                   && (includeDismissed || t.ReceiptDismissed != true)
                select new MissingReceiptSummaryDto
                {
