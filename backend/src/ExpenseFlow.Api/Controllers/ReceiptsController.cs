@@ -17,6 +17,7 @@ public class ReceiptsController : ApiControllerBase
     private readonly IReceiptService _receiptService;
     private readonly IUserService _userService;
     private readonly IBlobStorageService _blobStorageService;
+    private readonly IHtmlSanitizationService _htmlSanitizationService;
     private readonly ILogger<ReceiptsController> _logger;
     private readonly int _maxBatchSize;
     private readonly int _maxFileSizeBytes;
@@ -26,12 +27,14 @@ public class ReceiptsController : ApiControllerBase
         IReceiptService receiptService,
         IUserService userService,
         IBlobStorageService blobStorageService,
+        IHtmlSanitizationService htmlSanitizationService,
         IConfiguration configuration,
         ILogger<ReceiptsController> logger)
     {
         _receiptService = receiptService;
         _userService = userService;
         _blobStorageService = blobStorageService;
+        _htmlSanitizationService = htmlSanitizationService;
         _logger = logger;
 
         _maxBatchSize = configuration.GetValue<int>("ReceiptProcessing:MaxBatchSize", 20);
@@ -42,7 +45,7 @@ public class ReceiptsController : ApiControllerBase
     /// <summary>
     /// Uploads one or more receipt files.
     /// </summary>
-    /// <param name="files">Receipt image files (JPEG, PNG, HEIC, PDF)</param>
+    /// <param name="files">Receipt image files (JPEG, PNG, HEIC, PDF) or HTML receipt emails</param>
     /// <returns>Upload results including successful and failed uploads</returns>
     [HttpPost]
     [RequestSizeLimit(524_288_000)] // 500MB total for batch uploads
@@ -281,6 +284,72 @@ public class ReceiptsController : ApiControllerBase
             {
                 Title = "Receipt not found",
                 Detail = $"Receipt with ID {id} was not found"
+            });
+        }
+    }
+
+    /// <summary>
+    /// Gets sanitized HTML content for an HTML receipt.
+    /// Only available for receipts with content type text/html.
+    /// The HTML is sanitized to remove scripts, forms, and other potentially dangerous elements.
+    /// </summary>
+    /// <param name="id">Receipt ID</param>
+    /// <returns>Sanitized HTML content with Content-Security-Policy headers</returns>
+    [HttpGet("{id:guid}/html")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK, "text/html")]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetHtmlContent(Guid id)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+        var receipt = await _receiptService.GetReceiptAsync(id, user.Id);
+
+        if (receipt == null)
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Receipt not found",
+                Detail = $"Receipt with ID {id} was not found"
+            });
+        }
+
+        // Verify this is an HTML receipt
+        if (!receipt.ContentType.Equals("text/html", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Not an HTML receipt",
+                Detail = $"Receipt has content type '{receipt.ContentType}'. This endpoint is only available for HTML receipts."
+            });
+        }
+
+        try
+        {
+            // Download HTML content from blob storage
+            using var htmlStream = await _blobStorageService.DownloadAsync(receipt.BlobUrl);
+            using var reader = new StreamReader(htmlStream);
+            var rawHtml = await reader.ReadToEndAsync();
+
+            // Sanitize HTML to remove scripts, forms, and other dangerous elements
+            var sanitizedHtml = _htmlSanitizationService.Sanitize(rawHtml);
+
+            _logger.LogDebug(
+                "Serving sanitized HTML for receipt {ReceiptId}. Original: {OriginalLength} chars, Sanitized: {SanitizedLength} chars",
+                id, rawHtml.Length, sanitizedHtml.Length);
+
+            // Return HTML with security headers
+            Response.Headers.ContentSecurityPolicy = "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; frame-ancestors 'self'";
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+
+            return Content(sanitizedHtml, "text/html");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving HTML content for receipt {ReceiptId}", id);
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetailsResponse
+            {
+                Title = "Error retrieving HTML content",
+                Detail = "An error occurred while retrieving the HTML content"
             });
         }
     }

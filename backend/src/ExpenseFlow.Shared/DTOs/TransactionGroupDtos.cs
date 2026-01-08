@@ -129,6 +129,12 @@ public class TransactionGroupDetailDto : TransactionGroupSummaryDto
     /// List of transactions in this group.
     /// </summary>
     public List<GroupMemberTransactionDto> Transactions { get; set; } = new();
+
+    /// <summary>
+    /// Optional warning message from the last operation.
+    /// For example, when removing a transaction causes amount mismatch with matched receipt.
+    /// </summary>
+    public string? Warning { get; set; }
 }
 
 /// <summary>

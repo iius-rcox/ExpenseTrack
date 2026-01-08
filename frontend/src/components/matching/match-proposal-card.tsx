@@ -24,6 +24,7 @@ import {
   DollarSign,
   Loader2,
   Info,
+  Layers,
 } from 'lucide-react'
 
 interface MatchProposalCardProps {
@@ -187,13 +188,39 @@ export function MatchProposalCard({ proposal, onConfirmed, onRejected }: MatchPr
 
           <Separator orientation="vertical" className="mx-auto hidden lg:block" />
 
-          {/* Transaction Side */}
+          {/* Transaction/Group Side */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <CreditCard className="h-4 w-4" />
-              Transaction
+              {proposal.candidateType === 'group' ? (
+                <>
+                  <Layers className="h-4 w-4" />
+                  Transaction Group
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-4 w-4" />
+                  Transaction
+                </>
+              )}
             </div>
-            {proposal.transaction ? (
+            {proposal.candidateType === 'group' && proposal.transactionGroup ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium line-clamp-2">{proposal.transactionGroup.name}</p>
+                  <Badge variant="secondary" className="text-xs shrink-0">
+                    {proposal.transactionGroup.transactionCount} transactions
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <Calendar className="h-3 w-3" />
+                  {formatDate(proposal.transactionGroup.displayDate)}
+                </div>
+                <div className="flex items-center gap-1 text-sm font-medium">
+                  <DollarSign className="h-3 w-3" />
+                  {formatCurrency(proposal.transactionGroup.combinedAmount)}
+                </div>
+              </div>
+            ) : proposal.transaction ? (
               <div className="space-y-2">
                 <p className="font-medium line-clamp-2">{proposal.transaction.description}</p>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -206,7 +233,7 @@ export function MatchProposalCard({ proposal, onConfirmed, onRejected }: MatchPr
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Transaction data not available</p>
+              <p className="text-sm text-muted-foreground">Match data not available</p>
             )}
           </div>
         </div>

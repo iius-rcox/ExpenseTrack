@@ -129,11 +129,55 @@ export interface MatchActionResponse {
 }
 
 /**
+ * Type of match candidate (transaction or group)
+ */
+export type MatchCandidateType = 'transaction' | 'group'
+
+/**
+ * A potential match candidate (transaction or group)
+ * Returned by GET /api/matching/candidates/{receiptId}
+ */
+export interface MatchCandidate {
+  /** Candidate ID (TransactionId or TransactionGroupId) */
+  id: string
+  /** Type of candidate: "transaction" or "group" */
+  candidateType: MatchCandidateType
+  /** Amount (Transaction.Amount or TransactionGroup.CombinedAmount) */
+  amount: number
+  /** Date (Transaction.TransactionDate or TransactionGroup.DisplayDate) */
+  date: string
+  /** Display name (Transaction.Description or TransactionGroup.Name) */
+  displayName: string
+  /** Number of transactions in group (null for individual transactions) */
+  transactionCount?: number
+  /** Calculated match confidence score (0-100) */
+  confidenceScore: number
+  /** Amount match score component (0-40) */
+  amountScore: number
+  /** Date match score component (0-35) */
+  dateScore: number
+  /** Vendor match score component (0-25) */
+  vendorScore: number
+  /** Human-readable explanation of the match score */
+  matchReason?: string
+}
+
+/**
  * Request for manual match creation
+ * Either transactionId OR transactionGroupId must be provided (XOR)
  */
 export interface ManualMatchRequest {
   receiptId: string
-  transactionId: string
+  /** Transaction ID to match (mutually exclusive with transactionGroupId) */
+  transactionId?: string
+  /** Transaction Group ID to match (mutually exclusive with transactionId) */
+  transactionGroupId?: string
+  /** Optional vendor display name */
+  vendorDisplayName?: string
+  /** Optional default GL code */
+  defaultGLCode?: string
+  /** Optional default department */
+  defaultDepartment?: string
 }
 
 /**

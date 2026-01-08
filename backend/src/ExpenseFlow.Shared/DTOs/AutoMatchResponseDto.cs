@@ -6,9 +6,19 @@ namespace ExpenseFlow.Shared.DTOs;
 public class AutoMatchResponseDto
 {
     /// <summary>
-    /// Number of new proposed matches created.
+    /// Number of new proposed matches created (sum of TransactionMatchCount and GroupMatchCount).
     /// </summary>
     public int ProposedCount { get; set; }
+
+    /// <summary>
+    /// Number of matches to individual transactions.
+    /// </summary>
+    public int TransactionMatchCount { get; set; }
+
+    /// <summary>
+    /// Number of matches to transaction groups.
+    /// </summary>
+    public int GroupMatchCount { get; set; }
 
     /// <summary>
     /// Total receipts processed.
@@ -26,7 +36,7 @@ public class AutoMatchResponseDto
     public long DurationMs { get; set; }
 
     /// <summary>
-    /// List of proposed matches.
+    /// List of proposed matches (includes both transaction and group matches).
     /// </summary>
     public List<MatchProposalDto> Proposals { get; set; } = new();
 }

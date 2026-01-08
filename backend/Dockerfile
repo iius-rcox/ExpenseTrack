@@ -29,16 +29,39 @@ COPY src/ src/
 # Build and publish
 RUN dotnet publish src/ExpenseFlow.Api/ExpenseFlow.Api.csproj -c ${BUILD_CONFIGURATION} -o /app/publish
 
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
+# Runtime stage - Using Debian for Chromium/PuppeteerSharp support (HTML receipt thumbnails)
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim AS runtime
 WORKDIR /app
 
-# Install ICU libraries for SQL Server client globalization support
-RUN apk add --no-cache icu-libs
-ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+# Install Chromium and dependencies for PuppeteerSharp (HTML-to-image rendering)
+# Plus wget for health checks
+RUN apt-get update && apt-get install -y \
+    chromium \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libnspr4 \
+    libnss3 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    xdg-utils \
+    wget \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Chromium path for PuppeteerSharp
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Create non-root user for security
-RUN adduser -D -u 1000 appuser
+RUN useradd -m -u 1000 appuser
 
 # Copy published app
 COPY --from=build /app/publish .

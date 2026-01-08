@@ -5,7 +5,7 @@ namespace ExpenseFlow.Shared.DTOs;
 /// <summary>
 /// Request DTO for creating a manual match.
 /// </summary>
-public class ManualMatchRequestDto
+public class ManualMatchRequestDto : IValidatableObject
 {
     /// <summary>
     /// Receipt ID to match.
@@ -14,10 +14,16 @@ public class ManualMatchRequestDto
     public Guid ReceiptId { get; set; }
 
     /// <summary>
-    /// Transaction ID to match.
+    /// Transaction ID to match. Required if TransactionGroupId is not provided.
+    /// Mutually exclusive with TransactionGroupId.
     /// </summary>
-    [Required]
-    public Guid TransactionId { get; set; }
+    public Guid? TransactionId { get; set; }
+
+    /// <summary>
+    /// Transaction Group ID to match. Required if TransactionId is not provided.
+    /// Mutually exclusive with TransactionId.
+    /// </summary>
+    public Guid? TransactionGroupId { get; set; }
 
     /// <summary>
     /// Optional vendor display name.
@@ -36,4 +42,26 @@ public class ManualMatchRequestDto
     /// </summary>
     [StringLength(100, ErrorMessage = "Department cannot exceed 100 characters")]
     public string? DefaultDepartment { get; set; }
+
+    /// <summary>
+    /// Validates that exactly one of TransactionId or TransactionGroupId is provided.
+    /// </summary>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        var hasTransactionId = TransactionId.HasValue && TransactionId.Value != Guid.Empty;
+        var hasGroupId = TransactionGroupId.HasValue && TransactionGroupId.Value != Guid.Empty;
+
+        if (!hasTransactionId && !hasGroupId)
+        {
+            yield return new ValidationResult(
+                "Either TransactionId or TransactionGroupId must be provided.",
+                new[] { nameof(TransactionId), nameof(TransactionGroupId) });
+        }
+        else if (hasTransactionId && hasGroupId)
+        {
+            yield return new ValidationResult(
+                "TransactionId and TransactionGroupId are mutually exclusive. Provide only one.",
+                new[] { nameof(TransactionId), nameof(TransactionGroupId) });
+        }
+    }
 }

@@ -35,6 +35,7 @@ import {
   ExternalLink,
   Loader2,
   CheckCheck,
+  Layers,
 } from 'lucide-react'
 
 interface MatchReviewWorkspaceProps {
@@ -299,8 +300,17 @@ export function MatchReviewWorkspace({
                       Receipt
                     </TabsTrigger>
                     <TabsTrigger value="transaction" className="h-12 data-[state=active]:bg-muted/50">
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Transaction
+                      {currentProposal?.candidateType === 'group' ? (
+                        <>
+                          <Layers className="h-4 w-4 mr-2" />
+                          Group
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Transaction
+                        </>
+                      )}
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="receipt" className="p-4 mt-0">
@@ -337,7 +347,25 @@ export function MatchReviewWorkspace({
                     )}
                   </TabsContent>
                   <TabsContent value="transaction" className="p-4 mt-0">
-                    {currentProposal?.transaction ? (
+                    {currentProposal?.candidateType === 'group' && currentProposal.transactionGroup ? (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="font-medium text-base">{currentProposal.transactionGroup.name}</p>
+                            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                              {currentProposal.transactionGroup.transactionCount} txns
+                            </span>
+                          </div>
+                          <p className="text-2xl font-bold font-mono">${currentProposal.transactionGroup.combinedAmount.toFixed(2)}</p>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Display Date</span>
+                            <span className="font-medium">{new Date(currentProposal.transactionGroup.displayDate).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : currentProposal?.transaction ? (
                       <div className="space-y-4">
                         <div className="p-4 bg-muted/50 rounded-lg">
                           <p className="font-medium text-base mb-2">{currentProposal.transaction.description}</p>
@@ -432,13 +460,53 @@ export function MatchReviewWorkspace({
                     )}
                   </div>
 
-                  {/* Transaction Side */}
+                  {/* Transaction/Group Side */}
                   <div className="p-6">
                     <div className="flex items-center gap-2 mb-4">
-                      <CreditCard className="h-5 w-5 text-muted-foreground" />
-                      <h3 className="font-medium">Transaction</h3>
+                      {currentProposal?.candidateType === 'group' ? (
+                        <>
+                          <Layers className="h-5 w-5 text-muted-foreground" />
+                          <h3 className="font-medium">Transaction Group</h3>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="h-5 w-5 text-muted-foreground" />
+                          <h3 className="font-medium">Transaction</h3>
+                        </>
+                      )}
                     </div>
-                    {currentProposal?.transaction ? (
+                    {currentProposal?.candidateType === 'group' && currentProposal.transactionGroup ? (
+                      <div className="space-y-4">
+                        {/* Transaction Group Details */}
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="font-medium text-base">
+                              {currentProposal.transactionGroup.name}
+                            </p>
+                            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                              {currentProposal.transactionGroup.transactionCount} transactions
+                            </span>
+                          </div>
+                          <p className="text-2xl font-bold font-mono">
+                            ${currentProposal.transactionGroup.combinedAmount.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Display Date</span>
+                            <span className="font-medium">
+                              {new Date(currentProposal.transactionGroup.displayDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Group ID</span>
+                            <span className="font-medium font-mono text-xs">
+                              {currentProposal.transactionGroup.id.slice(0, 8)}...
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : currentProposal?.transaction ? (
                       <div className="space-y-4">
                         {/* Transaction Details */}
                         <div className="p-4 bg-muted/50 rounded-lg">
@@ -497,11 +565,17 @@ export function MatchReviewWorkspace({
                         date: currentProposal.receipt?.dateExtracted ?? undefined,
                         vendor: currentProposal.receipt?.vendorExtracted ?? undefined,
                       },
-                      {
-                        amount: currentProposal.transaction?.amount ?? 0,
-                        date: currentProposal.transaction?.transactionDate ?? '',
-                        description: currentProposal.transaction?.description ?? '',
-                      }
+                      currentProposal.candidateType === 'group' && currentProposal.transactionGroup
+                        ? {
+                            amount: currentProposal.transactionGroup.combinedAmount,
+                            date: currentProposal.transactionGroup.displayDate,
+                            description: currentProposal.transactionGroup.name,
+                          }
+                        : {
+                            amount: currentProposal.transaction?.amount ?? 0,
+                            date: currentProposal.transaction?.transactionDate ?? '',
+                            description: currentProposal.transaction?.description ?? '',
+                          }
                     )}
                     confidence={currentProposal.confidenceScore}
                     compact={false}

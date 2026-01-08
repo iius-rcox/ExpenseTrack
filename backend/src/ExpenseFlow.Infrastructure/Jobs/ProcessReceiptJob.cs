@@ -14,6 +14,7 @@ namespace ExpenseFlow.Infrastructure.Jobs;
 /// Hangfire background job for processing receipt images through Document Intelligence.
 /// Extracts vendor, date, amount, and line items from receipt images.
 /// Also triggers travel period detection for airline/hotel receipts.
+/// Supports HTML receipts via AI-based extraction.
 /// </summary>
 public class ProcessReceiptJob : IReceiptProcessingJob
 {
@@ -21,16 +22,23 @@ public class ProcessReceiptJob : IReceiptProcessingJob
     private readonly IBlobStorageService _blobStorageService;
     private readonly IDocumentIntelligenceService _documentIntelligenceService;
     private readonly IThumbnailService _thumbnailService;
+    private readonly IHtmlReceiptExtractionService _htmlExtractionService;
+    private readonly IHtmlThumbnailService _htmlThumbnailService;
     private readonly ITravelDetectionService _travelDetectionService;
     private readonly ILogger<ProcessReceiptJob> _logger;
     private readonly double _confidenceThreshold;
     private readonly int _maxRetries;
+    private readonly bool _enableInvoiceFallback;
+    private readonly double _fallbackConfidenceThreshold;
+    private readonly bool _preferInvoiceForMultiPage;
 
     public ProcessReceiptJob(
         IReceiptRepository receiptRepository,
         IBlobStorageService blobStorageService,
         IDocumentIntelligenceService documentIntelligenceService,
         IThumbnailService thumbnailService,
+        IHtmlReceiptExtractionService htmlExtractionService,
+        IHtmlThumbnailService htmlThumbnailService,
         ITravelDetectionService travelDetectionService,
         IConfiguration configuration,
         ILogger<ProcessReceiptJob> logger)
@@ -39,11 +47,18 @@ public class ProcessReceiptJob : IReceiptProcessingJob
         _blobStorageService = blobStorageService;
         _documentIntelligenceService = documentIntelligenceService;
         _thumbnailService = thumbnailService;
+        _htmlExtractionService = htmlExtractionService;
+        _htmlThumbnailService = htmlThumbnailService;
         _travelDetectionService = travelDetectionService;
         _logger = logger;
 
         _confidenceThreshold = configuration.GetValue<double>("ReceiptProcessing:ConfidenceThreshold", 0.60);
         _maxRetries = configuration.GetValue<int>("ReceiptProcessing:MaxRetries", 3);
+
+        // Invoice fallback configuration
+        _enableInvoiceFallback = configuration.GetValue<bool>("ReceiptProcessing:Extraction:EnableInvoiceFallback", true);
+        _fallbackConfidenceThreshold = configuration.GetValue<double>("ReceiptProcessing:Extraction:FallbackConfidenceThreshold", 0.50);
+        _preferInvoiceForMultiPage = configuration.GetValue<bool>("ReceiptProcessing:Extraction:PreferInvoiceForMultiPage", true);
     }
 
     [AutomaticRetry(Attempts = 3, DelaysInSeconds = new[] { 60, 300, 900 })]
@@ -82,11 +97,40 @@ public class ProcessReceiptJob : IReceiptProcessingJob
             receipt.RetryCount++;
             await _receiptRepository.UpdateAsync(receipt);
 
-            // Download the receipt image from blob storage
-            using var imageStream = await _blobStorageService.DownloadAsync(receipt.BlobUrl);
+            // Branch processing based on content type
+            ReceiptExtractionResult extractionResult;
 
-            // Extract data using Document Intelligence
-            var extractionResult = await _documentIntelligenceService.AnalyzeReceiptAsync(imageStream, receipt.ContentType);
+            if (receipt.ContentType.Equals("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                // HTML receipt processing via AI extraction
+                extractionResult = await ProcessHtmlReceiptAsync(receipt);
+            }
+            else
+            {
+                // Image/PDF receipt processing via Document Intelligence
+                // Use fallback method if enabled to try invoice model when receipt model fails
+                using var imageStream = await _blobStorageService.DownloadAsync(receipt.BlobUrl);
+
+                if (_enableInvoiceFallback)
+                {
+                    _logger.LogDebug("Invoice fallback enabled, using AnalyzeWithFallbackAsync for receipt {ReceiptId}", receipt.Id);
+                    extractionResult = await _documentIntelligenceService.AnalyzeWithFallbackAsync(
+                        imageStream,
+                        receipt.ContentType,
+                        _fallbackConfidenceThreshold);
+
+                    // Log which model was used
+                    _logger.LogInformation(
+                        "Receipt {ReceiptId} extracted using model: {Model}, field sources: {Sources}",
+                        receipt.Id,
+                        extractionResult.ExtractionModel,
+                        string.Join(", ", extractionResult.FieldSources.Select(kv => $"{kv.Key}={kv.Value}")));
+                }
+                else
+                {
+                    extractionResult = await _documentIntelligenceService.AnalyzeReceiptAsync(imageStream, receipt.ContentType);
+                }
+            }
 
             // Update receipt with extracted data
             // BUG-004 fix: If vendor is missing, try to extract from filename or use fallback patterns
@@ -116,25 +160,7 @@ public class ProcessReceiptJob : IReceiptProcessingJob
             receipt.ErrorMessage = null;
 
             // Generate and upload thumbnail
-            if (_thumbnailService.CanGenerateThumbnail(receipt.ContentType))
-            {
-                try
-                {
-                    // Re-download for thumbnail (the previous stream may have been consumed)
-                    using var thumbSourceStream = await _blobStorageService.DownloadAsync(receipt.BlobUrl);
-                    using var thumbnailStream = await _thumbnailService.GenerateThumbnailAsync(thumbSourceStream, receipt.ContentType);
-
-                    var thumbnailPath = BlobStorageService.GenerateThumbnailPath(receipt.UserId, receipt.Id);
-                    receipt.ThumbnailUrl = await _blobStorageService.UploadAsync(thumbnailStream, thumbnailPath, "image/jpeg");
-
-                    _logger.LogDebug("Generated thumbnail for receipt {ReceiptId}", receiptId);
-                }
-                catch (Exception thumbEx)
-                {
-                    // Log but don't fail the whole process for thumbnail failures
-                    _logger.LogWarning(thumbEx, "Failed to generate thumbnail for receipt {ReceiptId}", receiptId);
-                }
-            }
+            await GenerateThumbnailAsync(receipt);
 
             await _receiptRepository.UpdateAsync(receipt);
 
@@ -350,5 +376,99 @@ public class ProcessReceiptJob : IReceiptProcessingJob
         // This method is a placeholder for future pattern matching if needed
         // (e.g., scanning-app generated filenames that include vendor)
         return null;
+    }
+
+    /// <summary>
+    /// Processes an HTML receipt using AI-based extraction.
+    /// Downloads HTML content from blob storage and extracts receipt data via Azure OpenAI.
+    /// </summary>
+    private async Task<ReceiptExtractionResult> ProcessHtmlReceiptAsync(Core.Entities.Receipt receipt)
+    {
+        _logger.LogInformation("Processing HTML receipt {ReceiptId}", receipt.Id);
+
+        // Download HTML content
+        using var htmlStream = await _blobStorageService.DownloadAsync(receipt.BlobUrl);
+        using var reader = new StreamReader(htmlStream);
+        var htmlContent = await reader.ReadToEndAsync();
+
+        // Extract receipt data using AI
+        var (result, metrics) = await _htmlExtractionService.ExtractWithMetricsAsync(
+            htmlContent,
+            receipt.Id);
+
+        // Log extraction metrics
+        _logger.LogInformation(
+            "HTML extraction metrics for receipt {ReceiptId}: " +
+            "Success: {Success}, Confidence: {Confidence:P0}, Fields: {Fields}, " +
+            "HtmlSize: {HtmlSize}, TextLength: {TextLength}, Time: {Time}ms",
+            receipt.Id,
+            metrics.Success,
+            metrics.OverallConfidence ?? 0,
+            metrics.FieldsExtracted,
+            metrics.HtmlSizeBytes,
+            metrics.TextContentLength,
+            metrics.ProcessingTime.TotalMilliseconds);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Generates and uploads a thumbnail for the receipt based on its content type.
+    /// Supports both image/PDF (via ThumbnailService) and HTML (via HtmlThumbnailService).
+    /// </summary>
+    private async Task GenerateThumbnailAsync(Core.Entities.Receipt receipt)
+    {
+        try
+        {
+            Stream? thumbnailStream = null;
+
+            if (receipt.ContentType.Equals("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                // HTML thumbnail generation via headless browser
+                if (await _htmlThumbnailService.IsAvailableAsync())
+                {
+                    using var htmlStream = await _blobStorageService.DownloadAsync(receipt.BlobUrl);
+                    using var reader = new StreamReader(htmlStream);
+                    var htmlContent = await reader.ReadToEndAsync();
+
+                    thumbnailStream = await _htmlThumbnailService.GenerateThumbnailAsync(htmlContent);
+                    _logger.LogDebug("Generated HTML thumbnail for receipt {ReceiptId}", receipt.Id);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "HTML thumbnail service unavailable for receipt {ReceiptId}. " +
+                        "Chromium may not be installed.",
+                        receipt.Id);
+                    return;
+                }
+            }
+            else if (_thumbnailService.CanGenerateThumbnail(receipt.ContentType))
+            {
+                // Image/PDF thumbnail generation
+                using var sourceStream = await _blobStorageService.DownloadAsync(receipt.BlobUrl);
+                thumbnailStream = await _thumbnailService.GenerateThumbnailAsync(sourceStream, receipt.ContentType);
+                _logger.LogDebug("Generated image thumbnail for receipt {ReceiptId}", receipt.Id);
+            }
+            else
+            {
+                _logger.LogDebug(
+                    "No thumbnail generation available for receipt {ReceiptId} with content type {ContentType}",
+                    receipt.Id, receipt.ContentType);
+                return;
+            }
+
+            if (thumbnailStream != null)
+            {
+                var thumbnailPath = BlobStorageService.GenerateThumbnailPath(receipt.UserId, receipt.Id);
+                receipt.ThumbnailUrl = await _blobStorageService.UploadAsync(thumbnailStream, thumbnailPath, "image/jpeg");
+                await thumbnailStream.DisposeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail the whole process for thumbnail failures
+            _logger.LogWarning(ex, "Failed to generate thumbnail for receipt {ReceiptId}", receipt.Id);
+        }
     }
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Core.Interfaces;
@@ -89,60 +90,172 @@ public partial class MatchingService : IMatchingService
         var minDate = receiptDates.Min().AddDays(-7);
         var maxDate = receiptDates.Max().AddDays(7);
 
-        // Get unmatched transactions within date range (pre-filter for performance)
+        // T017: Query transactions and groups sequentially (DbContext is not thread-safe)
         var transactions = await _context.Transactions
             .Where(t => t.UserId == userId
                 && t.MatchStatus == MatchStatus.Unmatched
+                && t.GroupId == null  // T018: Exclude grouped transactions
                 && t.TransactionDate >= minDate
                 && t.TransactionDate <= maxDate)
             .ToListAsync();
 
-        _logger.LogInformation("Found {ReceiptCount} receipts and {TransactionCount} transactions to match (date range: {MinDate} to {MaxDate})",
-            receipts.Count, transactions.Count, minDate, maxDate);
+        var groups = await GetUnmatchedGroupsAsync(userId, minDate, maxDate);
 
-        if (!transactions.Any())
+        _logger.LogInformation(
+            "Found {ReceiptCount} receipts, {TransactionCount} transactions, and {GroupCount} groups to match (date range: {MinDate} to {MaxDate})",
+            receipts.Count, transactions.Count, groups.Count, minDate, maxDate);
+
+        // Log group details for debugging
+        foreach (var g in groups)
         {
-            _logger.LogInformation("No transactions in date range for user {UserId}", userId);
+            _logger.LogInformation(
+                "Group candidate: {GroupId} '{GroupName}' Amount=${Amount} Date={Date} Status={Status}",
+                g.Id, g.Name, g.CombinedAmount, g.DisplayDate, g.MatchStatus);
+        }
+
+        if (!transactions.Any() && !groups.Any())
+        {
+            _logger.LogInformation("No transactions or groups in date range for user {UserId}", userId);
             return new AutoMatchResult(0, receipts.Count, 0, stopwatch.ElapsedMilliseconds, new List<ReceiptTransactionMatch>());
         }
 
         // Pre-compute alias matches for all unique transaction descriptions (O(m) instead of O(n*m))
         var aliasCache = await BuildAliasCacheAsync(transactions);
+
+        // Also add group names to alias cache for vendor matching
+        foreach (var group in groups)
+        {
+            var vendorPattern = ExtractVendorFromGroupName(group.Name);
+            if (!string.IsNullOrEmpty(vendorPattern) && !aliasCache.ContainsKey(vendorPattern))
+            {
+                // Look up any alias that might match the extracted vendor pattern
+                var alias = await _context.VendorAliases
+                    .FirstOrDefaultAsync(a => a.CanonicalName == vendorPattern);
+                aliasCache[vendorPattern] = alias;
+            }
+        }
+
         _logger.LogDebug("Built alias cache with {CacheSize} entries", aliasCache.Count);
 
         var proposals = new List<ReceiptTransactionMatch>();
         var ambiguousCount = 0;
+        var transactionMatchCount = 0;
+        var groupMatchCount = 0;
+
+        // Track consumed candidates to prevent duplicate matches
+        var consumedTransactionIds = new HashSet<Guid>();
+        var consumedGroupIds = new HashSet<Guid>();
 
         foreach (var receipt in receipts)
         {
-            // Filter transactions by amount tolerance before detailed scoring
-            var candidateTransactions = transactions
-                .Where(t => Math.Abs(receipt.AmountExtracted!.Value - Math.Abs(t.Amount)) <= AmountNearTolerance)
-                .ToList();
+            // T019: Create unified candidate pool from transactions and groups
+            var candidates = new List<MatchCandidate>();
 
-            if (!candidateTransactions.Any())
+            // Add transaction candidates (filtered by amount tolerance)
+            foreach (var t in transactions.Where(t => !consumedTransactionIds.Contains(t.Id)))
             {
+                if (Math.Abs(receipt.AmountExtracted!.Value - Math.Abs(t.Amount)) <= AmountNearTolerance)
+                {
+                    candidates.Add(new MatchCandidate
+                    {
+                        Id = t.Id,
+                        Type = MatchCandidateType.Transaction,
+                        Amount = Math.Abs(t.Amount),
+                        Date = t.TransactionDate,
+                        VendorPattern = ExtractVendorPattern(t.Description),
+                        DisplayName = t.Description,
+                        TransactionCount = null
+                    });
+                }
+            }
+
+            // Add group candidates (filtered by amount tolerance)
+            foreach (var g in groups.Where(g => !consumedGroupIds.Contains(g.Id)))
+            {
+                if (Math.Abs(receipt.AmountExtracted!.Value - Math.Abs(g.CombinedAmount)) <= AmountNearTolerance)
+                {
+                    candidates.Add(new MatchCandidate
+                    {
+                        Id = g.Id,
+                        Type = MatchCandidateType.Group,
+                        Amount = Math.Abs(g.CombinedAmount),
+                        Date = g.DisplayDate,
+                        VendorPattern = ExtractVendorFromGroupName(g.Name),
+                        DisplayName = g.Name,
+                        TransactionCount = g.TransactionCount
+                    });
+                }
+            }
+
+            if (!candidates.Any())
+            {
+                _logger.LogInformation(
+                    "Receipt {ReceiptId} (${Amount}, {Vendor}) has no candidates within amount tolerance",
+                    receipt.Id, receipt.AmountExtracted, receipt.VendorExtracted);
                 continue;
             }
 
-            var matchResult = FindBestMatchWithCache(receipt, candidateTransactions, userId, aliasCache);
+            _logger.LogInformation(
+                "Receipt {ReceiptId} (${Amount}) has {CandidateCount} candidates",
+                receipt.Id, receipt.AmountExtracted, candidates.Count);
 
-            if (matchResult.IsAmbiguous)
+            // T020: Find best match from unified candidate pool
+            var (match, isAmbiguous, bestCandidate) = FindBestMatchFromCandidates(
+                receipt, candidates, userId, aliasCache);
+
+            if (match == null && !isAmbiguous)
+            {
+                _logger.LogInformation(
+                    "Receipt {ReceiptId} candidates all scored below threshold ({Threshold})",
+                    receipt.Id, MinimumConfidenceThreshold);
+            }
+
+            if (isAmbiguous)
             {
                 ambiguousCount++;
                 _logger.LogDebug("Receipt {ReceiptId} has ambiguous matches", receipt.Id);
                 continue;
             }
 
-            if (matchResult.Match != null)
+            if (match != null && bestCandidate != null)
             {
-                proposals.Add(matchResult.Match);
+                // Attach receipt navigation property for API response
+                match.Receipt = receipt;
 
                 // Update receipt status to Proposed
                 receipt.MatchStatus = MatchStatus.Proposed;
 
-                // Remove transaction from available list to prevent duplicate matches
-                transactions.RemoveAll(t => t.Id == matchResult.Match.TransactionId);
+                // Track which candidate type was matched and mark as consumed
+                if (bestCandidate.Type == MatchCandidateType.Transaction)
+                {
+                    transactionMatchCount++;
+                    consumedTransactionIds.Add(bestCandidate.Id);
+
+                    // Attach transaction navigation property for API response
+                    match.Transaction = transactions.First(t => t.Id == bestCandidate.Id);
+
+                    _logger.LogDebug(
+                        "Receipt {ReceiptId} matched to transaction {TransactionId} with score {Score}",
+                        receipt.Id, bestCandidate.Id, match.ConfidenceScore);
+                }
+                else
+                {
+                    groupMatchCount++;
+                    consumedGroupIds.Add(bestCandidate.Id);
+
+                    // T022: Update group MatchStatus to Proposed
+                    var matchedGroup = groups.First(g => g.Id == bestCandidate.Id);
+                    matchedGroup.MatchStatus = MatchStatus.Proposed;
+
+                    // Attach group navigation property for API response
+                    match.TransactionGroup = matchedGroup;
+
+                    _logger.LogDebug(
+                        "Receipt {ReceiptId} matched to group {GroupId} ({GroupName}) with score {Score}",
+                        receipt.Id, bestCandidate.Id, bestCandidate.DisplayName, match.ConfidenceScore);
+                }
+
+                proposals.Add(match);
             }
         }
 
@@ -155,15 +268,22 @@ public partial class MatchingService : IMatchingService
 
         stopwatch.Stop();
 
-        _logger.LogInformation("Auto-match completed: {ProposedCount} proposed, {AmbiguousCount} ambiguous, {ProcessedCount} processed in {Duration}ms",
-            proposals.Count, ambiguousCount, receipts.Count, stopwatch.ElapsedMilliseconds);
+        // T023: Structured logging with group match breakdown
+        _logger.LogInformation(
+            "Auto-match completed: {ProposedCount} proposed ({TransactionMatches} transactions, {GroupMatches} groups), " +
+            "{AmbiguousCount} ambiguous, {ProcessedCount} processed in {Duration}ms",
+            proposals.Count, transactionMatchCount, groupMatchCount, ambiguousCount, receipts.Count, stopwatch.ElapsedMilliseconds);
 
         return new AutoMatchResult(
             proposals.Count,
             receipts.Count,
             ambiguousCount,
             stopwatch.ElapsedMilliseconds,
-            proposals);
+            proposals)
+        {
+            TransactionMatchCount = transactionMatchCount,
+            GroupMatchCount = groupMatchCount
+        };
     }
 
     /// <summary>
@@ -267,6 +387,191 @@ public partial class MatchingService : IMatchingService
         var reason = BuildMatchReason(receipt, transaction, amountScore, dateScore, vendorScore);
 
         return new ScoreResult(totalScore, reason, aliasId);
+    }
+
+    /// <summary>
+    /// Scores a MatchCandidate against a receipt using pre-computed alias cache.
+    /// Works with both transaction and group candidates.
+    /// </summary>
+    private (decimal TotalScore, string Reason, Guid? AliasId) ScoreCandidate(
+        Receipt receipt,
+        MatchCandidate candidate,
+        Dictionary<string, VendorAlias?> aliasCache)
+    {
+        var amountScore = CalculateAmountScore(receipt.AmountExtracted!.Value, candidate.Amount);
+        var dateScore = CalculateDateScore(receipt.DateExtracted!.Value, candidate.Date);
+        var (vendorScore, aliasId) = CalculateVendorScoreWithCache(receipt.VendorExtracted, candidate.VendorPattern, aliasCache);
+
+        var totalScore = amountScore + dateScore + vendorScore;
+
+        _logger.LogDebug(
+            "Score breakdown for {CandidateType} '{Name}': Amount={AmountScore} (${ReceiptAmt} vs ${CandidateAmt}), " +
+            "Date={DateScore} ({ReceiptDate} vs {CandidateDate}), Vendor={VendorScore} ('{ReceiptVendor}' vs '{CandidateVendor}')",
+            candidate.Type, candidate.DisplayName,
+            amountScore, receipt.AmountExtracted, candidate.Amount,
+            dateScore, receipt.DateExtracted, candidate.Date,
+            vendorScore, receipt.VendorExtracted, candidate.VendorPattern);
+
+        // Build match reason based on candidate type
+        var reason = candidate.Type == MatchCandidateType.Group
+            ? BuildGroupMatchReason(receipt, candidate, amountScore, dateScore, vendorScore)
+            : BuildMatchReasonForCandidate(receipt, candidate, amountScore, dateScore, vendorScore);
+
+        return (totalScore, reason, aliasId);
+    }
+
+    /// <summary>
+    /// Builds a match reason string for a group candidate.
+    /// </summary>
+    private static string BuildGroupMatchReason(
+        Receipt receipt,
+        MatchCandidate candidate,
+        decimal amountScore,
+        decimal dateScore,
+        decimal vendorScore)
+    {
+        var reasons = new List<string>();
+
+        if (amountScore >= AmountExactPoints)
+        {
+            reasons.Add($"Group total ${candidate.Amount:F2} exact match");
+        }
+        else if (amountScore > 0)
+        {
+            reasons.Add($"Group total ${candidate.Amount:F2} close match (receipt: ${receipt.AmountExtracted:F2})");
+        }
+
+        if (dateScore >= DateSameDayPoints)
+        {
+            reasons.Add("same day");
+        }
+        else if (dateScore > 0)
+        {
+            var daysDiff = Math.Abs(receipt.DateExtracted!.Value.DayNumber - candidate.Date.DayNumber);
+            reasons.Add($"within {daysDiff} days");
+        }
+
+        if (vendorScore > 0)
+        {
+            reasons.Add("vendor pattern match");
+        }
+
+        if (candidate.TransactionCount.HasValue)
+        {
+            reasons.Add($"{candidate.TransactionCount} transactions");
+        }
+
+        return string.Join(", ", reasons);
+    }
+
+    /// <summary>
+    /// Builds a match reason string for a transaction candidate.
+    /// </summary>
+    private static string BuildMatchReasonForCandidate(
+        Receipt receipt,
+        MatchCandidate candidate,
+        decimal amountScore,
+        decimal dateScore,
+        decimal vendorScore)
+    {
+        var reasons = new List<string>();
+
+        if (amountScore >= AmountExactPoints)
+        {
+            reasons.Add($"Amount ${candidate.Amount:F2} exact match");
+        }
+        else if (amountScore > 0)
+        {
+            reasons.Add($"Amount ${candidate.Amount:F2} close match (receipt: ${receipt.AmountExtracted:F2})");
+        }
+
+        if (dateScore >= DateSameDayPoints)
+        {
+            reasons.Add("same day");
+        }
+        else if (dateScore > 0)
+        {
+            var daysDiff = Math.Abs(receipt.DateExtracted!.Value.DayNumber - candidate.Date.DayNumber);
+            reasons.Add($"within {daysDiff} days");
+        }
+
+        if (vendorScore > 0)
+        {
+            reasons.Add("vendor match");
+        }
+
+        return string.Join(", ", reasons);
+    }
+
+    /// <summary>
+    /// Finds the best match from a unified candidate pool (transactions + groups).
+    /// Returns the best candidate with score and match record.
+    /// </summary>
+    private (ReceiptTransactionMatch? Match, bool IsAmbiguous, MatchCandidate? BestCandidate) FindBestMatchFromCandidates(
+        Receipt receipt,
+        List<MatchCandidate> candidates,
+        Guid userId,
+        Dictionary<string, VendorAlias?> aliasCache)
+    {
+        var scoredCandidates = new List<(MatchCandidate Candidate, decimal Score, string Reason, Guid? AliasId)>();
+
+        foreach (var candidate in candidates)
+        {
+            var (score, reason, aliasId) = ScoreCandidate(receipt, candidate, aliasCache);
+
+            _logger.LogInformation(
+                "Candidate {CandidateType} {CandidateId} '{Name}' scored {Score} (threshold: {Threshold}) - {Reason}",
+                candidate.Type, candidate.Id, candidate.DisplayName, score, MinimumConfidenceThreshold, reason);
+
+            if (score >= MinimumConfidenceThreshold)
+            {
+                scoredCandidates.Add((candidate, score, reason, aliasId));
+            }
+        }
+
+        if (!scoredCandidates.Any())
+        {
+            return (null, false, null);
+        }
+
+        // Sort by score descending
+        scoredCandidates = scoredCandidates.OrderByDescending(c => c.Score).ToList();
+
+        // Check for ambiguous matches
+        if (scoredCandidates.Count > 1)
+        {
+            var topScore = scoredCandidates[0].Score;
+            var secondScore = scoredCandidates[1].Score;
+
+            if (topScore - secondScore <= AmbiguousThreshold)
+            {
+                return (null, true, null);
+            }
+        }
+
+        // Create match proposal
+        var best = scoredCandidates[0];
+        var amountScore = CalculateAmountScore(receipt.AmountExtracted!.Value, best.Candidate.Amount);
+        var dateScore = CalculateDateScore(receipt.DateExtracted!.Value, best.Candidate.Date);
+        var (vendorScore, _) = CalculateVendorScoreWithCache(receipt.VendorExtracted, best.Candidate.VendorPattern, aliasCache);
+
+        var match = new ReceiptTransactionMatch
+        {
+            ReceiptId = receipt.Id,
+            TransactionId = best.Candidate.Type == MatchCandidateType.Transaction ? best.Candidate.Id : null,
+            TransactionGroupId = best.Candidate.Type == MatchCandidateType.Group ? best.Candidate.Id : null,
+            UserId = userId,
+            Status = MatchProposalStatus.Proposed,
+            ConfidenceScore = best.Score,
+            AmountScore = amountScore,
+            DateScore = dateScore,
+            VendorScore = vendorScore,
+            MatchReason = best.Reason,
+            MatchedVendorAliasId = best.AliasId,
+            IsManualMatch = false
+        };
+
+        return (match, false, best.Candidate);
     }
 
     /// <summary>
@@ -514,6 +819,35 @@ public partial class MatchingService : IMatchingService
     private static partial Regex TrailingReferenceRegex();
 
     /// <summary>
+    /// Extracts vendor name from a transaction group name.
+    /// Removes the "(N charges)" suffix if present.
+    /// </summary>
+    /// <example>
+    /// "TWILIO (3 charges)" -> "TWILIO"
+    /// "THE HOME DEPOT (2 charges)" -> "THE HOME DEPOT"
+    /// "Simple Name" -> "Simple Name"
+    /// </example>
+    public static string ExtractVendorFromGroupName(string? groupName)
+    {
+        if (string.IsNullOrWhiteSpace(groupName))
+        {
+            return string.Empty;
+        }
+
+        // Match pattern: "VENDOR NAME (N charge[s])"
+        var match = GroupChargesRegex().Match(groupName);
+        if (match.Success)
+        {
+            return match.Groups[1].Value.Trim();
+        }
+
+        return groupName.Trim();
+    }
+
+    [GeneratedRegex(@"^(.+?)\s*\(\s*\d+\s*charges?\s*\)$", RegexOptions.IgnoreCase)]
+    private static partial Regex GroupChargesRegex();
+
+    /// <summary>
     /// Builds a human-readable match reason.
     /// </summary>
     private string BuildMatchReason(Receipt receipt, Transaction transaction, decimal amountScore, decimal dateScore, decimal vendorScore)
@@ -595,26 +929,50 @@ public partial class MatchingService : IMatchingService
         match.ConfirmedAt = DateTime.UtcNow;
         match.ConfirmedByUserId = userId;
 
-        // Link receipt and transaction using navigation properties (BUG-005 fix)
-        // The match was loaded with Include(), so Receipt and Transaction are already tracked
+        // Link receipt (required for both match types)
         var receipt = match.Receipt ?? throw new InvalidOperationException("Receipt not found");
-        var transaction = match.Transaction ?? throw new InvalidOperationException("Transaction not found");
-
-        receipt.MatchedTransactionId = transaction.Id;
         receipt.MatchStatus = MatchStatus.Matched;
-        transaction.MatchedReceiptId = receipt.Id;
-        transaction.MatchStatus = MatchStatus.Matched;
 
-        // Explicitly mark Receipt and Transaction as modified to ensure changes are persisted
-        // This fixes BUG-005 where these entities were not being updated after match confirmation
+        string? vendorPattern = null;
+
+        // T040: Handle group matches vs transaction matches
+        if (match.TransactionGroupId.HasValue)
+        {
+            // Group match - update group status
+            var group = await _context.TransactionGroups.FindAsync(match.TransactionGroupId.Value)
+                ?? throw new InvalidOperationException("Transaction group not found");
+
+            group.MatchedReceiptId = receipt.Id;
+            group.MatchStatus = MatchStatus.Matched;
+            _context.Entry(group).State = EntityState.Modified;
+
+            vendorPattern = ExtractVendorFromGroupName(group.Name);
+
+            _logger.LogDebug("Confirmed group match: Receipt {ReceiptId} -> Group {GroupId}", receipt.Id, group.Id);
+        }
+        else
+        {
+            // Transaction match - existing logic
+            var transaction = match.Transaction ?? throw new InvalidOperationException("Transaction not found");
+
+            receipt.MatchedTransactionId = transaction.Id;
+            transaction.MatchedReceiptId = receipt.Id;
+            transaction.MatchStatus = MatchStatus.Matched;
+            _context.Entry(transaction).State = EntityState.Modified;
+
+            vendorPattern = ExtractVendorPattern(transaction.OriginalDescription);
+
+            // Auto-create reimbursable prediction when match is confirmed
+            await _predictionService.MarkTransactionReimbursableAsync(userId, transaction.Id);
+        }
+
+        // Explicitly mark Receipt as modified
         _context.Entry(receipt).State = EntityState.Modified;
-        _context.Entry(transaction).State = EntityState.Modified;
 
         // Create or update vendor alias
-        var pattern = ExtractVendorPattern(transaction.OriginalDescription);
-        if (!string.IsNullOrWhiteSpace(pattern))
+        if (!string.IsNullOrWhiteSpace(vendorPattern))
         {
-            var existingAlias = await _vendorAliasService.FindMatchingAliasAsync(pattern);
+            var existingAlias = await _vendorAliasService.FindMatchingAliasAsync(vendorPattern);
             if (existingAlias != null)
             {
                 // Update existing alias
@@ -632,9 +990,9 @@ public partial class MatchingService : IMatchingService
                 // Create new alias
                 var newAlias = new VendorAlias
                 {
-                    CanonicalName = receipt.VendorExtracted ?? pattern,
-                    AliasPattern = pattern,
-                    DisplayName = vendorDisplayName ?? receipt.VendorExtracted ?? pattern,
+                    CanonicalName = receipt.VendorExtracted ?? vendorPattern,
+                    AliasPattern = vendorPattern,
+                    DisplayName = vendorDisplayName ?? receipt.VendorExtracted ?? vendorPattern,
                     DefaultGLCode = defaultGLCode,
                     DefaultDepartment = defaultDepartment,
                     MatchCount = 1,
@@ -647,12 +1005,7 @@ public partial class MatchingService : IMatchingService
         }
 
         // UpdateAsync already calls SaveChangesAsync, which saves all tracked changes
-        // including receipt and transaction updates
         await _matchRepository.UpdateAsync(match);
-
-        // Auto-create reimbursable prediction when match is confirmed
-        // (matching a receipt to a transaction implies it's a business expense)
-        await _predictionService.MarkTransactionReimbursableAsync(userId, transaction.Id);
 
         _logger.LogInformation("Match {MatchId} confirmed by user {UserId}", matchId, userId);
 
@@ -680,6 +1033,18 @@ public partial class MatchingService : IMatchingService
         if (receipt != null)
         {
             receipt.MatchStatus = MatchStatus.Unmatched;
+        }
+
+        // T038-T039: Handle group matches - reset group status
+        if (match.TransactionGroupId.HasValue)
+        {
+            var group = await _context.TransactionGroups.FindAsync(match.TransactionGroupId.Value);
+            if (group != null)
+            {
+                group.MatchStatus = MatchStatus.Unmatched;
+                group.MatchedReceiptId = null;
+                _logger.LogDebug("Reset group {GroupId} status to Unmatched on match rejection", group.Id);
+            }
         }
 
         // UpdateAsync already calls SaveChangesAsync, which saves all tracked changes
@@ -769,6 +1134,196 @@ public partial class MatchingService : IMatchingService
     }
 
     /// <inheritdoc />
+    public async Task<ReceiptTransactionMatch> CreateManualGroupMatchAsync(
+        Guid userId,
+        Guid receiptId,
+        Guid transactionGroupId,
+        string? vendorDisplayName = null)
+    {
+        // Validate receipt exists and is unmatched
+        var receipt = await _context.Receipts
+            .FirstOrDefaultAsync(r => r.Id == receiptId && r.UserId == userId)
+            ?? throw new InvalidOperationException("Receipt not found");
+
+        if (receipt.MatchStatus == MatchStatus.Matched)
+        {
+            throw new InvalidOperationException("Receipt is already matched");
+        }
+
+        // Validate group exists and is unmatched
+        var group = await _context.TransactionGroups
+            .FirstOrDefaultAsync(g => g.Id == transactionGroupId && g.UserId == userId)
+            ?? throw new InvalidOperationException("Transaction group not found");
+
+        if (group.MatchStatus == MatchStatus.Matched)
+        {
+            throw new InvalidOperationException("Transaction group is already matched");
+        }
+
+        // Create confirmed match with group
+        var match = new ReceiptTransactionMatch
+        {
+            ReceiptId = receiptId,
+            TransactionId = null, // No individual transaction
+            TransactionGroupId = transactionGroupId,
+            UserId = userId,
+            Status = MatchProposalStatus.Confirmed,
+            ConfidenceScore = 100m, // Manual matches are 100% confident
+            AmountScore = 0m,
+            DateScore = 0m,
+            VendorScore = 0m,
+            MatchReason = $"Manual match to group: {group.Name}",
+            IsManualMatch = true,
+            ConfirmedAt = DateTime.UtcNow,
+            ConfirmedByUserId = userId
+        };
+
+        // Update statuses (the link is through the ReceiptTransactionMatch record)
+        receipt.MatchStatus = MatchStatus.Matched;
+        group.MatchedReceiptId = receipt.Id;
+        group.MatchStatus = MatchStatus.Matched;
+
+        // Create vendor alias from group name
+        var vendorPattern = ExtractVendorFromGroupName(group.Name);
+        if (!string.IsNullOrWhiteSpace(vendorPattern))
+        {
+            var newAlias = new VendorAlias
+            {
+                CanonicalName = receipt.VendorExtracted ?? vendorPattern,
+                AliasPattern = vendorPattern,
+                DisplayName = vendorDisplayName ?? receipt.VendorExtracted ?? vendorPattern,
+                MatchCount = 1,
+                LastMatchedAt = DateTime.UtcNow,
+                Confidence = 1.0m
+            };
+            var savedAlias = await _vendorAliasService.AddOrUpdateAsync(newAlias);
+            match.MatchedVendorAliasId = savedAlias.Id;
+        }
+
+        await _matchRepository.AddAsync(match);
+
+        _logger.LogInformation(
+            "Manual group match created by user {UserId}: Receipt {ReceiptId} -> Group {GroupId} ({GroupName})",
+            userId, receiptId, transactionGroupId, group.Name);
+
+        return match;
+    }
+
+    /// <inheritdoc />
+    public async Task<List<MatchCandidate>> GetCandidatesAsync(Guid userId, Guid receiptId, int limit = 10)
+    {
+        // Validate limit
+        if (limit <= 0) limit = 10;
+        if (limit > 50) limit = 50;
+
+        // Get the receipt with extracted data
+        var receipt = await _context.Receipts
+            .FirstOrDefaultAsync(r => r.Id == receiptId && r.UserId == userId)
+            ?? throw new InvalidOperationException("Receipt not found");
+
+        if (!receipt.AmountExtracted.HasValue || !receipt.DateExtracted.HasValue)
+        {
+            _logger.LogWarning("Receipt {ReceiptId} missing extracted data for matching", receiptId);
+            return new List<MatchCandidate>();
+        }
+
+        // Calculate date range (±7 days)
+        var minDate = receipt.DateExtracted.Value.AddDays(-7);
+        var maxDate = receipt.DateExtracted.Value.AddDays(7);
+
+        // Query transactions and groups sequentially (DbContext is not thread-safe)
+        var transactions = await _context.Transactions
+            .Where(t => t.UserId == userId
+                && t.MatchStatus == MatchStatus.Unmatched
+                && t.GroupId == null  // Exclude grouped transactions
+                && t.TransactionDate >= minDate
+                && t.TransactionDate <= maxDate)
+            .ToListAsync();
+
+        var groups = await GetUnmatchedGroupsAsync(userId, minDate, maxDate);
+
+        // Build alias cache for vendor scoring
+        var aliasCache = await BuildAliasCacheAsync(transactions);
+
+        // Also add group vendor patterns to cache
+        foreach (var group in groups)
+        {
+            var vendorPattern = ExtractVendorFromGroupName(group.Name);
+            if (!string.IsNullOrEmpty(vendorPattern) && !aliasCache.ContainsKey(vendorPattern))
+            {
+                var alias = await _context.VendorAliases
+                    .FirstOrDefaultAsync(a => a.CanonicalName == vendorPattern);
+                aliasCache[vendorPattern] = alias;
+            }
+        }
+
+        // Create candidates and score them
+        var candidates = new List<MatchCandidate>();
+
+        // Add transaction candidates (filter by amount tolerance)
+        foreach (var t in transactions)
+        {
+            if (Math.Abs(receipt.AmountExtracted!.Value - Math.Abs(t.Amount)) <= AmountNearTolerance)
+            {
+                var candidate = new MatchCandidate
+                {
+                    Id = t.Id,
+                    Type = MatchCandidateType.Transaction,
+                    Amount = Math.Abs(t.Amount),
+                    Date = t.TransactionDate,
+                    VendorPattern = ExtractVendorPattern(t.Description),
+                    DisplayName = t.Description,
+                    TransactionCount = null
+                };
+
+                // Calculate scores
+                var (score, reason, _) = ScoreCandidate(receipt, candidate, aliasCache);
+                candidate.ConfidenceScore = score;
+                candidate.AmountScore = CalculateAmountScore(receipt.AmountExtracted!.Value, candidate.Amount);
+                candidate.DateScore = CalculateDateScore(receipt.DateExtracted!.Value, candidate.Date);
+                candidate.VendorScore = CalculateVendorScoreWithCache(receipt.VendorExtracted, candidate.VendorPattern, aliasCache).Score;
+                candidate.MatchReason = reason;
+
+                candidates.Add(candidate);
+            }
+        }
+
+        // Add group candidates (filter by amount tolerance)
+        foreach (var g in groups)
+        {
+            if (Math.Abs(receipt.AmountExtracted!.Value - Math.Abs(g.CombinedAmount)) <= AmountNearTolerance)
+            {
+                var candidate = new MatchCandidate
+                {
+                    Id = g.Id,
+                    Type = MatchCandidateType.Group,
+                    Amount = Math.Abs(g.CombinedAmount),
+                    Date = g.DisplayDate,
+                    VendorPattern = ExtractVendorFromGroupName(g.Name),
+                    DisplayName = g.Name,
+                    TransactionCount = g.TransactionCount
+                };
+
+                // Calculate scores
+                var (score, reason, _) = ScoreCandidate(receipt, candidate, aliasCache);
+                candidate.ConfidenceScore = score;
+                candidate.AmountScore = CalculateAmountScore(receipt.AmountExtracted!.Value, candidate.Amount);
+                candidate.DateScore = CalculateDateScore(receipt.DateExtracted!.Value, candidate.Date);
+                candidate.VendorScore = CalculateVendorScoreWithCache(receipt.VendorExtracted, candidate.VendorPattern, aliasCache).Score;
+                candidate.MatchReason = reason;
+
+                candidates.Add(candidate);
+            }
+        }
+
+        // Sort by confidence score descending and take top candidates
+        return candidates
+            .OrderByDescending(c => c.ConfidenceScore)
+            .Take(limit)
+            .ToList();
+    }
+
+    /// <inheritdoc />
     public async Task<(List<Receipt> Items, int TotalCount)> GetUnmatchedReceiptsAsync(Guid userId, int page = 1, int pageSize = 20)
     {
         var query = _context.Receipts
@@ -791,8 +1346,9 @@ public partial class MatchingService : IMatchingService
     /// <inheritdoc />
     public async Task<(List<Transaction> Items, int TotalCount)> GetUnmatchedTransactionsAsync(Guid userId, int page = 1, int pageSize = 20)
     {
+        // Exclude grouped transactions - their matching is handled at group level
         var query = _context.Transactions
-            .Where(t => t.UserId == userId && t.MatchStatus == MatchStatus.Unmatched);
+            .Where(t => t.UserId == userId && t.MatchStatus == MatchStatus.Unmatched && t.GroupId == null);
 
         var totalCount = await query.CountAsync();
 
@@ -805,6 +1361,25 @@ public partial class MatchingService : IMatchingService
         return (items, totalCount);
     }
 
+    /// <summary>
+    /// Gets unmatched transaction groups within a date range for auto-matching.
+    /// Groups are filtered by DisplayDate within the specified range.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="minDate">Minimum date (inclusive)</param>
+    /// <param name="maxDate">Maximum date (inclusive)</param>
+    /// <returns>List of unmatched transaction groups</returns>
+    private async Task<List<TransactionGroup>> GetUnmatchedGroupsAsync(Guid userId, DateOnly minDate, DateOnly maxDate)
+    {
+        return await _context.TransactionGroups
+            .Where(g => g.UserId == userId
+                && g.MatchStatus == MatchStatus.Unmatched
+                && g.DisplayDate >= minDate
+                && g.DisplayDate <= maxDate)
+            .OrderByDescending(g => g.DisplayDate)
+            .ToListAsync();
+    }
+
     /// <inheritdoc />
     public async Task<MatchingStats> GetStatsAsync(Guid userId)
     {
@@ -815,8 +1390,9 @@ public partial class MatchingService : IMatchingService
         var unmatchedReceiptsCount = await _context.Receipts
             .CountAsync(r => r.UserId == userId && r.MatchStatus == MatchStatus.Unmatched);
 
+        // Exclude grouped transactions - their matching is handled at group level
         var unmatchedTransactionsCount = await _context.Transactions
-            .CountAsync(t => t.UserId == userId && t.MatchStatus == MatchStatus.Unmatched);
+            .CountAsync(t => t.UserId == userId && t.MatchStatus == MatchStatus.Unmatched && t.GroupId == null);
 
         var totalReceipts = matchedCount + proposedCount + unmatchedReceiptsCount;
         var autoMatchRate = totalReceipts > 0

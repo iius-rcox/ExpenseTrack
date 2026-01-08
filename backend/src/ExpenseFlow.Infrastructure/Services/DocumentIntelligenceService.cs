@@ -34,7 +34,7 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
     {
         _logger.LogDebug("Starting receipt analysis with Azure Document Intelligence for content type {ContentType}", contentType);
 
-        var result = new ReceiptExtractionResult();
+        var result = new ReceiptExtractionResult { ExtractionModel = "receipt" };
 
         try
         {
@@ -90,6 +90,388 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
             _logger.LogError(ex, "Azure Document Intelligence request failed: {Message}", ex.Message);
             throw;
         }
+    }
+
+    public async Task<ReceiptExtractionResult> AnalyzeInvoiceAsync(Stream documentStream, string contentType)
+    {
+        _logger.LogDebug("Starting invoice analysis with Azure Document Intelligence for content type {ContentType}", contentType);
+
+        var result = new ReceiptExtractionResult { ExtractionModel = "invoice" };
+
+        try
+        {
+            using var memoryStream = new MemoryStream();
+            await documentStream.CopyToAsync(memoryStream);
+
+            if (memoryStream.Length == 0)
+            {
+                _logger.LogWarning("Document stream is empty, cannot analyze");
+                return result;
+            }
+
+            _logger.LogDebug("Analyzing invoice of {Size} bytes with content type {ContentType}",
+                memoryStream.Length, contentType);
+
+            var bytesSource = BinaryData.FromBytes(memoryStream.ToArray());
+
+            var operation = await _client.AnalyzeDocumentAsync(
+                WaitUntil.Completed,
+                "prebuilt-invoice",
+                bytesSource);
+
+            var analyzeResult = operation.Value;
+
+            // Set page count
+            result.PageCount = analyzeResult.Pages?.Count ?? 1;
+
+            // Extract data from the first invoice found
+            if (analyzeResult.Documents != null && analyzeResult.Documents.Count > 0)
+            {
+                var invoice = analyzeResult.Documents[0];
+                ExtractInvoiceFields(invoice, result);
+            }
+            else
+            {
+                _logger.LogWarning("No invoice documents found in the analyzed document");
+            }
+
+            _logger.LogInformation(
+                "Invoice analysis completed. Vendor: {Vendor}, Amount: {Amount}, Confidence: {Confidence:P1}",
+                result.VendorName ?? "Unknown",
+                result.TotalAmount?.ToString("C") ?? "Unknown",
+                result.OverallConfidence);
+
+            return result;
+        }
+        catch (RequestFailedException ex)
+        {
+            _logger.LogError(ex, "Azure Document Intelligence invoice request failed: {Message}", ex.Message);
+            throw;
+        }
+    }
+
+    public async Task<ReceiptExtractionResult> AnalyzeWithFallbackAsync(
+        Stream documentStream,
+        string contentType,
+        double fallbackConfidenceThreshold = 0.5)
+    {
+        // Validate threshold range
+        if (fallbackConfidenceThreshold < 0.0 || fallbackConfidenceThreshold > 1.0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(fallbackConfidenceThreshold),
+                fallbackConfidenceThreshold,
+                "Confidence threshold must be between 0.0 and 1.0");
+        }
+
+        _logger.LogDebug("Starting extraction with fallback for content type {ContentType}", contentType);
+
+        // Prepare document bytes once - avoids redundant stream copies in individual methods
+        // This is a significant memory optimization for large documents
+        using var memoryStream = new MemoryStream();
+        await documentStream.CopyToAsync(memoryStream);
+
+        if (memoryStream.Length == 0)
+        {
+            _logger.LogWarning("Document stream is empty, cannot analyze");
+            return new ReceiptExtractionResult { ExtractionModel = "receipt" };
+        }
+
+        var documentData = BinaryData.FromBytes(memoryStream.GetBuffer().AsMemory(0, (int)memoryStream.Length));
+
+        // Try receipt model first (most common case) - use internal method that accepts BinaryData
+        var receiptResult = await AnalyzeReceiptInternalAsync(documentData, contentType);
+
+        // Check if receipt extraction was successful enough
+        var needsFallback = NeedsFallback(receiptResult, fallbackConfidenceThreshold);
+
+        if (!needsFallback)
+        {
+            _logger.LogDebug("Receipt model extraction successful, no fallback needed");
+            return receiptResult;
+        }
+
+        _logger.LogInformation(
+            "Receipt model extraction incomplete (Vendor: {HasVendor}, Date: {HasDate}, Amount: {HasAmount}). Trying invoice model...",
+            receiptResult.VendorName != null,
+            receiptResult.TransactionDate != null,
+            receiptResult.TotalAmount != null);
+
+        // Try invoice model - reuse the same BinaryData (no additional allocation)
+        var invoiceResult = await AnalyzeInvoiceInternalAsync(documentData, contentType);
+
+        // Merge results, preferring higher confidence values
+        var mergedResult = MergeExtractionResults(receiptResult, invoiceResult);
+
+        _logger.LogInformation(
+            "Fallback extraction completed. Model: {Model}, Vendor: {Vendor}, Amount: {Amount}, Confidence: {Confidence:P1}",
+            mergedResult.ExtractionModel,
+            mergedResult.VendorName ?? "Unknown",
+            mergedResult.TotalAmount?.ToString("C") ?? "Unknown",
+            mergedResult.OverallConfidence);
+
+        return mergedResult;
+    }
+
+    /// <summary>
+    /// Determines if fallback to invoice model is needed based on missing fields or low confidence.
+    /// </summary>
+    private bool NeedsFallback(ReceiptExtractionResult result, double confidenceThreshold)
+    {
+        // Missing critical fields
+        if (result.VendorName == null || result.TransactionDate == null || result.TotalAmount == null)
+        {
+            return true;
+        }
+
+        // Check individual field confidence
+        var criticalFields = new[] { "VendorName", "TransactionDate", "TotalAmount" };
+        foreach (var field in criticalFields)
+        {
+            if (result.ConfidenceScores.TryGetValue(field, out var confidence) && confidence < confidenceThreshold)
+            {
+                _logger.LogDebug("Field {Field} has low confidence ({Confidence:P1}), triggering fallback", field, confidence);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Internal receipt analysis using pre-prepared BinaryData.
+    /// Used by AnalyzeWithFallbackAsync to avoid redundant memory allocations.
+    /// </summary>
+    private async Task<ReceiptExtractionResult> AnalyzeReceiptInternalAsync(BinaryData documentData, string contentType)
+    {
+        _logger.LogDebug("Starting receipt analysis (internal) with content type {ContentType}", contentType);
+
+        var result = new ReceiptExtractionResult { ExtractionModel = "receipt" };
+
+        try
+        {
+            var operation = await _client.AnalyzeDocumentAsync(
+                WaitUntil.Completed,
+                "prebuilt-receipt",
+                documentData);
+
+            var analyzeResult = operation.Value;
+            result.PageCount = analyzeResult.Pages?.Count ?? 1;
+
+            if (analyzeResult.Documents != null && analyzeResult.Documents.Count > 0)
+            {
+                var receipt = analyzeResult.Documents[0];
+                ExtractReceiptFields(receipt, result);
+            }
+            else
+            {
+                _logger.LogWarning("No receipt documents found in the analyzed document");
+            }
+
+            return result;
+        }
+        catch (RequestFailedException ex)
+        {
+            _logger.LogError(ex, "Azure Document Intelligence request failed: {Message}", ex.Message);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Internal invoice analysis using pre-prepared BinaryData.
+    /// Used by AnalyzeWithFallbackAsync to avoid redundant memory allocations.
+    /// </summary>
+    private async Task<ReceiptExtractionResult> AnalyzeInvoiceInternalAsync(BinaryData documentData, string contentType)
+    {
+        _logger.LogDebug("Starting invoice analysis (internal) with content type {ContentType}", contentType);
+
+        var result = new ReceiptExtractionResult { ExtractionModel = "invoice" };
+
+        try
+        {
+            var operation = await _client.AnalyzeDocumentAsync(
+                WaitUntil.Completed,
+                "prebuilt-invoice",
+                documentData);
+
+            var analyzeResult = operation.Value;
+            result.PageCount = analyzeResult.Pages?.Count ?? 1;
+
+            if (analyzeResult.Documents != null && analyzeResult.Documents.Count > 0)
+            {
+                var invoice = analyzeResult.Documents[0];
+                ExtractInvoiceFields(invoice, result);
+            }
+            else
+            {
+                _logger.LogWarning("No invoice documents found in the analyzed document");
+            }
+
+            return result;
+        }
+        catch (RequestFailedException ex)
+        {
+            _logger.LogError(ex, "Azure Document Intelligence invoice request failed: {Message}", ex.Message);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Merges extraction results from receipt and invoice models, preferring higher confidence values.
+    /// </summary>
+    private ReceiptExtractionResult MergeExtractionResults(
+        ReceiptExtractionResult receiptResult,
+        ReceiptExtractionResult invoiceResult)
+    {
+        var merged = new ReceiptExtractionResult
+        {
+            PageCount = Math.Max(receiptResult.PageCount, invoiceResult.PageCount),
+            ExtractionModel = "receipt+invoice"
+        };
+
+        // Merge VendorName
+        merged.VendorName = SelectBestValue(
+            receiptResult.VendorName, GetConfidence(receiptResult, "VendorName"),
+            invoiceResult.VendorName, GetConfidence(invoiceResult, "VendorName"),
+            "VendorName", merged);
+
+        // Merge TransactionDate
+        var receiptDate = receiptResult.TransactionDate;
+        var invoiceDate = invoiceResult.TransactionDate;
+        var receiptDateConf = GetConfidence(receiptResult, "TransactionDate");
+        var invoiceDateConf = GetConfidence(invoiceResult, "TransactionDate");
+
+        if (receiptDate == null && invoiceDate != null)
+        {
+            merged.TransactionDate = invoiceDate;
+            merged.FieldSources["TransactionDate"] = "invoice";
+            if (invoiceDateConf > 0) merged.ConfidenceScores["TransactionDate"] = invoiceDateConf;
+        }
+        else if (receiptDate != null && invoiceDate == null)
+        {
+            merged.TransactionDate = receiptDate;
+            merged.FieldSources["TransactionDate"] = "receipt";
+            if (receiptDateConf > 0) merged.ConfidenceScores["TransactionDate"] = receiptDateConf;
+        }
+        else if (receiptDate != null && invoiceDate != null)
+        {
+            // Both have values, prefer higher confidence
+            if (invoiceDateConf > receiptDateConf)
+            {
+                merged.TransactionDate = invoiceDate;
+                merged.FieldSources["TransactionDate"] = "invoice";
+                merged.ConfidenceScores["TransactionDate"] = invoiceDateConf;
+            }
+            else
+            {
+                merged.TransactionDate = receiptDate;
+                merged.FieldSources["TransactionDate"] = "receipt";
+                merged.ConfidenceScores["TransactionDate"] = receiptDateConf;
+            }
+        }
+
+        // Merge TotalAmount
+        merged.TotalAmount = SelectBestDecimalValue(
+            receiptResult.TotalAmount, GetConfidence(receiptResult, "TotalAmount"),
+            invoiceResult.TotalAmount, GetConfidence(invoiceResult, "TotalAmount"),
+            "TotalAmount", merged);
+
+        // Merge TaxAmount
+        merged.TaxAmount = SelectBestDecimalValue(
+            receiptResult.TaxAmount, GetConfidence(receiptResult, "TaxAmount"),
+            invoiceResult.TaxAmount, GetConfidence(invoiceResult, "TaxAmount"),
+            "TaxAmount", merged);
+
+        // Merge Currency (prefer non-null, then receipt)
+        merged.Currency = receiptResult.Currency ?? invoiceResult.Currency ?? "USD";
+        merged.FieldSources["Currency"] = receiptResult.Currency != null ? "receipt" : "invoice";
+
+        // Merge LineItems (prefer the result with more items, or higher total confidence)
+        if (invoiceResult.LineItems.Count > receiptResult.LineItems.Count)
+        {
+            merged.LineItems = invoiceResult.LineItems;
+            merged.FieldSources["LineItems"] = "invoice";
+        }
+        else
+        {
+            merged.LineItems = receiptResult.LineItems;
+            merged.FieldSources["LineItems"] = "receipt";
+        }
+
+        return merged;
+    }
+
+    private static double GetConfidence(ReceiptExtractionResult result, string field)
+    {
+        return result.ConfidenceScores.TryGetValue(field, out var conf) ? conf : 0;
+    }
+
+    private static string? SelectBestValue(
+        string? receiptValue, double receiptConf,
+        string? invoiceValue, double invoiceConf,
+        string fieldName,
+        ReceiptExtractionResult merged)
+    {
+        if (receiptValue == null && invoiceValue != null)
+        {
+            merged.FieldSources[fieldName] = "invoice";
+            if (invoiceConf > 0) merged.ConfidenceScores[fieldName] = invoiceConf;
+            return invoiceValue;
+        }
+        if (receiptValue != null && invoiceValue == null)
+        {
+            merged.FieldSources[fieldName] = "receipt";
+            if (receiptConf > 0) merged.ConfidenceScores[fieldName] = receiptConf;
+            return receiptValue;
+        }
+        if (receiptValue != null && invoiceValue != null)
+        {
+            // Both have values, prefer higher confidence
+            if (invoiceConf > receiptConf)
+            {
+                merged.FieldSources[fieldName] = "invoice";
+                merged.ConfidenceScores[fieldName] = invoiceConf;
+                return invoiceValue;
+            }
+            merged.FieldSources[fieldName] = "receipt";
+            merged.ConfidenceScores[fieldName] = receiptConf;
+            return receiptValue;
+        }
+        return null;
+    }
+
+    private static decimal? SelectBestDecimalValue(
+        decimal? receiptValue, double receiptConf,
+        decimal? invoiceValue, double invoiceConf,
+        string fieldName,
+        ReceiptExtractionResult merged)
+    {
+        if (receiptValue == null && invoiceValue != null)
+        {
+            merged.FieldSources[fieldName] = "invoice";
+            if (invoiceConf > 0) merged.ConfidenceScores[fieldName] = invoiceConf;
+            return invoiceValue;
+        }
+        if (receiptValue != null && invoiceValue == null)
+        {
+            merged.FieldSources[fieldName] = "receipt";
+            if (receiptConf > 0) merged.ConfidenceScores[fieldName] = receiptConf;
+            return receiptValue;
+        }
+        if (receiptValue != null && invoiceValue != null)
+        {
+            // Both have values, prefer higher confidence
+            if (invoiceConf > receiptConf)
+            {
+                merged.FieldSources[fieldName] = "invoice";
+                merged.ConfidenceScores[fieldName] = invoiceConf;
+                return invoiceValue;
+            }
+            merged.FieldSources[fieldName] = "receipt";
+            merged.ConfidenceScores[fieldName] = receiptConf;
+            return receiptValue;
+        }
+        return null;
     }
 
     private void ExtractReceiptFields(AnalyzedDocument receipt, ReceiptExtractionResult result)
@@ -169,6 +551,166 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
         }
     }
 
+    /// <summary>
+    /// Extracts invoice fields from Azure Document Intelligence prebuilt-invoice model
+    /// and maps them to the ReceiptExtractionResult format.
+    /// </summary>
+    /// <remarks>
+    /// Invoice model field mapping:
+    /// - VendorName → VendorName
+    /// - InvoiceDate → TransactionDate
+    /// - InvoiceTotal → TotalAmount
+    /// - TotalTax → TaxAmount
+    /// - CurrencyCode → Currency
+    /// - Items → LineItems (with different subfield names)
+    /// </remarks>
+    private void ExtractInvoiceFields(AnalyzedDocument invoice, ReceiptExtractionResult result)
+    {
+        // Log all available fields for debugging
+        _logger.LogDebug("Available invoice fields: {Fields}", string.Join(", ", invoice.Fields.Keys));
+
+        // Extract VendorName
+        if (invoice.Fields.TryGetValue("VendorName", out var vendorField) && vendorField.Content != null)
+        {
+            result.VendorName = vendorField.Content;
+            if (vendorField.Confidence.HasValue)
+            {
+                result.ConfidenceScores["VendorName"] = vendorField.Confidence.Value;
+            }
+        }
+
+        // Extract InvoiceDate (maps to TransactionDate)
+        if (invoice.Fields.TryGetValue("InvoiceDate", out var dateField) && dateField.ValueDate.HasValue)
+        {
+            result.TransactionDate = dateField.ValueDate.Value.DateTime;
+            if (dateField.Confidence.HasValue)
+            {
+                result.ConfidenceScores["TransactionDate"] = dateField.Confidence.Value;
+            }
+        }
+        // Fallback to DueDate if InvoiceDate not present
+        else if (invoice.Fields.TryGetValue("DueDate", out var dueDateField) && dueDateField.ValueDate.HasValue)
+        {
+            result.TransactionDate = dueDateField.ValueDate.Value.DateTime;
+            if (dueDateField.Confidence.HasValue)
+            {
+                // Slightly lower confidence since DueDate is not the actual invoice date
+                result.ConfidenceScores["TransactionDate"] = dueDateField.Confidence.Value * 0.9;
+            }
+        }
+
+        // Extract InvoiceTotal (maps to TotalAmount)
+        if (invoice.Fields.TryGetValue("InvoiceTotal", out var totalField) && totalField.ValueCurrency != null)
+        {
+            result.TotalAmount = (decimal)totalField.ValueCurrency.Amount;
+            result.Currency = totalField.ValueCurrency.CurrencyCode ?? "USD";
+            if (totalField.Confidence.HasValue)
+            {
+                result.ConfidenceScores["TotalAmount"] = totalField.Confidence.Value;
+            }
+        }
+        // Fallback to AmountDue if InvoiceTotal not present
+        else if (invoice.Fields.TryGetValue("AmountDue", out var amountDueField) && amountDueField.ValueCurrency != null)
+        {
+            result.TotalAmount = (decimal)amountDueField.ValueCurrency.Amount;
+            result.Currency = amountDueField.ValueCurrency.CurrencyCode ?? "USD";
+            if (amountDueField.Confidence.HasValue)
+            {
+                result.ConfidenceScores["TotalAmount"] = amountDueField.Confidence.Value;
+            }
+        }
+        // Fallback to SubTotal if neither InvoiceTotal nor AmountDue present
+        else if (invoice.Fields.TryGetValue("SubTotal", out var subTotalField) && subTotalField.ValueCurrency != null)
+        {
+            result.TotalAmount = (decimal)subTotalField.ValueCurrency.Amount;
+            result.Currency = subTotalField.ValueCurrency.CurrencyCode ?? "USD";
+            if (subTotalField.Confidence.HasValue)
+            {
+                // Lower confidence since SubTotal doesn't include tax
+                result.ConfidenceScores["TotalAmount"] = subTotalField.Confidence.Value * 0.8;
+            }
+        }
+
+        // Extract TotalTax (maps to TaxAmount)
+        if (invoice.Fields.TryGetValue("TotalTax", out var taxField) && taxField.ValueCurrency != null)
+        {
+            result.TaxAmount = (decimal)taxField.ValueCurrency.Amount;
+            if (taxField.Confidence.HasValue)
+            {
+                result.ConfidenceScores["TaxAmount"] = taxField.Confidence.Value;
+            }
+        }
+
+        // Extract Line Items - invoice model uses different field names
+        if (invoice.Fields.TryGetValue("Items", out var invoiceItemsField) && invoiceItemsField.ValueList != null)
+        {
+            foreach (var item in invoiceItemsField.ValueList)
+            {
+                if (item.ValueDictionary != null)
+                {
+                    var lineItem = ExtractInvoiceLineItem(item.ValueDictionary);
+                    if (lineItem != null)
+                    {
+                        result.LineItems.Add(lineItem);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Extracts a line item from invoice model fields.
+    /// Invoice model uses different field names than receipt model.
+    /// </summary>
+    private ReceiptLineItem? ExtractInvoiceLineItem(IReadOnlyDictionary<string, DocumentField> itemFields)
+    {
+        var lineItem = new ReceiptLineItem();
+        var hasData = false;
+
+        // Invoice uses "Description" same as receipt
+        if (itemFields.TryGetValue("Description", out var descField) && descField.Content != null)
+        {
+            lineItem.Description = descField.Content;
+            lineItem.Confidence = descField.Confidence;
+            hasData = true;
+        }
+        // Fallback to ProductCode if Description missing
+        else if (itemFields.TryGetValue("ProductCode", out var codeField) && codeField.Content != null)
+        {
+            lineItem.Description = codeField.Content;
+            lineItem.Confidence = codeField.Confidence;
+            hasData = true;
+        }
+
+        // Invoice uses "Quantity" same as receipt
+        if (itemFields.TryGetValue("Quantity", out var qtyField) && qtyField.ValueDouble.HasValue)
+        {
+            lineItem.Quantity = (decimal)qtyField.ValueDouble.Value;
+            hasData = true;
+        }
+
+        // Invoice uses "UnitPrice" instead of "Price"
+        if (itemFields.TryGetValue("UnitPrice", out var priceField) && priceField.ValueCurrency != null)
+        {
+            lineItem.UnitPrice = (decimal)priceField.ValueCurrency.Amount;
+            hasData = true;
+        }
+        else if (itemFields.TryGetValue("Unit", out var unitField) && unitField.ValueCurrency != null)
+        {
+            lineItem.UnitPrice = (decimal)unitField.ValueCurrency.Amount;
+            hasData = true;
+        }
+
+        // Invoice uses "Amount" instead of "TotalPrice"
+        if (itemFields.TryGetValue("Amount", out var totalField) && totalField.ValueCurrency != null)
+        {
+            lineItem.TotalPrice = (decimal)totalField.ValueCurrency.Amount;
+            hasData = true;
+        }
+
+        return hasData ? lineItem : null;
+    }
+
     private ReceiptLineItem? ExtractLineItem(IReadOnlyDictionary<string, DocumentField> itemFields)
     {
         var lineItem = new ReceiptLineItem();
@@ -200,13 +742,6 @@ public class DocumentIntelligenceService : IDocumentIntelligenceService
         }
 
         return hasData ? lineItem : null;
-    }
-
-    private static async Task<BinaryData> ConvertToBase64Async(Stream stream)
-    {
-        using var memoryStream = new MemoryStream();
-        await stream.CopyToAsync(memoryStream);
-        return BinaryData.FromBytes(memoryStream.ToArray());
     }
 
     /// <summary>

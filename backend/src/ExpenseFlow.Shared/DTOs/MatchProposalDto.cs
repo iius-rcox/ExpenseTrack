@@ -26,6 +26,11 @@ public class MatchProposalDto
     public Guid? TransactionGroupId { get; set; }
 
     /// <summary>
+    /// Type of match candidate: "transaction" or "group".
+    /// </summary>
+    public string CandidateType { get; set; } = "transaction";
+
+    /// <summary>
     /// Overall confidence score (0-100).
     /// </summary>
     public decimal ConfidenceScore { get; set; }
@@ -61,9 +66,14 @@ public class MatchProposalDto
     public MatchReceiptSummaryDto? Receipt { get; set; }
 
     /// <summary>
-    /// Transaction summary data.
+    /// Transaction summary data (null if matched to a group).
     /// </summary>
     public MatchTransactionSummaryDto? Transaction { get; set; }
+
+    /// <summary>
+    /// Transaction group summary data (null if matched to a transaction).
+    /// </summary>
+    public MatchTransactionGroupSummaryDto? TransactionGroup { get; set; }
 
     /// <summary>
     /// When the match was proposed.

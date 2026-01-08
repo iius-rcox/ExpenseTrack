@@ -30,8 +30,12 @@ public class MatchingController : ApiControllerBase
     /// <summary>
     /// Run auto-match for all unmatched receipts.
     /// </summary>
+    /// <remarks>
+    /// Considers both individual transactions and transaction groups as match candidates.
+    /// Returns ProposedCount broken down by TransactionMatchCount and GroupMatchCount.
+    /// </remarks>
     /// <param name="request">Optional list of specific receipt IDs to match</param>
-    /// <returns>Auto-match results including proposed matches</returns>
+    /// <returns>Auto-match results including proposed matches to transactions and groups</returns>
     [HttpPost("auto")]
     [ProducesResponseType(typeof(AutoMatchResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
@@ -46,6 +50,8 @@ public class MatchingController : ApiControllerBase
         var response = new AutoMatchResponseDto
         {
             ProposedCount = result.ProposedCount,
+            TransactionMatchCount = result.TransactionMatchCount,
+            GroupMatchCount = result.GroupMatchCount,
             ProcessedCount = result.ProcessedCount,
             AmbiguousCount = result.AmbiguousCount,
             DurationMs = result.DurationMs,
@@ -75,6 +81,17 @@ public class MatchingController : ApiControllerBase
         var user = await _userService.GetOrCreateUserAsync(User);
         var (items, totalCount) = await _matchingService.GetProposalsAsync(user.Id, page, pageSize);
 
+        // Debug: Log TransactionGroup presence for each match
+        foreach (var match in items)
+        {
+            _logger.LogInformation(
+                "Match {MatchId}: TransactionGroupId={GroupId}, TransactionGroup={HasGroup}, Transaction={HasTxn}",
+                match.Id,
+                match.TransactionGroupId,
+                match.TransactionGroup != null ? $"Name={match.TransactionGroup.Name}" : "null",
+                match.Transaction != null ? $"Desc={match.Transaction.Description}" : "null");
+        }
+
         var response = new ProposalListResponseDto
         {
             Items = items.Select(MapToProposalDto).ToList(),
@@ -82,6 +99,18 @@ public class MatchingController : ApiControllerBase
             Page = page,
             PageSize = pageSize
         };
+
+        // Debug: Log mapped DTOs to verify transactionGroup is present
+        foreach (var dto in response.Items)
+        {
+            _logger.LogInformation(
+                "DTO {MatchId}: CandidateType={CandidateType}, TransactionGroup={TransactionGroup}",
+                dto.MatchId,
+                dto.CandidateType,
+                dto.TransactionGroup != null
+                    ? $"{{Id={dto.TransactionGroup.Id}, Name={dto.TransactionGroup.Name}, Amount={dto.TransactionGroup.CombinedAmount}}}"
+                    : "null");
+        }
 
         return Ok(response);
     }
@@ -186,9 +215,13 @@ public class MatchingController : ApiControllerBase
     }
 
     /// <summary>
-    /// Manually match a receipt to a transaction.
+    /// Manually match a receipt to a transaction or transaction group.
     /// </summary>
-    /// <param name="request">Receipt and transaction IDs to match</param>
+    /// <remarks>
+    /// Provide either TransactionId OR TransactionGroupId (not both).
+    /// When matching to a group, the group's MatchStatus is updated to Matched.
+    /// </remarks>
+    /// <param name="request">Receipt and transaction/group IDs to match</param>
     /// <returns>Created match details</returns>
     [HttpPost("manual")]
     [ProducesResponseType(typeof(MatchDetailResponseDto), StatusCodes.Status201Created)]
@@ -202,13 +235,35 @@ public class MatchingController : ApiControllerBase
 
         try
         {
-            var match = await _matchingService.CreateManualMatchAsync(
-                user.Id,
-                request.ReceiptId,
-                request.TransactionId,
-                request.VendorDisplayName,
-                request.DefaultGLCode,
-                request.DefaultDepartment);
+            ReceiptTransactionMatch match;
+
+            // Route to appropriate method based on whether TransactionId or TransactionGroupId is provided
+            if (request.TransactionId.HasValue && request.TransactionId.Value != Guid.Empty)
+            {
+                match = await _matchingService.CreateManualMatchAsync(
+                    user.Id,
+                    request.ReceiptId,
+                    request.TransactionId.Value,
+                    request.VendorDisplayName,
+                    request.DefaultGLCode,
+                    request.DefaultDepartment);
+            }
+            else if (request.TransactionGroupId.HasValue && request.TransactionGroupId.Value != Guid.Empty)
+            {
+                match = await _matchingService.CreateManualGroupMatchAsync(
+                    user.Id,
+                    request.ReceiptId,
+                    request.TransactionGroupId.Value,
+                    request.VendorDisplayName);
+            }
+            else
+            {
+                return BadRequest(new ProblemDetailsResponse
+                {
+                    Title = "Invalid Request",
+                    Detail = "Either TransactionId or TransactionGroupId must be provided."
+                });
+            }
 
             return CreatedAtAction(nameof(GetMatch), new { matchId = match.Id }, MapToDetailDto(match));
         }
@@ -395,6 +450,54 @@ public class MatchingController : ApiControllerBase
         return Ok(response);
     }
 
+    /// <summary>
+    /// Gets ranked match candidates for a specific receipt.
+    /// Returns both ungrouped transactions and transaction groups as potential matches.
+    /// </summary>
+    /// <param name="receiptId">Receipt ID to find candidates for</param>
+    /// <param name="limit">Maximum number of candidates to return (default 10, max 50)</param>
+    /// <returns>List of ranked candidates ordered by confidence score descending</returns>
+    [HttpGet("candidates/{receiptId:guid}")]
+    [ProducesResponseType(typeof(List<MatchCandidateDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<List<MatchCandidateDto>>> GetCandidates(
+        Guid receiptId,
+        [FromQuery] int limit = 10)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        try
+        {
+            var candidates = await _matchingService.GetCandidatesAsync(user.Id, receiptId, limit);
+
+            var dtos = candidates.Select(c => new MatchCandidateDto
+            {
+                Id = c.Id,
+                CandidateType = c.Type == Core.Interfaces.MatchCandidateType.Group ? "group" : "transaction",
+                Amount = c.Amount,
+                Date = c.Date,
+                DisplayName = c.DisplayName,
+                TransactionCount = c.TransactionCount,
+                ConfidenceScore = c.ConfidenceScore,
+                AmountScore = c.AmountScore,
+                DateScore = c.DateScore,
+                VendorScore = c.VendorScore,
+                MatchReason = c.MatchReason
+            }).ToList();
+
+            return Ok(dtos);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = ex.Message
+            });
+        }
+    }
+
     private static MatchProposalDto MapToProposalDto(ReceiptTransactionMatch match)
     {
         return new MatchProposalDto
@@ -403,6 +506,7 @@ public class MatchingController : ApiControllerBase
             ReceiptId = match.ReceiptId,
             TransactionId = match.TransactionId,
             TransactionGroupId = match.TransactionGroupId,
+            CandidateType = match.TransactionGroupId.HasValue ? "group" : "transaction",
             ConfidenceScore = match.ConfidenceScore,
             AmountScore = match.AmountScore,
             DateScore = match.DateScore,
@@ -427,6 +531,14 @@ public class MatchingController : ApiControllerBase
                 TransactionDate = match.Transaction.TransactionDate,
                 PostDate = match.Transaction.PostDate,
                 Amount = match.Transaction.Amount
+            } : null,
+            TransactionGroup = match.TransactionGroup != null ? new MatchTransactionGroupSummaryDto
+            {
+                Id = match.TransactionGroup.Id,
+                Name = match.TransactionGroup.Name,
+                CombinedAmount = match.TransactionGroup.CombinedAmount,
+                DisplayDate = match.TransactionGroup.DisplayDate,
+                TransactionCount = match.TransactionGroup.TransactionCount
             } : null,
             CreatedAt = match.CreatedAt
         };
@@ -440,6 +552,7 @@ public class MatchingController : ApiControllerBase
             ReceiptId = match.ReceiptId,
             TransactionId = match.TransactionId,
             TransactionGroupId = match.TransactionGroupId,
+            CandidateType = match.TransactionGroupId.HasValue ? "group" : "transaction",
             ConfidenceScore = match.ConfidenceScore,
             AmountScore = match.AmountScore,
             DateScore = match.DateScore,
@@ -464,6 +577,14 @@ public class MatchingController : ApiControllerBase
                 TransactionDate = match.Transaction.TransactionDate,
                 PostDate = match.Transaction.PostDate,
                 Amount = match.Transaction.Amount
+            } : null,
+            TransactionGroup = match.TransactionGroup != null ? new MatchTransactionGroupSummaryDto
+            {
+                Id = match.TransactionGroup.Id,
+                Name = match.TransactionGroup.Name,
+                CombinedAmount = match.TransactionGroup.CombinedAmount,
+                DisplayDate = match.TransactionGroup.DisplayDate,
+                TransactionCount = match.TransactionGroup.TransactionCount
             } : null,
             CreatedAt = match.CreatedAt,
             ConfirmedAt = match.ConfirmedAt,

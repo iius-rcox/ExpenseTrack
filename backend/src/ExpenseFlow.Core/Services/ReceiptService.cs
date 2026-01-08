@@ -315,6 +315,7 @@ public class ReceiptService : IReceiptService
             "image/png" => buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47,
             "application/pdf" => buffer[0] == 0x25 && buffer[1] == 0x50 && buffer[2] == 0x44 && buffer[3] == 0x46,
             "image/heic" or "image/heif" => ValidateHeicMagicBytes(buffer),
+            "text/html" => ValidateHtmlMagicBytes(stream),
             _ => true // Allow unknown types to pass through
         };
     }
@@ -336,5 +337,30 @@ public class ReceiptService : IReceiptService
         // Check for HEIC/HEIF brand identifiers
         var brand = System.Text.Encoding.ASCII.GetString(buffer, 8, 4);
         return brand is "heic" or "heix" or "mif1" or "msf1" or "hevc" or "hevx";
+    }
+
+    private static bool ValidateHtmlMagicBytes(Stream stream)
+    {
+        // Read more bytes for HTML detection (may have BOM or whitespace)
+        var buffer = new byte[256];
+        stream.Position = 0;
+        var bytesRead = stream.Read(buffer, 0, buffer.Length);
+        stream.Position = 0;
+
+        if (bytesRead < 10)
+        {
+            return false;
+        }
+
+        // Convert to string and trim leading whitespace/BOM
+        var content = System.Text.Encoding.UTF8.GetString(buffer, 0, bytesRead).TrimStart();
+
+        // Check for common HTML start patterns (case-insensitive)
+        return content.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase)
+            || content.StartsWith("<html", StringComparison.OrdinalIgnoreCase)
+            || content.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase)
+            || content.StartsWith("<head", StringComparison.OrdinalIgnoreCase)
+            || content.StartsWith("<body", StringComparison.OrdinalIgnoreCase)
+            || content.StartsWith("<!--", StringComparison.Ordinal); // HTML comment at start
     }
 }

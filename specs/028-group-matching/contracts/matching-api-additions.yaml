@@ -1,0 +1,356 @@
+# OpenAPI 3.0 Additions for Transaction Group Matching
+# These additions extend the existing /api/matching endpoints
+
+openapi: 3.0.3
+info:
+  title: ExpenseFlow Matching API - Group Matching Additions
+  version: 1.1.0
+  description: |
+    Extensions to the matching API to support transaction group matching.
+    These additions are backward-compatible with existing endpoints.
+
+paths:
+  /api/matching/auto:
+    post:
+      summary: Run auto-matching (extended for groups)
+      description: |
+        Auto-matches unmatched receipts to unmatched transactions AND transaction groups.
+        Groups are scored using CombinedAmount and DisplayDate.
+        Grouped transactions are excluded from individual matching.
+      tags:
+        - Matching
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutoMatchRequest'
+      responses:
+        '200':
+          description: Auto-match completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoMatchResult'
+
+  /api/matching/proposals:
+    get:
+      summary: Get match proposals (extended for groups)
+      description: |
+        Returns paginated list of proposed matches.
+        Now includes group matches with candidateType = "group".
+      tags:
+        - Matching
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated proposals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchProposalListResponse'
+
+  /api/matching/manual:
+    post:
+      summary: Create manual match (extended for groups)
+      description: |
+        Creates a confirmed match between a receipt and either a transaction OR a group.
+        Exactly one of transactionId or transactionGroupId must be provided.
+      tags:
+        - Matching
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateManualMatchRequest'
+      responses:
+        '201':
+          description: Match created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchDetailDto'
+        '400':
+          description: Validation error (e.g., both IDs provided, already matched)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /api/matching/candidates:
+    get:
+      summary: Get match candidates for a receipt (NEW)
+      description: |
+        Returns ranked list of potential matches for a specific receipt.
+        Includes both ungrouped transactions and transaction groups.
+      tags:
+        - Matching
+      parameters:
+        - name: receiptId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: Ranked candidates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MatchCandidateDto'
+        '404':
+          description: Receipt not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+components:
+  schemas:
+    AutoMatchRequest:
+      type: object
+      properties:
+        receiptIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Optional list of specific receipt IDs to match. If empty, matches all unmatched receipts.
+          nullable: true
+
+    AutoMatchResult:
+      type: object
+      properties:
+        processedCount:
+          type: integer
+          description: Number of receipts processed
+        proposedCount:
+          type: integer
+          description: Number of new match proposals created
+        transactionMatchCount:
+          type: integer
+          description: Number of matches to individual transactions
+        groupMatchCount:
+          type: integer
+          description: Number of matches to transaction groups (NEW)
+        ambiguousCount:
+          type: integer
+          description: Number of receipts with ambiguous matches (multiple candidates with similar scores)
+        durationMs:
+          type: integer
+          description: Processing time in milliseconds
+
+    MatchProposalListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchProposalDto'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        hasMore:
+          type: boolean
+
+    MatchProposalDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        receiptId:
+          type: string
+          format: uuid
+        receiptUrl:
+          type: string
+        receiptAmount:
+          type: number
+          format: decimal
+        receiptDate:
+          type: string
+          format: date
+        receiptMerchant:
+          type: string
+          nullable: true
+        candidateType:
+          type: string
+          enum: [transaction, group]
+          description: Type of matched candidate (NEW)
+        transactionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set when candidateType = transaction
+        transactionGroupId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set when candidateType = group (NEW)
+        candidateAmount:
+          type: number
+          format: decimal
+        candidateDate:
+          type: string
+          format: date
+        candidateDisplayName:
+          type: string
+          description: Transaction description or group name
+        transactionCount:
+          type: integer
+          nullable: true
+          description: Number of transactions in group (only for groups) (NEW)
+        confidenceScore:
+          type: number
+          format: decimal
+        amountScore:
+          type: number
+          format: decimal
+        dateScore:
+          type: number
+          format: decimal
+        vendorScore:
+          type: number
+          format: decimal
+        matchReason:
+          type: string
+        status:
+          type: string
+          enum: [Proposed, Confirmed, Rejected]
+        createdAt:
+          type: string
+          format: date-time
+
+    MatchCandidateDto:
+      type: object
+      description: A potential match candidate (transaction or group)
+      properties:
+        id:
+          type: string
+          format: uuid
+        candidateType:
+          type: string
+          enum: [transaction, group]
+        amount:
+          type: number
+          format: decimal
+        date:
+          type: string
+          format: date
+        displayName:
+          type: string
+          description: Transaction description or group name
+        transactionCount:
+          type: integer
+          nullable: true
+          description: Number of transactions (only for groups)
+        confidenceScore:
+          type: number
+          format: decimal
+          description: Calculated match score (0-100)
+        amountScore:
+          type: number
+          format: decimal
+        dateScore:
+          type: number
+          format: decimal
+        vendorScore:
+          type: number
+          format: decimal
+        matchReason:
+          type: string
+          description: Human-readable explanation of the score
+
+    CreateManualMatchRequest:
+      type: object
+      required:
+        - receiptId
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of transaction to match (mutually exclusive with transactionGroupId)
+        transactionGroupId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of transaction group to match (mutually exclusive with transactionId) (NEW)
+      description: |
+        Exactly one of transactionId or transactionGroupId must be provided.
+        Validation error returned if both or neither are specified.
+
+    MatchDetailDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        receiptId:
+          type: string
+          format: uuid
+        candidateType:
+          type: string
+          enum: [transaction, group]
+        transactionId:
+          type: string
+          format: uuid
+          nullable: true
+        transactionGroupId:
+          type: string
+          format: uuid
+          nullable: true
+        confidenceScore:
+          type: number
+          format: decimal
+        status:
+          type: string
+          enum: [Proposed, Confirmed, Rejected]
+        isManualMatch:
+          type: boolean
+        confirmedAt:
+          type: string
+          format: date-time
+          nullable: true
+        matchReason:
+          type: string
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807 Problem Details
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string

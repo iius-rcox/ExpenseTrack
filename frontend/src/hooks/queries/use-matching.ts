@@ -7,10 +7,10 @@ import type {
   MatchingStats,
   AutoMatchResponse,
   ConfirmMatchRequest,
-  ManualMatchRequest,
   MatchReceiptSummary,
   MatchTransactionSummary,
 } from '@/types/api'
+import type { ManualMatchRequest, MatchCandidate } from '@/types/match'
 
 /**
  * Normalizes confidence scores from backend (0-100) to frontend (0-1) scale.
@@ -65,6 +65,7 @@ export const matchingKeys = {
   stats: () => [...matchingKeys.all, 'stats'] as const,
   unmatchedReceipts: () => [...matchingKeys.all, 'unmatched-receipts'] as const,
   unmatchedTransactions: () => [...matchingKeys.all, 'unmatched-transactions'] as const,
+  candidates: (receiptId: string) => [...matchingKeys.all, 'candidates', receiptId] as const,
 }
 
 interface ProposalListParams {
@@ -131,6 +132,37 @@ export function useUnmatchedTransactions() {
       return response.items
     },
     staleTime: 60_000,
+  })
+}
+
+/**
+ * Normalizes candidate scores from backend (0-100) to frontend (0-1) scale.
+ */
+function normalizeCandidate(candidate: MatchCandidate): MatchCandidate {
+  return {
+    ...candidate,
+    confidenceScore: candidate.confidenceScore / 100,
+    amountScore: candidate.amountScore / 100,
+    dateScore: candidate.dateScore / 100,
+    vendorScore: candidate.vendorScore / 100,
+  }
+}
+
+/**
+ * Fetches ranked match candidates for a specific receipt.
+ * Returns both ungrouped transactions and transaction groups as potential matches.
+ */
+export function useMatchCandidates(receiptId: string, limit: number = 10) {
+  return useQuery({
+    queryKey: matchingKeys.candidates(receiptId),
+    queryFn: async () => {
+      const response = await apiFetch<MatchCandidate[]>(
+        `/matching/candidates/${receiptId}?limit=${limit}`
+      )
+      return response.map(normalizeCandidate)
+    },
+    enabled: !!receiptId,
+    staleTime: 30_000,
   })
 }
 

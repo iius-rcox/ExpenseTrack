@@ -55,9 +55,9 @@ public class DashboardController : ApiControllerBase
                        (r.Status == ReceiptStatus.Uploaded || r.Status == ReceiptStatus.Processing))
             .CountAsync();
 
-        // Unmatched transactions = no matched receipt
+        // Unmatched transactions = no matched receipt AND not part of a group (groups are matched separately)
         var unmatchedTransactionsCount = await _dbContext.Transactions
-            .Where(t => t.UserId == user.Id && t.MatchedReceiptId == null)
+            .Where(t => t.UserId == user.Id && t.MatchedReceiptId == null && t.GroupId == null)
             .CountAsync();
 
         // Pending matches = Proposed status
