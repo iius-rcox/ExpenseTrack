@@ -226,23 +226,13 @@ function buildSearchString(
     searchParams.set('maxAmount', String(filters.amountRange.max))
   }
 
-  // Array params
+  // Array params - backend accepts these as multiple query params with same name
   filters.categories.forEach((cat) => searchParams.append('categories', cat))
   filters.tags.forEach((tag) => searchParams.append('tags', tag))
 
-  // Convert matchStatus array to backend's 'matched' boolean parameter
-  // Backend expects: matched=true (has receipt) or matched=false (no receipt)
-  // Frontend sends: matchStatus=['matched'] or ['unmatched'] or ['matched', 'unmatched']
-  if (filters.matchStatus.length === 1) {
-    // Single selection - convert to boolean
-    if (filters.matchStatus[0] === 'matched') {
-      searchParams.set('matched', 'true')
-    } else if (filters.matchStatus[0] === 'unmatched') {
-      searchParams.set('matched', 'false')
-    }
-    // 'pending' status not currently supported by backend
-  }
-  // If both selected or none selected, don't filter (show all)
+  // matchStatus - backend accepts: matched, pending, unmatched (case-insensitive)
+  // Sends as: ?matchStatus=matched&matchStatus=unmatched for multiple
+  filters.matchStatus.forEach((status) => searchParams.append('matchStatus', status))
 
   // Predictions filter (Feature 023)
   if (filters.hasPendingPrediction) {
