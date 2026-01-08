@@ -81,6 +81,17 @@ public class MatchingController : ApiControllerBase
         var user = await _userService.GetOrCreateUserAsync(User);
         var (items, totalCount) = await _matchingService.GetProposalsAsync(user.Id, page, pageSize);
 
+        // Debug: Log TransactionGroup presence for each match
+        foreach (var match in items)
+        {
+            _logger.LogInformation(
+                "Match {MatchId}: TransactionGroupId={GroupId}, TransactionGroup={HasGroup}, Transaction={HasTxn}",
+                match.Id,
+                match.TransactionGroupId,
+                match.TransactionGroup != null ? $"Name={match.TransactionGroup.Name}" : "null",
+                match.Transaction != null ? $"Desc={match.Transaction.Description}" : "null");
+        }
+
         var response = new ProposalListResponseDto
         {
             Items = items.Select(MapToProposalDto).ToList(),
