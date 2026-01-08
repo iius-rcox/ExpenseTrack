@@ -13,6 +13,7 @@ public class TransactionsController : ApiControllerBase
 {
     private readonly ITransactionRepository _transactionRepository;
     private readonly IStatementImportRepository _importRepository;
+    private readonly IExpensePatternRepository _patternRepository;
     private readonly IExpensePredictionService _predictionService;
     private readonly IUserService _userService;
     private readonly ILogger<TransactionsController> _logger;
@@ -20,12 +21,14 @@ public class TransactionsController : ApiControllerBase
     public TransactionsController(
         ITransactionRepository transactionRepository,
         IStatementImportRepository importRepository,
+        IExpensePatternRepository patternRepository,
         IExpensePredictionService predictionService,
         IUserService userService,
         ILogger<TransactionsController> logger)
     {
         _transactionRepository = transactionRepository;
         _importRepository = importRepository;
+        _patternRepository = patternRepository;
         _predictionService = predictionService;
         _userService = userService;
         _logger = logger;
@@ -38,10 +41,10 @@ public class TransactionsController : ApiControllerBase
     /// <param name="pageSize">Page size (default 50, max 200).</param>
     /// <param name="startDate">Optional start date filter.</param>
     /// <param name="endDate">Optional end date filter.</param>
-    /// <param name="matched">Optional filter by receipt match status.</param>
+    /// <param name="matchStatus">Optional filter by match status (matched, pending, unmatched). Supports multiple values.</param>
     /// <param name="importId">Optional filter by specific import batch.</param>
     /// <param name="search">Optional text search on description (case-insensitive).</param>
-    /// <param name="sortBy">Field to sort by: date (default), amount, description.</param>
+    /// <param name="sortBy">Field to sort by: date (default), amount, description, merchant.</param>
     /// <param name="sortOrder">Sort direction: desc (default) or asc.</param>
     /// <param name="minAmount">Optional minimum amount filter.</param>
     /// <param name="maxAmount">Optional maximum amount filter.</param>
@@ -54,7 +57,7 @@ public class TransactionsController : ApiControllerBase
         [FromQuery] int pageSize = 50,
         [FromQuery] DateOnly? startDate = null,
         [FromQuery] DateOnly? endDate = null,
-        [FromQuery] bool? matched = null,
+        [FromQuery] List<string>? matchStatus = null,
         [FromQuery] Guid? importId = null,
         [FromQuery] string? search = null,
         [FromQuery] string? sortBy = null,
@@ -76,7 +79,7 @@ public class TransactionsController : ApiControllerBase
             pageSize,
             startDate,
             endDate,
-            matched,
+            matchStatus,
             importId,
             search,
             sortBy,
@@ -107,6 +110,159 @@ public class TransactionsController : ApiControllerBase
         };
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Gets available categories for transaction filtering.
+    /// Returns distinct categories from user's expense patterns,
+    /// merged with default categories for comprehensive filtering.
+    /// </summary>
+    /// <returns>List of categories with id and name.</returns>
+    [HttpGet("categories")]
+    [ProducesResponseType(typeof(TransactionCategoriesResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<TransactionCategoriesResponse>> GetCategories()
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        // Get user's custom categories from expense patterns
+        var userCategories = await _patternRepository.GetDistinctCategoriesAsync(user.Id);
+
+        // Default categories (always available for filtering)
+        var defaultCategories = new List<string>
+        {
+            "Food & Dining",
+            "Transportation",
+            "Utilities",
+            "Entertainment",
+            "Shopping",
+            "Travel",
+            "Health & Medical",
+            "Business",
+            "Other"
+        };
+
+        // Merge and deduplicate (user categories first, then defaults)
+        var allCategories = userCategories
+            .Union(defaultCategories, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(c => c)
+            .Select(c => new CategoryDto
+            {
+                Id = c.ToLowerInvariant().Replace(" & ", "-").Replace(" ", "-"),
+                Name = c
+            })
+            .ToList();
+
+        return Ok(new TransactionCategoriesResponse { Categories = allCategories });
+    }
+
+    /// <summary>
+    /// Gets smart filter suggestions based on the user's transaction data.
+    /// Analyzes transaction patterns to suggest relevant filters like
+    /// top merchants, date ranges, and amount brackets.
+    /// </summary>
+    /// <returns>List of filter suggestions with relevance scores.</returns>
+    [HttpGet("filter-suggestions")]
+    [ProducesResponseType(typeof(FilterSuggestionsResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<FilterSuggestionsResponse>> GetFilterSuggestions()
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        var stats = await _transactionRepository.GetFilterSuggestionsDataAsync(user.Id);
+
+        var suggestions = new List<FilterSuggestionDto>();
+
+        // Suggest top merchants (only those with multiple transactions)
+        foreach (var merchant in stats.TopMerchants.Where(m => m.TransactionCount >= 2).Take(5))
+        {
+            suggestions.Add(new FilterSuggestionDto
+            {
+                Type = "merchant",
+                Label = merchant.Merchant.Length > 30
+                    ? merchant.Merchant[..27] + "..."
+                    : merchant.Merchant,
+                Description = $"{merchant.TransactionCount} transactions, ${merchant.TotalAmount:N2} total",
+                FilterValue = merchant.Merchant,
+                TransactionCount = merchant.TransactionCount,
+                RelevanceScore = Math.Min(100, merchant.TransactionCount * 10)
+            });
+        }
+
+        // Suggest unmatched filter if there are unmatched transactions
+        if (stats.MatchStats.UnmatchedCount > 0)
+        {
+            var unmatchedPct = (double)stats.MatchStats.UnmatchedCount / stats.TotalTransactions * 100;
+            suggestions.Add(new FilterSuggestionDto
+            {
+                Type = "match_status",
+                Label = "Unmatched Transactions",
+                Description = $"{stats.MatchStats.UnmatchedCount} transactions need receipts ({unmatchedPct:N0}%)",
+                FilterValue = new[] { "unmatched" },
+                TransactionCount = stats.MatchStats.UnmatchedCount,
+                RelevanceScore = Math.Min(100, (int)(unmatchedPct * 1.5))
+            });
+        }
+
+        // Suggest pending matches if any
+        if (stats.MatchStats.PendingCount > 0)
+        {
+            suggestions.Add(new FilterSuggestionDto
+            {
+                Type = "match_status",
+                Label = "Pending Review",
+                Description = $"{stats.MatchStats.PendingCount} proposed matches awaiting approval",
+                FilterValue = new[] { "pending" },
+                TransactionCount = stats.MatchStats.PendingCount,
+                RelevanceScore = 80 // High relevance - actionable items
+            });
+        }
+
+        // Suggest high-value filter if there are significant high-value transactions
+        if (stats.AmountStats.HighValueCount >= 5)
+        {
+            suggestions.Add(new FilterSuggestionDto
+            {
+                Type = "amount_range",
+                Label = "High Value ($100+)",
+                Description = $"{stats.AmountStats.HighValueCount} transactions of $100 or more",
+                FilterValue = new { min = 100, max = (decimal?)null },
+                TransactionCount = stats.AmountStats.HighValueCount,
+                RelevanceScore = 60
+            });
+        }
+
+        // Suggest date range filters
+        foreach (var period in stats.RecentPeriods.Take(3))
+        {
+            // Only add if period has meaningful activity
+            var activityPct = (double)period.TransactionCount / stats.TotalTransactions * 100;
+            if (activityPct >= 5)
+            {
+                suggestions.Add(new FilterSuggestionDto
+                {
+                    Type = "date_range",
+                    Label = period.PeriodName,
+                    Description = $"{period.TransactionCount} transactions ({activityPct:N0}% of total)",
+                    FilterValue = new
+                    {
+                        startDate = period.StartDate.ToString("yyyy-MM-dd"),
+                        endDate = period.EndDate.ToString("yyyy-MM-dd")
+                    },
+                    TransactionCount = period.TransactionCount,
+                    RelevanceScore = Math.Min(90, (int)(activityPct * 2))
+                });
+            }
+        }
+
+        // Sort by relevance score descending
+        suggestions = suggestions.OrderByDescending(s => s.RelevanceScore).ToList();
+
+        return Ok(new FilterSuggestionsResponse
+        {
+            Suggestions = suggestions,
+            TotalTransactions = stats.TotalTransactions,
+            EarliestDate = stats.EarliestDate,
+            LatestDate = stats.LatestDate
+        });
     }
 
     /// <summary>

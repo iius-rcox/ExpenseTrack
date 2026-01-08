@@ -23,10 +23,10 @@ public interface ITransactionRepository
     /// <param name="pageSize">Page size.</param>
     /// <param name="startDate">Optional start date filter.</param>
     /// <param name="endDate">Optional end date filter.</param>
-    /// <param name="matched">Optional matched receipt filter.</param>
+    /// <param name="matchStatus">Optional match status filter (supports: matched, pending, unmatched).</param>
     /// <param name="importId">Optional import batch filter.</param>
     /// <param name="search">Optional text search on description (case-insensitive).</param>
-    /// <param name="sortBy">Field to sort by (date, amount, description). Defaults to date.</param>
+    /// <param name="sortBy">Field to sort by (date, amount, description, merchant). Defaults to date.</param>
     /// <param name="sortOrder">Sort direction (asc or desc). Defaults to desc.</param>
     /// <param name="minAmount">Optional minimum amount filter.</param>
     /// <param name="maxAmount">Optional maximum amount filter.</param>
@@ -38,7 +38,7 @@ public interface ITransactionRepository
         int pageSize,
         DateOnly? startDate = null,
         DateOnly? endDate = null,
-        bool? matched = null,
+        List<string>? matchStatus = null,
         Guid? importId = null,
         string? search = null,
         string? sortBy = null,
@@ -81,4 +81,96 @@ public interface ITransactionRepository
     /// <param name="endDate">End of the period (inclusive)</param>
     /// <returns>List of unmatched transactions</returns>
     Task<List<Transaction>> GetUnmatchedByPeriodAsync(Guid userId, DateOnly startDate, DateOnly endDate);
+
+    /// <summary>
+    /// Gets transaction statistics for filter suggestions.
+    /// Analyzes transaction data to provide intelligent filter suggestions.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security.</param>
+    /// <returns>Statistics object containing filter suggestion data.</returns>
+    Task<TransactionStatistics> GetFilterSuggestionsDataAsync(Guid userId);
+}
+
+/// <summary>
+/// Transaction statistics for generating filter suggestions.
+/// </summary>
+public class TransactionStatistics
+{
+    /// <summary>
+    /// Total number of transactions for the user.
+    /// </summary>
+    public int TotalTransactions { get; set; }
+
+    /// <summary>
+    /// Earliest transaction date.
+    /// </summary>
+    public DateOnly? EarliestDate { get; set; }
+
+    /// <summary>
+    /// Most recent transaction date.
+    /// </summary>
+    public DateOnly? LatestDate { get; set; }
+
+    /// <summary>
+    /// Top merchants by transaction count.
+    /// </summary>
+    public List<MerchantStats> TopMerchants { get; set; } = new();
+
+    /// <summary>
+    /// Match status breakdown.
+    /// </summary>
+    public MatchStatusStats MatchStats { get; set; } = new();
+
+    /// <summary>
+    /// Amount distribution statistics.
+    /// </summary>
+    public AmountStats AmountStats { get; set; } = new();
+
+    /// <summary>
+    /// Recent activity periods.
+    /// </summary>
+    public List<DateRangeStats> RecentPeriods { get; set; } = new();
+}
+
+/// <summary>
+/// Statistics for a merchant.
+/// </summary>
+public class MerchantStats
+{
+    public string Merchant { get; set; } = string.Empty;
+    public int TransactionCount { get; set; }
+    public decimal TotalAmount { get; set; }
+}
+
+/// <summary>
+/// Match status distribution.
+/// </summary>
+public class MatchStatusStats
+{
+    public int MatchedCount { get; set; }
+    public int PendingCount { get; set; }
+    public int UnmatchedCount { get; set; }
+}
+
+/// <summary>
+/// Amount distribution statistics.
+/// </summary>
+public class AmountStats
+{
+    public decimal MinAmount { get; set; }
+    public decimal MaxAmount { get; set; }
+    public decimal AverageAmount { get; set; }
+    public int HighValueCount { get; set; } // $100+
+    public int LowValueCount { get; set; } // <$25
+}
+
+/// <summary>
+/// Statistics for a date range period.
+/// </summary>
+public class DateRangeStats
+{
+    public string PeriodName { get; set; } = string.Empty;
+    public DateOnly StartDate { get; set; }
+    public DateOnly EndDate { get; set; }
+    public int TransactionCount { get; set; }
 }

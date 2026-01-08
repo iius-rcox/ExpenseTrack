@@ -75,14 +75,26 @@ import type {
   PatternSelectionState,
 } from '@/types/prediction'
 
-// Search params schema for URL state
+// Search params schema for URL state - supports all filter types
 const transactionSearchSchema = z.object({
+  // View and pagination
   view: z.enum(['transactions', 'patterns']).optional().default('transactions'),
   page: z.coerce.number().optional().default(1),
   pageSize: z.coerce.number().optional().default(50),
+  // Text search
   search: z.string().optional(),
+  // Date range
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  // Amount range
+  minAmount: z.coerce.number().optional(),
+  maxAmount: z.coerce.number().optional(),
+  // Multi-select filters (comma-separated in URL)
+  matchStatus: z.string().optional(), // comma-separated: matched,pending,unmatched
+  categories: z.string().optional(),  // comma-separated category IDs
+  // Boolean filters
+  hasPendingPrediction: z.coerce.boolean().optional(),
+  // Sort
   sortBy: z.enum(['date', 'amount', 'merchant', 'category']).optional().default('date'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 })
@@ -142,15 +154,26 @@ function TransactionsPage() {
 
   const navigate = Route.useNavigate()
 
-  // Filter state (local, not persisted in URL for simplicity)
-  const [filters, setFilters] = useState<TransactionFilters>({
+  // Parse comma-separated URL params to arrays
+  const parseCommaSeparated = (value: string | undefined): string[] =>
+    value ? value.split(',').filter(Boolean) : []
+
+  // Initialize filters from URL params (fully persisted)
+  const [filters, setFilters] = useState<TransactionFilters>(() => ({
     ...DEFAULT_TRANSACTION_FILTERS,
     search: typeof search.search === 'string' ? search.search : '',
     dateRange: {
       start: search.startDate ? new Date(search.startDate) : null,
       end: search.endDate ? new Date(search.endDate) : null,
     },
-  })
+    amountRange: {
+      min: typeof search.minAmount === 'number' ? search.minAmount : null,
+      max: typeof search.maxAmount === 'number' ? search.maxAmount : null,
+    },
+    matchStatus: parseCommaSeparated(search.matchStatus) as ('matched' | 'pending' | 'unmatched' | 'manual')[],
+    categories: parseCommaSeparated(search.categories),
+    hasPendingPrediction: search.hasPendingPrediction ?? false,
+  }))
 
   // Sort state - use defensive safe values
   const [sort, setSort] = useState<TransactionSortConfig>({
@@ -207,6 +230,7 @@ function TransactionsPage() {
   )
 
   // Data fetching - use mixed list to include both transactions and groups
+  // All filter params are now passed for comprehensive server-side filtering
   const {
     data: mixedListData,
     isLoading,
@@ -214,10 +238,21 @@ function TransactionsPage() {
   } = useMixedTransactionList({
     page: search.page,
     pageSize: search.pageSize,
+    // Date range
     startDate: filters.dateRange.start?.toISOString().split('T')[0],
     endDate: filters.dateRange.end?.toISOString().split('T')[0],
+    // Text search
     search: filters.search || undefined,
-    sortBy: sort.field === 'date' || sort.field === 'amount' ? sort.field : 'date',
+    // Amount range
+    minAmount: filters.amountRange.min ?? undefined,
+    maxAmount: filters.amountRange.max ?? undefined,
+    // Multi-select filters
+    matchStatus: filters.matchStatus.length > 0 ? filters.matchStatus : undefined,
+    categories: filters.categories.length > 0 ? filters.categories : undefined,
+    // Boolean filters
+    hasPendingPrediction: filters.hasPendingPrediction || undefined,
+    // Sort
+    sortBy: sort.field,
     sortOrder: sort.direction,
   })
 
@@ -301,36 +336,57 @@ function TransactionsPage() {
   )
   const { canGroup } = useCanGroupTransactions(selectedTransactionIds)
 
-  // Handle filter changes
+  // Handle filter changes - sync all filters to URL for persistence
   const handleFilterChange = useCallback(
     (newFilters: TransactionFilters) => {
       setFilters(newFilters)
-      // Sync search to URL
+      // Sync all filter params to URL (enables bookmarking and sharing)
       navigate({
         search: {
           ...search,
+          // Text search
           search: newFilters.search || undefined,
+          // Date range
           startDate: newFilters.dateRange.start?.toISOString().split('T')[0] || undefined,
           endDate: newFilters.dateRange.end?.toISOString().split('T')[0] || undefined,
-          page: 1, // Reset to first page on filter change
+          // Amount range
+          minAmount: newFilters.amountRange.min ?? undefined,
+          maxAmount: newFilters.amountRange.max ?? undefined,
+          // Multi-select filters (comma-separated)
+          matchStatus: newFilters.matchStatus.length > 0 ? newFilters.matchStatus.join(',') : undefined,
+          categories: newFilters.categories.length > 0 ? newFilters.categories.join(',') : undefined,
+          // Boolean filters
+          hasPendingPrediction: newFilters.hasPendingPrediction || undefined,
+          // Reset pagination on filter change
+          page: 1,
         },
       })
     },
     [search, navigate]
   )
 
-  // Handle filter reset
+  // Handle filter reset - clears all filter params from URL
   const handleFilterReset = useCallback(() => {
     setFilters(DEFAULT_TRANSACTION_FILTERS)
     navigate({
       search: {
+        view: search.view,
         page: 1,
         pageSize: search.pageSize,
         sortBy: search.sortBy,
         sortOrder: search.sortOrder,
+        // Explicitly clear all filter params
+        search: undefined,
+        startDate: undefined,
+        endDate: undefined,
+        minAmount: undefined,
+        maxAmount: undefined,
+        matchStatus: undefined,
+        categories: undefined,
+        hasPendingPrediction: undefined,
       },
     })
-  }, [search.pageSize, search.sortBy, search.sortOrder, navigate])
+  }, [search.view, search.pageSize, search.sortBy, search.sortOrder, navigate])
 
   // Handle sort changes
   const handleSortChange = useCallback(
