@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using ExpenseFlow.Core.Interfaces;
+using ExpenseFlow.Infrastructure.Services;
 using ExpenseFlow.Shared.DTOs;
 using Hangfire;
 using Microsoft.Extensions.Configuration;

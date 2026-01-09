@@ -76,4 +76,20 @@ public interface IReceiptRepository
     /// Gets count of receipts by status for a user.
     /// </summary>
     Task<Dictionary<ReceiptStatus, int>> GetStatusCountsAsync(Guid userId);
+
+    /// <summary>
+    /// Gets the count of receipts without thumbnails, optionally filtered by content types.
+    /// Used for thumbnail backfill progress estimation.
+    /// </summary>
+    /// <param name="contentTypes">Optional list of content types to filter (e.g., "image/jpeg", "application/pdf")</param>
+    /// <returns>Count of receipts without thumbnails</returns>
+    Task<int> GetReceiptsWithoutThumbnailsCountAsync(List<string>? contentTypes = null);
+
+    /// <summary>
+    /// Gets a batch of receipts that don't have thumbnails, for backfill processing.
+    /// </summary>
+    /// <param name="batchSize">Maximum number of receipts to return</param>
+    /// <param name="contentTypes">Optional list of content types to filter</param>
+    /// <returns>List of receipts needing thumbnail generation</returns>
+    Task<List<Receipt>> GetReceiptsWithoutThumbnailsAsync(int batchSize, List<string>? contentTypes = null);
 }

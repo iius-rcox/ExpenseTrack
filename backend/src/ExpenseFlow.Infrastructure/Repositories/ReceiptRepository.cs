@@ -153,4 +153,33 @@ public class ReceiptRepository : IReceiptRepository
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Status, x => x.Count);
     }
+
+    public async Task<int> GetReceiptsWithoutThumbnailsCountAsync(List<string>? contentTypes = null)
+    {
+        var query = _context.Receipts
+            .Where(r => r.ThumbnailUrl == null && r.BlobUrl != null);
+
+        if (contentTypes != null && contentTypes.Count > 0)
+        {
+            query = query.Where(r => contentTypes.Contains(r.ContentType));
+        }
+
+        return await query.CountAsync();
+    }
+
+    public async Task<List<Receipt>> GetReceiptsWithoutThumbnailsAsync(int batchSize, List<string>? contentTypes = null)
+    {
+        var query = _context.Receipts
+            .Where(r => r.ThumbnailUrl == null && r.BlobUrl != null);
+
+        if (contentTypes != null && contentTypes.Count > 0)
+        {
+            query = query.Where(r => contentTypes.Contains(r.ContentType));
+        }
+
+        return await query
+            .OrderBy(r => r.CreatedAt)
+            .Take(batchSize)
+            .ToListAsync();
+    }
 }
