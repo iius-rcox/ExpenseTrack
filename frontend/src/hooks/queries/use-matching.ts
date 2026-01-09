@@ -258,6 +258,29 @@ export function useRejectMatch() {
   })
 }
 
+/**
+ * Unmatch a previously confirmed match, returning both entities to unmatched state.
+ * The match record is preserved with status Unmatched for audit trail.
+ */
+export function useUnmatch() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (matchId: string) => {
+      return apiFetch<MatchDetail>(`/matching/${matchId}/unmatch`, {
+        method: 'POST',
+      })
+    },
+    onSuccess: () => {
+      // Invalidate all matching-related queries
+      queryClient.invalidateQueries({ queryKey: matchingKeys.all })
+      // Also invalidate transactions since their match status changed
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['receipts'] })
+    },
+  })
+}
+
 export function useManualMatch() {
   const queryClient = useQueryClient()
 

@@ -45,6 +45,15 @@ public interface IMatchingService
     Task<ReceiptTransactionMatch> RejectMatchAsync(Guid matchId, Guid userId);
 
     /// <summary>
+    /// Unmatches a previously confirmed match, returning both receipt and transaction to unmatched state.
+    /// Preserves the match record with Unmatched status for audit trail.
+    /// </summary>
+    /// <param name="matchId">Match record ID</param>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <returns>Updated match record</returns>
+    Task<ReceiptTransactionMatch> UnmatchAsync(Guid matchId, Guid userId);
+
+    /// <summary>
     /// Gets a single match by ID.
     /// </summary>
     /// <param name="matchId">Match record ID</param>

@@ -215,6 +215,56 @@ public class MatchingController : ApiControllerBase
     }
 
     /// <summary>
+    /// Unmatch a previously confirmed match, returning both receipt and transaction to unmatched state.
+    /// </summary>
+    /// <remarks>
+    /// This reverses a confirmed match. The match record is preserved with status Unmatched for audit trail.
+    /// Both the receipt and transaction/group will have their match status reset to Unmatched.
+    /// </remarks>
+    /// <param name="matchId">Match record ID</param>
+    /// <returns>Updated match details</returns>
+    [HttpPost("{matchId:guid}/unmatch")]
+    [ProducesResponseType(typeof(MatchDetailResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<MatchDetailResponseDto>> UnmatchMatch(Guid matchId)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        try
+        {
+            var match = await _matchingService.UnmatchAsync(matchId, user.Id);
+            return Ok(MapToDetailDto(match));
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Invalid Operation",
+                Detail = ex.Message
+            });
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new ProblemDetailsResponse
+            {
+                Title = "Conflict",
+                Detail = "This match was modified by another user. Please refresh and try again."
+            });
+        }
+    }
+
+    /// <summary>
     /// Manually match a receipt to a transaction or transaction group.
     /// </summary>
     /// <remarks>

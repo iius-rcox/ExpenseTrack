@@ -1056,6 +1056,65 @@ public partial class MatchingService : IMatchingService
     }
 
     /// <inheritdoc />
+    public async Task<ReceiptTransactionMatch> UnmatchAsync(Guid matchId, Guid userId)
+    {
+        var match = await _matchRepository.GetByIdAsync(matchId, userId)
+            ?? throw new InvalidOperationException("Match not found");
+
+        if (match.Status != MatchProposalStatus.Confirmed)
+        {
+            throw new InvalidOperationException("Can only unmatch confirmed matches");
+        }
+
+        // Update match status to Unmatched (preserves audit trail)
+        match.Status = MatchProposalStatus.Unmatched;
+        match.ConfirmedAt = DateTime.UtcNow;
+        match.ConfirmedByUserId = userId;
+
+        // Reset receipt status and clear transaction link
+        var receipt = await _context.Receipts.FindAsync(match.ReceiptId);
+        if (receipt != null)
+        {
+            receipt.MatchStatus = MatchStatus.Unmatched;
+            receipt.MatchedTransactionId = null;
+            _context.Entry(receipt).State = EntityState.Modified;
+        }
+
+        // Handle group matches vs transaction matches
+        if (match.TransactionGroupId.HasValue)
+        {
+            // Group match - reset group status
+            var group = await _context.TransactionGroups.FindAsync(match.TransactionGroupId.Value);
+            if (group != null)
+            {
+                group.MatchStatus = MatchStatus.Unmatched;
+                group.MatchedReceiptId = null;
+                _context.Entry(group).State = EntityState.Modified;
+                _logger.LogDebug("Reset group {GroupId} status to Unmatched on unmatch", group.Id);
+            }
+        }
+        else if (match.TransactionId.HasValue)
+        {
+            // Transaction match - reset transaction status
+            var transaction = await _context.Transactions.FindAsync(match.TransactionId.Value);
+            if (transaction != null)
+            {
+                transaction.MatchStatus = MatchStatus.Unmatched;
+                transaction.MatchedReceiptId = null;
+                _context.Entry(transaction).State = EntityState.Modified;
+                _logger.LogDebug("Reset transaction {TransactionId} status to Unmatched on unmatch", transaction.Id);
+            }
+        }
+
+        // UpdateAsync already calls SaveChangesAsync, which saves all tracked changes
+        await _matchRepository.UpdateAsync(match);
+
+        _logger.LogInformation("Match {MatchId} unmatched by user {UserId}", matchId, userId);
+
+        return match;
+    }
+
+    /// <inheritdoc />
     public async Task<ReceiptTransactionMatch> CreateManualMatchAsync(Guid userId, Guid receiptId, Guid transactionId, string? vendorDisplayName = null, string? defaultGLCode = null, string? defaultDepartment = null)
     {
         // Validate receipt exists and is unmatched

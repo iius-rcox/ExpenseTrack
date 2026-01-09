@@ -14,15 +14,28 @@ function safeDisplayString(value: unknown, fallback = ''): string {
   return String(value);
 }
 
+import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useTransactionDetail } from '@/hooks/queries/use-transactions'
+import { useUnmatch } from '@/hooks/queries/use-matching'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
+import { toast } from 'sonner'
 import {
   ArrowLeft,
   AlertCircle,
@@ -35,6 +48,8 @@ import {
   ExternalLink,
   Check,
   X,
+  Link2Off,
+  Loader2,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/transactions/$transactionId')({
@@ -48,6 +63,25 @@ function TransactionDetailPage() {
   const params = Route.useParams()
   const transactionId = params.transactionId
   const { data: transaction, isLoading, error } = useTransactionDetail(transactionId)
+  const unmatchMutation = useUnmatch()
+  const [showUnmatchDialog, setShowUnmatchDialog] = useState(false)
+
+  const handleUnmatch = () => {
+    if (!transaction?.matchedReceipt?.matchId) {
+      toast.error('No match found to unmatch')
+      return
+    }
+
+    unmatchMutation.mutate(transaction.matchedReceipt.matchId, {
+      onSuccess: () => {
+        toast.success('Receipt unmatched successfully')
+        setShowUnmatchDialog(false)
+      },
+      onError: (error) => {
+        toast.error(error.message || 'Failed to unmatch receipt')
+      },
+    })
+  }
 
   if (isLoading) {
     return <TransactionDetailSkeleton />
@@ -235,12 +269,26 @@ function TransactionDetailPage() {
                     </Badge>
                   </div>
                 </div>
-                <Button variant="outline" asChild>
-                  <Link to="/receipts/$receiptId" params={{ receiptId: transaction.matchedReceipt.id }}>
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    View Receipt
-                  </Link>
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" asChild>
+                    <Link to="/receipts/$receiptId" params={{ receiptId: transaction.matchedReceipt.id }}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      View Receipt
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowUnmatchDialog(true)}
+                    disabled={unmatchMutation.isPending}
+                  >
+                    {unmatchMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Link2Off className="mr-2 h-4 w-4" />
+                    )}
+                    Unmatch
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -265,6 +313,37 @@ function TransactionDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Unmatch Confirmation Dialog */}
+      <AlertDialog open={showUnmatchDialog} onOpenChange={setShowUnmatchDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unmatch Receipt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the link between this transaction and its matched receipt.
+              Both the transaction and receipt will return to unmatched status and can be
+              matched again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={unmatchMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnmatch}
+              disabled={unmatchMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {unmatchMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Unmatching...
+                </>
+              ) : (
+                'Unmatch'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -73,5 +73,8 @@ public enum MatchProposalStatus : short
     Confirmed = 1,
 
     /// <summary>User rejected the match</summary>
-    Rejected = 2
+    Rejected = 2,
+
+    /// <summary>User unmatched a previously confirmed match</summary>
+    Unmatched = 3
 }
