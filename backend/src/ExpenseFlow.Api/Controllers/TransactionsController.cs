@@ -15,6 +15,8 @@ public class TransactionsController : ApiControllerBase
     private readonly IStatementImportRepository _importRepository;
     private readonly IExpensePatternRepository _patternRepository;
     private readonly IExpensePredictionService _predictionService;
+    private readonly IMatchRepository _matchRepository;
+    private readonly IReceiptRepository _receiptRepository;
     private readonly IUserService _userService;
     private readonly ILogger<TransactionsController> _logger;
 
@@ -23,6 +25,8 @@ public class TransactionsController : ApiControllerBase
         IStatementImportRepository importRepository,
         IExpensePatternRepository patternRepository,
         IExpensePredictionService predictionService,
+        IMatchRepository matchRepository,
+        IReceiptRepository receiptRepository,
         IUserService userService,
         ILogger<TransactionsController> logger)
     {
@@ -30,6 +34,8 @@ public class TransactionsController : ApiControllerBase
         _importRepository = importRepository;
         _patternRepository = patternRepository;
         _predictionService = predictionService;
+        _matchRepository = matchRepository;
+        _receiptRepository = receiptRepository;
         _userService = userService;
         _logger = logger;
     }
@@ -295,6 +301,29 @@ public class TransactionsController : ApiControllerBase
             importFileName = import?.FileName ?? string.Empty;
         }
 
+        // Get matched receipt info if available
+        MatchedReceiptInfoDto? matchedReceiptInfo = null;
+        if (transaction.MatchedReceiptId.HasValue)
+        {
+            var receipt = await _receiptRepository.GetByIdAsync(user.Id, transaction.MatchedReceiptId.Value);
+            if (receipt != null)
+            {
+                // Find the confirmed match record to get the matchId
+                var match = await _matchRepository.GetByTransactionIdAsync(transaction.Id, user.Id);
+
+                matchedReceiptInfo = new MatchedReceiptInfoDto
+                {
+                    MatchId = match?.Id ?? Guid.Empty,
+                    Id = receipt.Id,
+                    Vendor = receipt.Vendor,
+                    Date = receipt.Date,
+                    Amount = receipt.Amount,
+                    ThumbnailUrl = receipt.ThumbnailUrl,
+                    MatchConfidence = match?.ConfidenceScore ?? 0m
+                };
+            }
+        }
+
         var response = new TransactionDetailDto
         {
             Id = transaction.Id,
@@ -306,7 +335,8 @@ public class TransactionsController : ApiControllerBase
             MatchedReceiptId = transaction.MatchedReceiptId,
             ImportId = transaction.ImportId,
             ImportFileName = importFileName,
-            CreatedAt = transaction.CreatedAt
+            CreatedAt = transaction.CreatedAt,
+            MatchedReceipt = matchedReceiptInfo
         };
 
         return Ok(response);

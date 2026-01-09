@@ -95,6 +95,7 @@ export interface TransactionDetail extends TransactionSummary {
 }
 
 export interface MatchedReceiptInfo {
+  matchId: string
   id: string
   vendor: string | null
   date: string | null

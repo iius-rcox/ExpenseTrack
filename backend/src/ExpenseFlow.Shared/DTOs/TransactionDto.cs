@@ -95,6 +95,57 @@ public class TransactionDetailDto
     /// When the transaction was imported.
     /// </summary>
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// Matched receipt details (null if not matched).
+    /// </summary>
+    public MatchedReceiptInfoDto? MatchedReceipt { get; set; }
+
+    /// <summary>
+    /// Whether this transaction has a matched receipt.
+    /// </summary>
+    public bool HasMatchedReceipt => MatchedReceipt != null;
+}
+
+/// <summary>
+/// Information about a matched receipt.
+/// </summary>
+public class MatchedReceiptInfoDto
+{
+    /// <summary>
+    /// The match record ID (needed for unmatch operations).
+    /// </summary>
+    public Guid MatchId { get; set; }
+
+    /// <summary>
+    /// The receipt ID.
+    /// </summary>
+    public Guid Id { get; set; }
+
+    /// <summary>
+    /// Vendor name extracted from receipt.
+    /// </summary>
+    public string? Vendor { get; set; }
+
+    /// <summary>
+    /// Date extracted from receipt.
+    /// </summary>
+    public DateOnly? Date { get; set; }
+
+    /// <summary>
+    /// Amount extracted from receipt.
+    /// </summary>
+    public decimal? Amount { get; set; }
+
+    /// <summary>
+    /// Thumbnail URL for receipt preview.
+    /// </summary>
+    public string? ThumbnailUrl { get; set; }
+
+    /// <summary>
+    /// Match confidence score (0-1).
+    /// </summary>
+    public decimal MatchConfidence { get; set; }
 }
 
 /// <summary>
