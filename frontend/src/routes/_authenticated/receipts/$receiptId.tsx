@@ -1,8 +1,9 @@
 "use client"
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useReceiptDetail, useDeleteReceipt, useRetryReceipt, useProcessReceipt, useUpdateReceipt, useReceiptHtmlContent } from '@/hooks/queries/use-receipts'
+import { useUnmatch } from '@/hooks/queries/use-matching'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -21,7 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { formatCurrency, formatDateTime, getStatusVariant } from '@/lib/utils'
+import { formatCurrency, formatDate, formatDateTime, getStatusVariant } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   ArrowLeft,
@@ -34,6 +35,8 @@ import {
   Save,
   RotateCcw,
   X,
+  CreditCard,
+  Link2Off,
 } from 'lucide-react'
 import { DocumentViewer } from '@/components/ui/document-viewer'
 import { ExtractedField } from '@/components/receipts/extracted-field'
@@ -63,6 +66,8 @@ function ReceiptDetailPage() {
   const { mutate: retryReceipt, isPending: isRetrying } = useRetryReceipt()
   const { mutate: processReceipt, isPending: isProcessing } = useProcessReceipt()
   const { mutate: updateReceipt, isPending: isSaving } = useUpdateReceipt()
+  const { mutate: unmatchReceipt, isPending: isUnmatching } = useUnmatch()
+  const [showUnmatchDialog, setShowUnmatchDialog] = useState(false)
 
   // Feature 029: Fetch HTML content for HTML receipts
   const isHtmlReceipt = receipt?.contentType === 'text/html'
@@ -249,6 +254,20 @@ function ReceiptDetailPage() {
       },
       onError: (error) => {
         toast.error(`Failed to retry processing: ${error.message}`)
+      },
+    })
+  }
+
+  const handleUnmatch = () => {
+    if (!receipt?.matchedTransaction) return
+
+    unmatchReceipt(receipt.matchedTransaction.matchId, {
+      onSuccess: () => {
+        toast.success('Receipt unmatched successfully')
+        setShowUnmatchDialog(false)
+      },
+      onError: (error) => {
+        toast.error(`Failed to unmatch: ${error.message}`)
       },
     })
   }
@@ -600,6 +619,83 @@ function ReceiptDetailPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Processed</span>
                   <span>{formatDateTime(receipt.processedAt)}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Linked Transaction (Feature 031) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Linked Transaction
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {receipt.matchedTransaction ? (
+                <div className="flex flex-col gap-4">
+                  <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                    <p className="font-medium">{receipt.matchedTransaction.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDate(receipt.matchedTransaction.transactionDate)} •{' '}
+                      {formatCurrency(receipt.matchedTransaction.amount)}
+                    </p>
+                    {receipt.matchedTransaction.merchantName && (
+                      <p className="text-sm text-muted-foreground">
+                        Merchant: {receipt.matchedTransaction.merchantName}
+                      </p>
+                    )}
+                    <Badge variant="outline" className="mt-1">
+                      Confidence: {Math.round(receipt.matchedTransaction.matchConfidence * 100)}%
+                    </Badge>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" asChild>
+                      <Link
+                        to="/transactions/$transactionId"
+                        params={{ transactionId: receipt.matchedTransaction.id }}
+                      >
+                        View Transaction
+                      </Link>
+                    </Button>
+                    <AlertDialog open={showUnmatchDialog} onOpenChange={setShowUnmatchDialog}>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" disabled={isUnmatching}>
+                          {isUnmatching ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Link2Off className="mr-2 h-4 w-4" />
+                          )}
+                          Unmatch
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Unmatch Receipt?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will remove the link between this receipt and the transaction.
+                            Both items will return to unmatched status and can be re-matched later.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleUnmatch} disabled={isUnmatching}>
+                            {isUnmatching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Unmatch
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CreditCard className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No transaction matched yet</p>
+                  <p className="text-xs mt-1">
+                    Go to the Matching page to link this receipt to a transaction
+                  </p>
                 </div>
               )}
             </CardContent>

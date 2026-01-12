@@ -18,6 +18,7 @@ public class ReceiptsController : ApiControllerBase
     private readonly IUserService _userService;
     private readonly IBlobStorageService _blobStorageService;
     private readonly IHtmlSanitizationService _htmlSanitizationService;
+    private readonly IMatchRepository _matchRepository;
     private readonly ILogger<ReceiptsController> _logger;
     private readonly int _maxBatchSize;
     private readonly int _maxFileSizeBytes;
@@ -28,6 +29,7 @@ public class ReceiptsController : ApiControllerBase
         IUserService userService,
         IBlobStorageService blobStorageService,
         IHtmlSanitizationService htmlSanitizationService,
+        IMatchRepository matchRepository,
         IConfiguration configuration,
         ILogger<ReceiptsController> logger)
     {
@@ -35,6 +37,7 @@ public class ReceiptsController : ApiControllerBase
         _userService = userService;
         _blobStorageService = blobStorageService;
         _htmlSanitizationService = htmlSanitizationService;
+        _matchRepository = matchRepository;
         _logger = logger;
 
         _maxBatchSize = configuration.GetValue<int>("ReceiptProcessing:MaxBatchSize", 20);
@@ -221,7 +224,27 @@ public class ReceiptsController : ApiControllerBase
             });
         }
 
-        var dto = MapToDetailDto(receipt);
+        // Get matched transaction info if available
+        MatchedTransactionInfoDto? matchedTransactionInfo = null;
+        if (receipt.MatchedTransactionId.HasValue)
+        {
+            var match = await _matchRepository.GetByReceiptIdAsync(receipt.Id, user.Id);
+            if (match?.Transaction != null)
+            {
+                matchedTransactionInfo = new MatchedTransactionInfoDto
+                {
+                    MatchId = match.Id,
+                    Id = match.Transaction.Id,
+                    TransactionDate = match.Transaction.TransactionDate,
+                    Description = match.Transaction.Description,
+                    Amount = match.Transaction.Amount,
+                    MerchantName = null, // Transaction entity doesn't store merchant name separately
+                    MatchConfidence = match.ConfidenceScore / 100m // Normalize to 0-1 scale
+                };
+            }
+        }
+
+        var dto = MapToDetailDto(receipt, matchedTransactionInfo);
 
         // Generate SAS URLs for blob access (storage account has public access disabled)
         if (!string.IsNullOrEmpty(receipt.BlobUrl))
@@ -592,7 +615,7 @@ public class ReceiptsController : ApiControllerBase
         };
     }
 
-    private static ReceiptDetailDto MapToDetailDto(Receipt receipt)
+    private static ReceiptDetailDto MapToDetailDto(Receipt receipt, MatchedTransactionInfoDto? matchedTransaction = null)
     {
         return new ReceiptDetailDto
         {
@@ -621,7 +644,8 @@ public class ReceiptsController : ApiControllerBase
             ErrorMessage = receipt.ErrorMessage,
             RetryCount = receipt.RetryCount,
             PageCount = receipt.PageCount,
-            ProcessedAt = receipt.ProcessedAt
+            ProcessedAt = receipt.ProcessedAt,
+            MatchedTransaction = matchedTransaction
         };
     }
 

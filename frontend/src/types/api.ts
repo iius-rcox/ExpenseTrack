@@ -36,6 +36,8 @@ export interface ReceiptDetail extends ReceiptSummary {
   processedAt: string | null
   /** Concurrency token for optimistic locking (Feature 024) */
   rowVersion: number
+  /** Matched transaction details (null if not matched) - Feature 031 */
+  matchedTransaction: MatchedTransactionInfo | null
 }
 
 export interface LineItem {
@@ -102,6 +104,16 @@ export interface MatchedReceiptInfo {
   amount: number | null
   thumbnailUrl: string | null
   matchConfidence: number
+}
+
+export interface MatchedTransactionInfo {
+  matchId: string
+  id: string
+  transactionDate: string // ISO date
+  description: string
+  amount: number
+  merchantName: string | null
+  matchConfidence: number // 0-1 scale (normalized from backend 0-100)
 }
 
 export interface TransactionListResponse {

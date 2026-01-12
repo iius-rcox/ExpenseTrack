@@ -129,7 +129,7 @@ function TransactionDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {transaction.hasMatchedReceipt ? (
+          {transaction.matchedReceipt ? (
             <Badge variant="default" className="bg-green-500">
               <Check className="mr-1 h-3 w-3" />
               Matched
@@ -234,7 +234,7 @@ function TransactionDetailPage() {
               Linked Receipt
             </CardTitle>
             <CardDescription>
-              {transaction.hasMatchedReceipt
+              {transaction.matchedReceipt
                 ? 'This transaction is matched to a receipt'
                 : 'No receipt has been matched to this transaction'}
             </CardDescription>
