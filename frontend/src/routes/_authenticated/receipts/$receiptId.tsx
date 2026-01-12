@@ -492,7 +492,7 @@ function ReceiptDetailPage() {
               </div>
             </CardHeader>
             <Separator />
-            <ScrollArea className="flex-1 max-h-[400px]">
+            <ScrollArea className="h-[350px]">
               <CardContent className="p-4 space-y-3">
                 {receiptPreview?.extractedFields.map((field) => (
                   <ExtractedField
