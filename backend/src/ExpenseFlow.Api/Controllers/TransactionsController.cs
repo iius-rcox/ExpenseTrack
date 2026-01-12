@@ -315,9 +315,9 @@ public class TransactionsController : ApiControllerBase
                 {
                     MatchId = match?.Id ?? Guid.Empty,
                     Id = receipt.Id,
-                    Vendor = receipt.Vendor,
-                    Date = receipt.Date,
-                    Amount = receipt.Amount,
+                    Vendor = receipt.VendorExtracted,
+                    Date = receipt.DateExtracted,
+                    Amount = receipt.AmountExtracted,
                     ThumbnailUrl = receipt.ThumbnailUrl,
                     MatchConfidence = match?.ConfidenceScore ?? 0m
                 };

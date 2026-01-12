@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ReceiptDetailResponse",
+  "description": "Extended receipt detail response with matched transaction information",
+  "type": "object",
+  "required": ["id", "status", "vendor", "date", "amount", "currency", "createdAt", "blobUrl", "contentType", "fileSize", "lineItems", "confidenceScores", "retryCount", "pageCount"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique receipt identifier"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["Uploaded", "Processing", "Completed", "Error"],
+      "description": "Receipt processing status"
+    },
+    "vendor": {
+      "type": ["string", "null"],
+      "description": "Extracted vendor name"
+    },
+    "date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Extracted receipt date"
+    },
+    "amount": {
+      "type": ["number", "null"],
+      "description": "Extracted total amount"
+    },
+    "currency": {
+      "type": "string",
+      "description": "Currency code (e.g., USD)"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the receipt was uploaded"
+    },
+    "blobUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL to the receipt image/document"
+    },
+    "contentType": {
+      "type": "string",
+      "description": "MIME type of the receipt file"
+    },
+    "fileSize": {
+      "type": "integer",
+      "description": "File size in bytes"
+    },
+    "tax": {
+      "type": ["number", "null"],
+      "description": "Extracted tax amount"
+    },
+    "lineItems": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/LineItem"
+      },
+      "description": "Extracted line items"
+    },
+    "confidenceScores": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "description": "Confidence scores per field (0-1)"
+    },
+    "errorMessage": {
+      "type": ["string", "null"],
+      "description": "Error message if processing failed"
+    },
+    "retryCount": {
+      "type": "integer",
+      "description": "Number of processing retries"
+    },
+    "pageCount": {
+      "type": "integer",
+      "description": "Number of pages in the document"
+    },
+    "processedAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "When processing completed"
+    },
+    "matchedTransaction": {
+      "oneOf": [
+        { "$ref": "#/definitions/MatchedTransactionInfo" },
+        { "type": "null" }
+      ],
+      "description": "Matched transaction details (null if not matched) - NEW FIELD"
+    }
+  },
+  "definitions": {
+    "LineItem": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "quantity": { "type": ["number", "null"] },
+        "unitPrice": { "type": ["number", "null"] },
+        "totalPrice": { "type": ["number", "null"] },
+        "confidence": { "type": ["number", "null"] }
+      },
+      "required": ["description"]
+    },
+    "MatchedTransactionInfo": {
+      "type": "object",
+      "required": ["matchId", "id", "transactionDate", "description", "amount", "matchConfidence"],
+      "properties": {
+        "matchId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Match record ID (needed for unmatch operations)"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Transaction ID"
+        },
+        "transactionDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Transaction date"
+        },
+        "description": {
+          "type": "string",
+          "description": "Transaction description"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Transaction amount"
+        },
+        "merchantName": {
+          "type": ["string", "null"],
+          "description": "Merchant name (if available)"
+        },
+        "matchConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Match confidence score (0-1)"
+        }
+      }
+    }
+  }
+}
