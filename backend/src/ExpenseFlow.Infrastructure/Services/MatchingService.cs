@@ -1352,13 +1352,18 @@ public partial class MatchingService : IMatchingService
         {
             if (Math.Abs(receipt.AmountExtracted!.Value - Math.Abs(g.CombinedAmount)) <= AmountNearTolerance)
             {
+                // Use MerchantName if available, otherwise extract from Name
+                var vendorPattern = !string.IsNullOrWhiteSpace(g.MerchantName)
+                    ? g.MerchantName
+                    : ExtractVendorFromGroupName(g.Name);
+
                 var candidate = new MatchCandidate
                 {
                     Id = g.Id,
                     Type = MatchCandidateType.Group,
                     Amount = Math.Abs(g.CombinedAmount),
                     Date = g.DisplayDate,
-                    VendorPattern = ExtractVendorFromGroupName(g.Name),
+                    VendorPattern = vendorPattern,
                     DisplayName = g.Name,
                     TransactionCount = g.TransactionCount
                 };

@@ -61,6 +61,25 @@ public class TransactionGroupConfiguration : IEntityTypeConfiguration<Transactio
             .HasDefaultValueSql("NOW()")
             .IsRequired();
 
+        builder.Property(g => g.MerchantName)
+            .HasColumnName("merchant_name")
+            .HasMaxLength(255)
+            .IsRequired(false);
+
+        builder.Property(g => g.IsReimbursable)
+            .HasColumnName("is_reimbursable")
+            .IsRequired(false);
+
+        builder.Property(g => g.Category)
+            .HasColumnName("category")
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(g => g.Notes)
+            .HasColumnName("notes")
+            .HasMaxLength(1000)
+            .IsRequired(false);
+
         // Relationships
         builder.HasOne(g => g.User)
             .WithMany()

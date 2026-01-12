@@ -105,6 +105,14 @@ public class TransactionGroupService : ITransactionGroupService
                 var displayDate = request.DisplayDate ?? maxDate;
                 var isDateOverridden = request.DisplayDate.HasValue;
 
+                // Derive merchant name if not provided
+                var merchantName = request.MerchantName;
+                if (string.IsNullOrWhiteSpace(merchantName))
+                {
+                    // Try to extract from first transaction description
+                    merchantName = transactions.FirstOrDefault()?.Description;
+                }
+
                 // Create the group
                 var group = new TransactionGroup
                 {
@@ -115,6 +123,10 @@ public class TransactionGroupService : ITransactionGroupService
                     CombinedAmount = combinedAmount,
                     TransactionCount = transactionCount,
                     MatchStatus = MatchStatus.Unmatched,
+                    MerchantName = merchantName,
+                    IsReimbursable = request.IsReimbursable,
+                    Category = request.Category,
+                    Notes = request.Notes,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -184,6 +196,10 @@ public class TransactionGroupService : ITransactionGroupService
                 TransactionCount = g.TransactionCount,
                 MatchStatus = g.MatchStatus,
                 MatchedReceiptId = g.MatchedReceiptId,
+                MerchantName = g.MerchantName,
+                IsReimbursable = g.IsReimbursable,
+                Category = g.Category,
+                Notes = g.Notes,
                 CreatedAt = g.CreatedAt
             })
             .ToListAsync(ct);
@@ -223,6 +239,30 @@ public class TransactionGroupService : ITransactionGroupService
         {
             group.DisplayDate = request.DisplayDate.Value;
             group.IsDateOverridden = true;
+        }
+
+        // Update merchant name if provided (including explicit null to clear)
+        if (request.MerchantName != null)
+        {
+            group.MerchantName = string.IsNullOrWhiteSpace(request.MerchantName) ? null : request.MerchantName;
+        }
+
+        // Update reimbursable flag if provided (including explicit null to clear)
+        if (request.IsReimbursable.HasValue || request.IsReimbursable == null)
+        {
+            group.IsReimbursable = request.IsReimbursable;
+        }
+
+        // Update category if provided (including explicit null to clear)
+        if (request.Category != null)
+        {
+            group.Category = string.IsNullOrWhiteSpace(request.Category) ? null : request.Category;
+        }
+
+        // Update notes if provided (including explicit null to clear)
+        if (request.Notes != null)
+        {
+            group.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes;
         }
 
         await _dbContext.SaveChangesAsync(ct);
@@ -793,6 +833,10 @@ public class TransactionGroupService : ITransactionGroupService
             TransactionCount = group.TransactionCount,
             MatchStatus = group.MatchStatus,
             MatchedReceiptId = group.MatchedReceiptId,
+            MerchantName = group.MerchantName,
+            IsReimbursable = group.IsReimbursable,
+            Category = group.Category,
+            Notes = group.Notes,
             CreatedAt = group.CreatedAt,
             Warning = warning,
             Transactions = transactions

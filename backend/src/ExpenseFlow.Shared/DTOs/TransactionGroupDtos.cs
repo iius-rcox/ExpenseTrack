@@ -32,6 +32,34 @@ public class CreateGroupRequest
     /// If not provided, uses the maximum transaction date.
     /// </summary>
     public DateOnly? DisplayDate { get; set; }
+
+    /// <summary>
+    /// Optional merchant/vendor name for vendor matching.
+    /// If not provided, attempts to derive from first transaction's description.
+    /// Maximum 255 characters.
+    /// </summary>
+    [StringLength(255, ErrorMessage = "Merchant name cannot exceed 255 characters")]
+    public string? MerchantName { get; set; }
+
+    /// <summary>
+    /// Whether this group represents reimbursable expenses.
+    /// Null = unknown/not set, true = reimbursable, false = not reimbursable.
+    /// </summary>
+    public bool? IsReimbursable { get; set; }
+
+    /// <summary>
+    /// Expense category (e.g., "travel", "meals", "software").
+    /// Maximum 100 characters.
+    /// </summary>
+    [StringLength(100, ErrorMessage = "Category cannot exceed 100 characters")]
+    public string? Category { get; set; }
+
+    /// <summary>
+    /// Optional notes/description for additional context.
+    /// Maximum 1000 characters.
+    /// </summary>
+    [StringLength(1000, ErrorMessage = "Notes cannot exceed 1000 characters")]
+    public string? Notes { get; set; }
 }
 
 /// <summary>
@@ -50,6 +78,29 @@ public class UpdateGroupRequest
     /// When set, marks IsDateOverridden as true.
     /// </summary>
     public DateOnly? DisplayDate { get; set; }
+
+    /// <summary>
+    /// New merchant/vendor name (optional). Maximum 255 characters.
+    /// </summary>
+    [StringLength(255, ErrorMessage = "Merchant name cannot exceed 255 characters")]
+    public string? MerchantName { get; set; }
+
+    /// <summary>
+    /// Update reimbursable status (optional).
+    /// </summary>
+    public bool? IsReimbursable { get; set; }
+
+    /// <summary>
+    /// New category (optional). Maximum 100 characters.
+    /// </summary>
+    [StringLength(100, ErrorMessage = "Category cannot exceed 100 characters")]
+    public string? Category { get; set; }
+
+    /// <summary>
+    /// New notes (optional). Maximum 1000 characters.
+    /// </summary>
+    [StringLength(1000, ErrorMessage = "Notes cannot exceed 1000 characters")]
+    public string? Notes { get; set; }
 }
 
 /// <summary>
@@ -113,6 +164,26 @@ public class TransactionGroupSummaryDto
     /// When the group was created.
     /// </summary>
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// Merchant/vendor name for vendor matching (nullable).
+    /// </summary>
+    public string? MerchantName { get; set; }
+
+    /// <summary>
+    /// Whether this group represents reimbursable expenses (nullable).
+    /// </summary>
+    public bool? IsReimbursable { get; set; }
+
+    /// <summary>
+    /// Expense category (nullable).
+    /// </summary>
+    public string? Category { get; set; }
+
+    /// <summary>
+    /// Optional notes/description (nullable).
+    /// </summary>
+    public string? Notes { get; set; }
 }
 
 /// <summary>

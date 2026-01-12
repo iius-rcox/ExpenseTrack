@@ -50,6 +50,30 @@ public class TransactionGroup : BaseEntity
     /// </summary>
     public MatchStatus MatchStatus { get; set; } = MatchStatus.Unmatched;
 
+    /// <summary>
+    /// Merchant/vendor name for this group. Used for receipt matching vendor score calculation.
+    /// Typically derived from the first transaction's description or user-specified.
+    /// </summary>
+    public string? MerchantName { get; set; }
+
+    /// <summary>
+    /// Whether this group represents reimbursable expenses (for missing receipts tracking).
+    /// Null = unknown/not set, true = reimbursable, false = not reimbursable.
+    /// </summary>
+    public bool? IsReimbursable { get; set; }
+
+    /// <summary>
+    /// Expense category for reporting and analysis (e.g., "travel", "meals", "software").
+    /// Matches the category system used in ExpensePattern/TransactionPrediction.
+    /// </summary>
+    public string? Category { get; set; }
+
+    /// <summary>
+    /// Optional user notes/description for additional context beyond the Name field.
+    /// Useful for explaining why transactions were grouped or providing audit trail details.
+    /// </summary>
+    public string? Notes { get; set; }
+
     // Navigation properties
     public User User { get; set; } = null!;
     public Receipt? MatchedReceipt { get; set; }
