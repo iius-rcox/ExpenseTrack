@@ -224,23 +224,41 @@ public class ReceiptsController : ApiControllerBase
             });
         }
 
-        // Get matched transaction info if available
+        // Get matched transaction info if available (Feature 031)
         MatchedTransactionInfoDto? matchedTransactionInfo = null;
         if (receipt.MatchedTransactionId.HasValue)
         {
             var match = await _matchRepository.GetByReceiptIdAsync(receipt.Id, user.Id);
-            if (match?.Transaction != null)
+            if (match != null)
             {
-                matchedTransactionInfo = new MatchedTransactionInfoDto
+                // Handle both transaction matches and transaction group matches
+                if (match.Transaction != null)
                 {
-                    MatchId = match.Id,
-                    Id = match.Transaction.Id,
-                    TransactionDate = match.Transaction.TransactionDate,
-                    Description = match.Transaction.Description,
-                    Amount = match.Transaction.Amount,
-                    MerchantName = null, // Transaction entity doesn't store merchant name separately
-                    MatchConfidence = match.ConfidenceScore / 100m // Normalize to 0-1 scale
-                };
+                    matchedTransactionInfo = new MatchedTransactionInfoDto
+                    {
+                        MatchId = match.Id,
+                        Id = match.Transaction.Id,
+                        TransactionDate = match.Transaction.TransactionDate,
+                        Description = match.Transaction.Description,
+                        Amount = match.Transaction.Amount,
+                        MerchantName = null, // Transaction entity doesn't store merchant name separately
+                        MatchConfidence = match.ConfidenceScore / 100m // Normalize to 0-1 scale
+                    };
+                }
+                else if (match.TransactionGroup != null)
+                {
+                    // For transaction group matches, use group display info
+                    matchedTransactionInfo = new MatchedTransactionInfoDto
+                    {
+                        MatchId = match.Id,
+                        Id = match.TransactionGroup.Id, // Use group ID
+                        TransactionDate = match.TransactionGroup.DisplayDate,
+                        Description = match.TransactionGroup.Name, // E.g., "Twilio (3 charges)"
+                        Amount = match.TransactionGroup.CombinedAmount,
+                        MerchantName = null,
+                        MatchConfidence = match.ConfidenceScore / 100m
+                    };
+                }
             }
         }
 

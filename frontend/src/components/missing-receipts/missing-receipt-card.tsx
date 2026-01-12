@@ -34,6 +34,7 @@ import {
   UserCheck,
   Bot,
   MoreVertical,
+  ArrowRight,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -41,6 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Link } from '@tanstack/react-router'
 import type { MissingReceiptSummary, ReimbursabilitySource } from '@/types/api'
 
 /**
@@ -223,6 +225,15 @@ export function MissingReceiptCard({
               <DropdownMenuContent align="end">
                 {!item.isDismissed ? (
                   <>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        to="/transactions/$transactionId"
+                        params={{ transactionId: item.transactionId }}
+                      >
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        View Transaction
+                      </Link>
+                    </DropdownMenuItem>
                     {onAddUrl && (
                       <DropdownMenuItem onClick={onAddUrl}>
                         <Link2 className="mr-2 h-4 w-4" />
@@ -243,12 +254,23 @@ export function MissingReceiptCard({
                     )}
                   </>
                 ) : (
-                  onRestore && (
-                    <DropdownMenuItem onClick={onRestore}>
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      Restore
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        to="/transactions/$transactionId"
+                        params={{ transactionId: item.transactionId }}
+                      >
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        View Transaction
+                      </Link>
                     </DropdownMenuItem>
-                  )
+                    {onRestore && (
+                      <DropdownMenuItem onClick={onRestore}>
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        Restore
+                      </DropdownMenuItem>
+                    )}
+                  </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
