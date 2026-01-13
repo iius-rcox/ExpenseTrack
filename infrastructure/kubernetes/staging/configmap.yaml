@@ -9,7 +9,7 @@ metadata:
 data:
   azure-tenant-id: "953922e6-5370-4a01-a3d5-773a30df726b"
   azure-client-id: "00435dee-8aff-429b-bab6-762973c091c4"
-  azure-audience: "00435dee-8aff-429b-bab6-762973c091c4"
+  azure-audience: "api://00435dee-8aff-429b-bab6-762973c091c4"
   # Allow API to accept tokens without scope/roles claims (for ID tokens)
   azure-allow-acl: "true"
   # CORS allowed origins
