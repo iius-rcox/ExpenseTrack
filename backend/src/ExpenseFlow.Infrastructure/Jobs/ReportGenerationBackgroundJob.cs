@@ -304,27 +304,53 @@ public class ReportGenerationBackgroundJob
         TierCounters tierCounters,
         CancellationToken ct)
     {
-        var transaction = match.Transaction;
         var receipt = match.Receipt;
 
+        // Handle both transaction and transaction group matches
+        Guid entityId;
+        DateOnly transactionDate;
+        decimal amount;
+        string originalDescription;
+
+        if (match.Transaction != null)
+        {
+            // Single transaction match
+            entityId = match.Transaction.Id;
+            transactionDate = match.Transaction.TransactionDate;
+            amount = match.Transaction.Amount;
+            originalDescription = match.Transaction.OriginalDescription;
+        }
+        else if (match.TransactionGroup != null)
+        {
+            // Transaction group match - use group aggregate data
+            entityId = match.TransactionGroup.Id;
+            transactionDate = match.TransactionGroup.DisplayDate;
+            amount = match.TransactionGroup.CombinedAmount;
+            originalDescription = match.TransactionGroup.Name;
+        }
+        else
+        {
+            throw new InvalidOperationException($"Match {match.Id} has neither Transaction nor TransactionGroup");
+        }
+
         // Get categorization
-        var categorization = await GetCategorizationSafeAsync(transaction.Id, match.UserId, ct);
+        var categorization = await GetCategorizationSafeAsync(entityId, match.UserId, ct);
 
         // Normalize description
         var normalizedDesc = await NormalizeDescriptionSafeAsync(
-            transaction.OriginalDescription, match.UserId, ct);
+            originalDescription, match.UserId, ct);
 
         // Check for prediction
-        var hasPrediction = predictions.TryGetValue(transaction.Id, out var prediction);
+        var hasPrediction = predictions.TryGetValue(entityId, out var prediction);
 
         var line = new ExpenseLine
         {
             ReceiptId = receipt.Id,
-            TransactionId = transaction.Id,
+            TransactionId = match.TransactionId, // Null for group matches, that's OK
             LineOrder = lineOrder,
-            ExpenseDate = transaction.TransactionDate,
-            Amount = transaction.Amount,
-            OriginalDescription = transaction.OriginalDescription,
+            ExpenseDate = transactionDate,
+            Amount = amount,
+            OriginalDescription = originalDescription,
             NormalizedDescription = normalizedDesc,
             VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName,
             HasReceipt = true,
@@ -435,18 +461,46 @@ public class ReportGenerationBackgroundJob
     /// <summary>
     /// Creates a minimal expense line when processing fails.
     /// </summary>
-    private static ExpenseLine CreateFailedLine(ReceiptTransactionMatch match, int lineOrder) => new()
+    private static ExpenseLine CreateFailedLine(ReceiptTransactionMatch match, int lineOrder)
     {
-        ReceiptId = match.ReceiptId,
-        TransactionId = match.TransactionId,
-        LineOrder = lineOrder,
-        ExpenseDate = match.Transaction.TransactionDate,
-        Amount = match.Transaction.Amount,
-        OriginalDescription = match.Transaction.OriginalDescription,
-        NormalizedDescription = match.Transaction.OriginalDescription,
-        HasReceipt = true,
-        CreatedAt = DateTime.UtcNow
-    };
+        // Handle both transaction and transaction group matches
+        DateOnly expenseDate;
+        decimal amount;
+        string description;
+
+        if (match.Transaction != null)
+        {
+            expenseDate = match.Transaction.TransactionDate;
+            amount = match.Transaction.Amount;
+            description = match.Transaction.OriginalDescription;
+        }
+        else if (match.TransactionGroup != null)
+        {
+            expenseDate = match.TransactionGroup.DisplayDate;
+            amount = match.TransactionGroup.CombinedAmount;
+            description = match.TransactionGroup.Name;
+        }
+        else
+        {
+            // Fallback if both are null (shouldn't happen, but defensive)
+            expenseDate = DateOnly.FromDateTime(DateTime.UtcNow);
+            amount = 0m;
+            description = "Unknown - Match Error";
+        }
+
+        return new ExpenseLine
+        {
+            ReceiptId = match.ReceiptId,
+            TransactionId = match.TransactionId, // Null for groups, that's OK
+            LineOrder = lineOrder,
+            ExpenseDate = expenseDate,
+            Amount = amount,
+            OriginalDescription = description,
+            NormalizedDescription = description,
+            HasReceipt = true,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
 
     /// <summary>
     /// Creates a minimal expense line when processing fails for unmatched transaction.
