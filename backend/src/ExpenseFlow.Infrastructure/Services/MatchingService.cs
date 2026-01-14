@@ -942,6 +942,7 @@ public partial class MatchingService : IMatchingService
             var group = await _context.TransactionGroups.FindAsync(match.TransactionGroupId.Value)
                 ?? throw new InvalidOperationException("Transaction group not found");
 
+            receipt.MatchedTransactionId = group.Id; // Store group ID in MatchedTransactionId for unmatch lookup
             group.MatchedReceiptId = receipt.Id;
             group.MatchStatus = MatchStatus.Matched;
             _context.Entry(group).State = EntityState.Modified;
@@ -1238,6 +1239,7 @@ public partial class MatchingService : IMatchingService
         };
 
         // Update statuses (the link is through the ReceiptTransactionMatch record)
+        receipt.MatchedTransactionId = group.Id; // Store group ID for unmatch lookup
         receipt.MatchStatus = MatchStatus.Matched;
         group.MatchedReceiptId = receipt.Id;
         group.MatchStatus = MatchStatus.Matched;
