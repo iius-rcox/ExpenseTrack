@@ -343,6 +343,11 @@ public class ReportGenerationBackgroundJob
         // Check for prediction
         var hasPrediction = predictions.TryGetValue(entityId, out var prediction);
 
+        // Determine vendor name with fallback chain
+        var vendorName = receipt.VendorExtracted
+            ?? match.MatchedVendorAlias?.DisplayName
+            ?? match.TransactionGroup?.MerchantName; // Use group merchant name if available
+
         var line = new ExpenseLine
         {
             ReceiptId = receipt.Id,
@@ -352,7 +357,7 @@ public class ReportGenerationBackgroundJob
             Amount = amount,
             OriginalDescription = originalDescription,
             NormalizedDescription = normalizedDesc,
-            VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName,
+            VendorName = vendorName,
             HasReceipt = true,
             CreatedAt = DateTime.UtcNow,
             IsAutoSuggested = hasPrediction,
@@ -404,6 +409,11 @@ public class ReportGenerationBackgroundJob
         // Check for prediction
         var hasPrediction = predictions.TryGetValue(transaction.Id, out var prediction);
 
+        // Determine vendor name: prefer prediction, fallback to extract from description
+        var vendorName = hasPrediction && !string.IsNullOrWhiteSpace(prediction!.VendorName)
+            ? prediction.VendorName
+            : ExtractVendorFromDescription(transaction.OriginalDescription);
+
         var line = new ExpenseLine
         {
             ReceiptId = null,
@@ -413,7 +423,7 @@ public class ReportGenerationBackgroundJob
             Amount = transaction.Amount,
             OriginalDescription = transaction.OriginalDescription,
             NormalizedDescription = normalizedDesc,
-            VendorName = hasPrediction ? prediction!.VendorName : null,
+            VendorName = vendorName,
             HasReceipt = false,
             MissingReceiptJustification = MissingReceiptJustification.NotProvided,
             CreatedAt = DateTime.UtcNow,
@@ -677,5 +687,41 @@ public class ReportGenerationBackgroundJob
         var endDate = startDate.AddMonths(1).AddDays(-1);
 
         return (startDate, endDate);
+    }
+
+    /// <summary>
+    /// Extracts a clean vendor name from transaction description.
+    /// Removes trailing reference numbers and transaction IDs.
+    /// </summary>
+    private static string ExtractVendorFromDescription(string description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return string.Empty;
+        }
+
+        // Common patterns to clean up
+        var cleaned = description.Trim();
+
+        // Remove common suffixes: AMAZON MKTPL*WU2K02YC3 → AMAZON MKTPL
+        if (cleaned.Contains("*"))
+        {
+            cleaned = cleaned.Substring(0, cleaned.IndexOf("*")).Trim();
+        }
+
+        // Remove trailing reference numbers: PAYPAL *NEWEGGCOM → PAYPAL
+        if (cleaned.Contains("  "))
+        {
+            cleaned = cleaned.Substring(0, cleaned.IndexOf("  ")).Trim();
+        }
+
+        // Take first 3 words maximum for readability
+        var words = cleaned.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length > 3)
+        {
+            cleaned = string.Join(" ", words.Take(3));
+        }
+
+        return cleaned;
     }
 }
