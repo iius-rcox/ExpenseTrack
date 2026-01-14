@@ -11,6 +11,7 @@ namespace ExpenseFlow.Api.Controllers;
 /// Supports creating jobs, polling status, listing history, and cancellation.
 /// </summary>
 [Authorize]
+[Route("api/report-jobs")] // Explicit kebab-case route for frontend compatibility
 public class ReportJobsController : ApiControllerBase
 {
     private readonly IReportJobService _reportJobService;
