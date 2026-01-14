@@ -63,7 +63,9 @@ public class MatchRepository : IMatchRepository
             .Include(m => m.Transaction)
             .Include(m => m.TransactionGroup)
             .Include(m => m.MatchedVendorAlias)
-            .FirstOrDefaultAsync(m => m.TransactionId == transactionId && m.UserId == userId);
+            .Where(m => m.TransactionId == transactionId && m.UserId == userId)
+            .Where(m => m.Status == MatchProposalStatus.Confirmed) // Only return confirmed matches for consistency
+            .FirstOrDefaultAsync();
     }
 
     public async Task<(List<ReceiptTransactionMatch> Items, int TotalCount)> GetProposedByUserIdAsync(
