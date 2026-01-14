@@ -1,6 +1,7 @@
 using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Infrastructure.Data;
+using ExpenseFlow.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExpenseFlow.Infrastructure.Repositories;
@@ -173,6 +174,8 @@ public class TransactionRepository : ITransactionRepository
             // Exclude transactions that are part of a group - their matching is handled at group level
             .Where(t => t.GroupId == null)
             .Where(t => t.TransactionDate >= startDate && t.TransactionDate <= endDate)
+            // CRITICAL: Only include reimbursable transactions (have prediction that's not rejected)
+            .Where(t => _context.TransactionPredictions.Any(p => p.TransactionId == t.Id && p.Status != PredictionStatus.Rejected))
             .OrderBy(t => t.TransactionDate)
             .ThenBy(t => t.CreatedAt)
             .ToListAsync();

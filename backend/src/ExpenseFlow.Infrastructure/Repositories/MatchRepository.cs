@@ -175,10 +175,16 @@ public class MatchRepository : IMatchRepository
             .Include(m => m.MatchedVendorAlias)
             .Where(m => m.UserId == userId && m.Status == MatchProposalStatus.Confirmed)
             .Where(m =>
-                // For transaction matches, filter by transaction date
-                (m.TransactionId != null && m.Transaction!.TransactionDate >= startDate && m.Transaction!.TransactionDate <= endDate) ||
-                // For group matches, filter by group display date
-                (m.TransactionGroupId != null && m.TransactionGroup!.DisplayDate >= startDate && m.TransactionGroup!.DisplayDate <= endDate))
+                // For transaction matches, filter by transaction date AND reimbursability
+                (m.TransactionId != null &&
+                 m.Transaction!.TransactionDate >= startDate &&
+                 m.Transaction!.TransactionDate <= endDate &&
+                 _context.TransactionPredictions.Any(p => p.TransactionId == m.TransactionId && p.Status != PredictionStatus.Rejected)) ||
+                // For group matches, filter by group display date AND reimbursability
+                (m.TransactionGroupId != null &&
+                 m.TransactionGroup!.DisplayDate >= startDate &&
+                 m.TransactionGroup!.DisplayDate <= endDate &&
+                 m.TransactionGroup!.IsReimbursable == true))
             .OrderBy(m => m.TransactionId != null ? m.Transaction!.TransactionDate : m.TransactionGroup!.DisplayDate)
             .ThenBy(m => m.CreatedAt)
             .ToListAsync();
