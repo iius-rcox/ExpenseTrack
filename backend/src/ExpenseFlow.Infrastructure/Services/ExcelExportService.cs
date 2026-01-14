@@ -76,24 +76,29 @@ public class ExcelExportService : IExcelExportService
             // Column A: Expense Date
             worksheet.Cell(row, 1).Value = line.ExpenseDate.ToString(_options.DateFormat);
 
-            // Column B: GL Acct/Job
-            worksheet.Cell(row, 2).Value = line.GLCode ?? "";
+            // Column B: Vendor Name
+            worksheet.Cell(row, 2).Value = line.VendorName ?? "";
 
-            // Column C: Dept/Phas
-            worksheet.Cell(row, 3).Value = line.DepartmentCode ?? "";
+            // Column C: GL Acct/Job (Category)
+            worksheet.Cell(row, 3).Value = line.GLCode ?? "";
 
-            // Column D: Expense Description
-            worksheet.Cell(row, 4).Value = line.NormalizedDescription;
+            // Column D: Dept/Phase
+            worksheet.Cell(row, 4).Value = line.DepartmentCode ?? "";
 
-            // Column E: Units/Mileage (default to 1)
-            worksheet.Cell(row, 5).Value = 1;
+            // Column E: Expense Description
+            worksheet.Cell(row, 5).Value = line.NormalizedDescription;
 
-            // Column F: Rate/Amount
-            worksheet.Cell(row, 6).Value = line.Amount;
+            // Column F: Receipt Status
+            worksheet.Cell(row, 6).Value = line.HasReceipt ? "Yes" : "Missing";
 
-            // Column G: Expense Total - formula should already be in template
-            // =IF(ISBLANK(E{row}),"",E{row}*F{row})
-            // We don't touch this column to preserve template formulas
+            // Column G: Units/Mileage (default to 1)
+            worksheet.Cell(row, 7).Value = 1;
+
+            // Column H: Rate/Amount
+            worksheet.Cell(row, 8).Value = line.Amount;
+
+            // Column I: Expense Total - formula
+            worksheet.Cell(row, 9).SetFormulaA1($"=IF(ISBLANK(G{row}),\"\",G{row}*H{row})");
         }
 
         // Serialize workbook to byte array
@@ -118,12 +123,14 @@ public class ExcelExportService : IExcelExportService
 
         // Set column widths
         worksheet.Column(1).Width = 12; // Date
-        worksheet.Column(2).Width = 15; // GL Acct/Job
-        worksheet.Column(3).Width = 12; // Dept/Phase
-        worksheet.Column(4).Width = 40; // Description
-        worksheet.Column(5).Width = 10; // Units
-        worksheet.Column(6).Width = 12; // Rate/Amount
-        worksheet.Column(7).Width = 14; // Total
+        worksheet.Column(2).Width = 25; // Vendor
+        worksheet.Column(3).Width = 15; // GL Acct/Job
+        worksheet.Column(4).Width = 12; // Dept/Phase
+        worksheet.Column(5).Width = 40; // Description
+        worksheet.Column(6).Width = 12; // Receipt Status
+        worksheet.Column(7).Width = 10; // Units
+        worksheet.Column(8).Width = 12; // Rate/Amount
+        worksheet.Column(9).Width = 14; // Total
 
         // Header section
         worksheet.Cell("A1").Value = "EXPENSE REPORT";
@@ -145,15 +152,17 @@ public class ExcelExportService : IExcelExportService
         // Column headers (row 6)
         var headerRow = 6;
         worksheet.Cell(headerRow, 1).Value = "Date";
-        worksheet.Cell(headerRow, 2).Value = "GL Acct/Job";
-        worksheet.Cell(headerRow, 3).Value = "Dept/Phas";
-        worksheet.Cell(headerRow, 4).Value = "Expense Description";
-        worksheet.Cell(headerRow, 5).Value = "Units";
-        worksheet.Cell(headerRow, 6).Value = "Rate/Amount";
-        worksheet.Cell(headerRow, 7).Value = "Expense Total";
+        worksheet.Cell(headerRow, 2).Value = "Vendor";
+        worksheet.Cell(headerRow, 3).Value = "GL Acct/Job";
+        worksheet.Cell(headerRow, 4).Value = "Dept/Phase";
+        worksheet.Cell(headerRow, 5).Value = "Expense Description";
+        worksheet.Cell(headerRow, 6).Value = "Receipt";
+        worksheet.Cell(headerRow, 7).Value = "Units";
+        worksheet.Cell(headerRow, 8).Value = "Rate/Amount";
+        worksheet.Cell(headerRow, 9).Value = "Expense Total";
 
         // Style header row
-        var headerRange = worksheet.Range(headerRow, 1, headerRow, 7);
+        var headerRange = worksheet.Range(headerRow, 1, headerRow, 9);
         headerRange.Style.Font.Bold = true;
         headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
         headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
