@@ -40,14 +40,19 @@ function reportEditorReducer(
     case 'LOAD_PREVIEW': {
       return {
         ...state,
-        lines: action.lines.map((line: any) => {
+        lines: action.lines.map((line: any, index: number) => {
           // Map API response fields to editor state
           const expenseDate = line.expenseDate
             ? new Date(line.expenseDate).toISOString().split('T')[0]
             : (line.transactionDate ? new Date(line.transactionDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
 
+          // Generate truly unique ID: combine API ID (if exists) with index and random suffix
+          const uniqueId = line.id && line.id !== '00000000-0000-0000-0000-000000000000'
+            ? `${line.id}-${index}`
+            : `${crypto.randomUUID()}-${index}`
+
           return {
-            id: line.id || crypto.randomUUID(),
+            id: uniqueId,
             transactionId: line.transactionId || '',
             receiptId: line.receiptId || null,
             originalAmount: line.amount || 0,
