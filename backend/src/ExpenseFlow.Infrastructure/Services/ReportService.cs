@@ -616,6 +616,9 @@ public class ReportService : IReportService
             {
                 var transaction = match.Transaction;
 
+                // Get categorization suggestions (GL code + Department)
+                var categorization = await GetCategorizationSafeAsync(transaction.Id, userId, ct);
+
                 previewLines.Add(new ExpenseLineDto
                 {
                     Id = Guid.Empty, // No ID yet - this is just a preview
@@ -628,6 +631,10 @@ public class ReportService : IReportService
                     OriginalDescription = transaction.OriginalDescription,
                     NormalizedDescription = transaction.Description,
                     VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName,
+                    GlCode = categorization?.GL?.TopSuggestion?.Code,
+                    GlCodeSuggested = categorization?.GL?.TopSuggestion?.Code,
+                    DepartmentCode = categorization?.Department?.TopSuggestion?.Code,
+                    DepartmentSuggested = categorization?.Department?.TopSuggestion?.Code,
                     HasReceipt = true,
                     CreatedAt = DateTime.UtcNow
                 });
@@ -640,6 +647,9 @@ public class ReportService : IReportService
 
                 foreach (var transaction in groupTransactions)
                 {
+                    // Get categorization suggestions for each transaction in group
+                    var categorization = await GetCategorizationSafeAsync(transaction.Id, userId, ct);
+
                     previewLines.Add(new ExpenseLineDto
                     {
                         Id = Guid.Empty,
@@ -652,6 +662,10 @@ public class ReportService : IReportService
                         OriginalDescription = transaction.OriginalDescription,
                         NormalizedDescription = transaction.Description,
                         VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName ?? group.Name,
+                        GlCode = categorization?.GL?.TopSuggestion?.Code,
+                        GlCodeSuggested = categorization?.GL?.TopSuggestion?.Code,
+                        DepartmentCode = categorization?.Department?.TopSuggestion?.Code,
+                        DepartmentSuggested = categorization?.Department?.TopSuggestion?.Code,
                         HasReceipt = true,
                         CreatedAt = DateTime.UtcNow
                     });

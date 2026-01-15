@@ -40,20 +40,27 @@ function reportEditorReducer(
     case 'LOAD_PREVIEW': {
       return {
         ...state,
-        lines: action.lines.map((line: any) => ({
-          id: line.id || crypto.randomUUID(),
-          transactionId: line.transactionId || '',
-          receiptId: line.receiptId || null,
-          originalAmount: line.amount || 0,
-          expenseDate: line.transactionDate || line.expenseDate || new Date().toISOString().split('T')[0],
-          vendor: line.vendor || line.vendorName || '',
-          glCode: line.glCode || '',
-          departmentCode: line.department || line.departmentCode || '',
-          description: line.normalizedDescription || line.description || '',
-          hasReceipt: line.hasReceipt || false,
-          isDirty: false,
-          validationWarnings: [],
-        })),
+        lines: action.lines.map((line: any) => {
+          // Map API response fields to editor state
+          const expenseDate = line.expenseDate
+            ? new Date(line.expenseDate).toISOString().split('T')[0]
+            : (line.transactionDate ? new Date(line.transactionDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
+
+          return {
+            id: line.id || crypto.randomUUID(),
+            transactionId: line.transactionId || '',
+            receiptId: line.receiptId || null,
+            originalAmount: line.amount || 0,
+            expenseDate,
+            vendor: line.vendorName || line.vendor || '',
+            glCode: line.glCode || line.glCodeSuggested || '',
+            departmentCode: line.departmentCode || line.departmentSuggested || '',
+            description: line.normalizedDescription || line.description || line.originalDescription || '',
+            hasReceipt: line.hasReceipt || false,
+            isDirty: false,
+            validationWarnings: [],
+          }
+        }),
         selectedLineIds: new Set(),
       }
     }
