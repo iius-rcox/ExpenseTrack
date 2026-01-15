@@ -499,9 +499,16 @@ public class CategorizationService : ICategorizationService
         string description,
         CancellationToken cancellationToken)
     {
-        // Get available GL accounts for context
-        var glAccounts = await _referenceDataService.GetGLAccountsAsync();
-        var glContext = string.Join("\n", glAccounts.Take(50).Select(g => $"- {g.Code}: {g.Name}"));
+        // Get available GL accounts for context (FILTER TO EXPENSE ACCOUNTS ONLY)
+        var allGLAccounts = await _referenceDataService.GetGLAccountsAsync();
+
+        // Only include expense accounts (50000-69999 range) - excludes assets, liabilities, equity
+        var expenseGLAccounts = allGLAccounts
+            .Where(g => g.Code.StartsWith("5") || g.Code.StartsWith("6"))
+            .OrderBy(g => g.Code)
+            .ToList();
+
+        var glContext = string.Join("\n", expenseGLAccounts.Take(100).Select(g => $"- {g.Code}: {g.Name}"));
 
         var prompt = $"""
             You are a financial categorization assistant. Given a transaction description, suggest the most appropriate GL (General Ledger) code.
