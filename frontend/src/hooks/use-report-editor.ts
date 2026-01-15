@@ -74,22 +74,27 @@ function reportEditorReducer(
       return {
         ...state,
         lines: state.lines.map((line) => {
+          // CRITICAL: Only update the specific line, return others unchanged
           if (line.id !== action.id) return line
 
           const newValue = action.value
           const warning = validateField(action.field, newValue)
-          const newWarnings = line.validationWarnings.filter(
+          const newWarnings = [...line.validationWarnings].filter(
             (w) => !w.startsWith(action.field)
           )
           if (warning) {
             newWarnings.push(`${action.field}: ${warning}`)
           }
 
+          // Deep clone to prevent shared references
           return {
             ...line,
             [action.field]: newValue,
             isDirty: true,
             validationWarnings: newWarnings,
+            // Ensure nested objects are not shared
+            allocations: [...line.allocations],
+            appliedAllocations: line.appliedAllocations ? [...line.appliedAllocations] : undefined,
           }
         }),
       }
