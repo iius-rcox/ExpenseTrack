@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import { z } from 'zod'
 import { useReportPreview } from '@/hooks/queries/use-reports'
 import { useReportEditor } from '@/hooks/use-report-editor'
 import { useExportPreview } from '@/hooks/queries/use-report-export'
@@ -16,10 +18,19 @@ import { FileSpreadsheet, FileText, AlertCircle, ChevronLeft, ChevronRight, Chec
 import { formatCurrency, cn } from '@/lib/utils'
 import type { ExportPreviewRequest } from '@/types/report-editor'
 
-// Simplified route component for MVP - TanStack Router generation will be handled separately
-export default function ReportEditorPage() {
-  const searchParams = new URLSearchParams(window.location.search)
-  const period = searchParams.get('period') || new Date().toISOString().slice(0, 7)
+const editorSearchSchema = z.object({
+  period: z.string().optional().default(new Date().toISOString().slice(0, 7)),
+})
+
+export const Route = createFileRoute('/_authenticated/reports/editor' as any)({
+  validateSearch: editorSearchSchema,
+  component: ReportEditorPage,
+})
+
+function ReportEditorPage() {
+  const search = Route.useSearch() as { period: string }
+  const period = search.period
+  const navigate = Route.useNavigate()
 
   // Fetch preview data
   const { data: previewLines, isLoading, error } = useReportPreview(period)
@@ -81,7 +92,7 @@ export default function ReportEditorPage() {
     const date = new Date(year, month - 1, 1)
     date.setMonth(date.getMonth() + (direction === 'next' ? 1 : -1))
     const newPeriod = date.toISOString().slice(0, 7)
-    window.location.href = `/reports/editor?period=${newPeriod}`
+    navigate({ search: { period: newPeriod } } as any)
   }
 
   if (isLoading) {
