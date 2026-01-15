@@ -57,4 +57,10 @@ public class ExportLineDto
     /// Units for calculation (always 1 for MVP, future: mileage tracking).
     /// </summary>
     public int Units => 1;
+
+    /// <summary>
+    /// Child allocations if this expense is split across multiple GL codes/departments.
+    /// When present, this line represents the parent and children should be exported as separate rows.
+    /// </summary>
+    public List<ExportLineDto>? ChildAllocations { get; set; }
 }

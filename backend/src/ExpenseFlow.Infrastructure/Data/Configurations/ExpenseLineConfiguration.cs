@@ -136,6 +136,30 @@ public class ExpenseLineConfiguration : IEntityTypeConfiguration<ExpenseLine>
             .HasColumnName("updated_at")
             .IsRequired(false);
 
+        // Split allocation fields
+        builder.Property(e => e.ParentLineId)
+            .HasColumnName("parent_line_id")
+            .IsRequired(false);
+
+        builder.Property(e => e.SplitPercentage)
+            .HasColumnName("split_percentage")
+            .HasPrecision(5, 2)
+            .IsRequired(false);
+
+        builder.Property(e => e.IsSplitParent)
+            .HasColumnName("is_split_parent")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(e => e.IsSplitChild)
+            .HasColumnName("is_split_child")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(e => e.AllocationOrder)
+            .HasColumnName("allocation_order")
+            .IsRequired(false);
+
         // Relationships
         builder.HasOne(e => e.Report)
             .WithMany(r => r.Lines)
@@ -152,12 +176,23 @@ public class ExpenseLineConfiguration : IEntityTypeConfiguration<ExpenseLine>
             .HasForeignKey(e => e.TransactionId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // Self-referencing relationship for split allocations
+        builder.HasOne(e => e.ParentLine)
+            .WithMany(e => e.ChildAllocations)
+            .HasForeignKey(e => e.ParentLineId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Indexes
         builder.HasIndex(e => new { e.ReportId, e.LineOrder })
             .HasDatabaseName("ix_expense_lines_report_order");
 
         builder.HasIndex(e => e.TransactionId)
             .HasDatabaseName("ix_expense_lines_transaction");
+
+        // Partial index on parent_line_id for efficient child lookups (reviewer recommendation)
+        builder.HasIndex(e => e.ParentLineId)
+            .HasDatabaseName("ix_expense_lines_parent")
+            .HasFilter("parent_line_id IS NOT NULL");
 
         // Check constraint: at least one of ReceiptId or TransactionId must be set
         builder.ToTable(t => t.HasCheckConstraint(
@@ -172,5 +207,10 @@ public class ExpenseLineConfiguration : IEntityTypeConfiguration<ExpenseLine>
         builder.ToTable(t => t.HasCheckConstraint(
             "chk_dept_tier_valid",
             "department_tier IS NULL OR department_tier IN (1, 2, 3)"));
+
+        // Check constraint: split consistency (reviewer recommendation)
+        builder.ToTable(t => t.HasCheckConstraint(
+            "chk_split_consistency",
+            "(is_split_child = false AND parent_line_id IS NULL) OR (is_split_child = true AND parent_line_id IS NOT NULL)"));
     }
 }

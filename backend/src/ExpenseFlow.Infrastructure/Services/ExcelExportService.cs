@@ -148,39 +148,32 @@ public class ExcelExportService : IExcelExportService
         worksheet.Cell("B3").Value = request.Period;
 
         // Fill expense lines starting at row 7
+        // Flatten splits: parent lines with ChildAllocations export as multiple rows
         const int startRow = 7;
+        int currentRow = startRow;
 
-        for (int i = 0; i < request.Lines.Count; i++)
+        foreach (var line in request.Lines)
         {
-            var line = request.Lines[i];
-            var row = startRow + i;
+            // Check if this line has split allocations
+            if (line.ChildAllocations != null && line.ChildAllocations.Count > 0)
+            {
+                // Export each child allocation as a separate row
+                var childCount = line.ChildAllocations.Count;
+                for (int j = 0; j < childCount; j++)
+                {
+                    var child = line.ChildAllocations[j];
+                    var description = $"{line.Description} (Split {j + 1}/{childCount})"; // Reviewer recommendation
 
-            // Column A: Expense Date
-            worksheet.Cell(row, 1).Value = line.ExpenseDate.ToString(_options.DateFormat);
-
-            // Column B: Vendor Name
-            worksheet.Cell(row, 2).Value = line.VendorName ?? "";
-
-            // Column C: GL Acct/Job (Category)
-            worksheet.Cell(row, 3).Value = line.GlCode ?? "";
-
-            // Column D: Dept/Phase
-            worksheet.Cell(row, 4).Value = line.DepartmentCode ?? "";
-
-            // Column E: Expense Description
-            worksheet.Cell(row, 5).Value = line.Description;
-
-            // Column F: Receipt Status
-            worksheet.Cell(row, 6).Value = line.HasReceipt ? "Yes" : "Missing";
-
-            // Column G: Units/Mileage
-            worksheet.Cell(row, 7).Value = line.Units;
-
-            // Column H: Rate/Amount
-            worksheet.Cell(row, 8).Value = line.Amount;
-
-            // Column I: Expense Total - formula
-            worksheet.Cell(row, 9).SetFormulaA1($"=IF(ISBLANK(G{row}),\"\",G{row}*H{row})");
+                    WriteExcelRow(worksheet, currentRow++, child.ExpenseDate, line.VendorName,
+                        child.GlCode, child.DepartmentCode, description, line.HasReceipt, child.Amount, _options.DateFormat);
+                }
+            }
+            else
+            {
+                // Regular line (no split)
+                WriteExcelRow(worksheet, currentRow++, line.ExpenseDate, line.VendorName,
+                    line.GlCode, line.DepartmentCode, line.Description, line.HasReceipt, line.Amount, _options.DateFormat);
+            }
         }
 
         // Serialize workbook to byte array
@@ -303,5 +296,31 @@ public class ExcelExportService : IExcelExportService
         headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
 
         return (workbook, worksheet);
+    }
+
+    /// <summary>
+    /// Helper method to write a single expense row to Excel worksheet.
+    /// </summary>
+    private static void WriteExcelRow(
+        IXLWorksheet worksheet,
+        int row,
+        DateOnly expenseDate,
+        string? vendorName,
+        string? glCode,
+        string? departmentCode,
+        string description,
+        bool hasReceipt,
+        decimal amount,
+        string dateFormat)
+    {
+        worksheet.Cell(row, 1).Value = expenseDate.ToString(dateFormat);
+        worksheet.Cell(row, 2).Value = vendorName ?? "";
+        worksheet.Cell(row, 3).Value = glCode ?? "";
+        worksheet.Cell(row, 4).Value = departmentCode ?? "";
+        worksheet.Cell(row, 5).Value = description;
+        worksheet.Cell(row, 6).Value = hasReceipt ? "Yes" : "Missing";
+        worksheet.Cell(row, 7).Value = 1; // Units
+        worksheet.Cell(row, 8).Value = amount;
+        worksheet.Cell(row, 9).SetFormulaA1($"=IF(ISBLANK(G{row}),\"\",G{row}*H{row})");
     }
 }

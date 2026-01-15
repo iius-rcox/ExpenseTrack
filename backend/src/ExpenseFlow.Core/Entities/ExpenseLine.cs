@@ -86,8 +86,44 @@ public class ExpenseLine : BaseEntity
     /// <summary>Last modification timestamp</summary>
     public DateTime? UpdatedAt { get; set; }
 
+    /// <summary>
+    /// FK to parent ExpenseLine if this is a split child allocation.
+    /// Null for normal lines and split parent lines.
+    /// </summary>
+    public Guid? ParentLineId { get; set; }
+
+    /// <summary>
+    /// Percentage of parent amount if this is a split child (0-100).
+    /// Null for normal lines and split parent lines.
+    /// </summary>
+    public decimal? SplitPercentage { get; set; }
+
+    /// <summary>
+    /// True if this line has child split allocations.
+    /// When true, this line's GLCode/DepartmentCode should be ignored in favor of children.
+    /// </summary>
+    public bool IsSplitParent { get; set; }
+
+    /// <summary>
+    /// True if this line is a split child allocation.
+    /// When true, ParentLineId and SplitPercentage must be set.
+    /// </summary>
+    public bool IsSplitChild { get; set; }
+
+    /// <summary>
+    /// Order within split allocations (1-based).
+    /// Used to preserve sequence when exporting split lines.
+    /// </summary>
+    public int? AllocationOrder { get; set; }
+
     // Navigation properties
     public ExpenseReport Report { get; set; } = null!;
     public Receipt? Receipt { get; set; }
     public Transaction? Transaction { get; set; }
+
+    /// <summary>Parent line if this is a split allocation</summary>
+    public ExpenseLine? ParentLine { get; set; }
+
+    /// <summary>Child allocations if this is a split parent</summary>
+    public ICollection<ExpenseLine> ChildAllocations { get; set; } = new List<ExpenseLine>();
 }
