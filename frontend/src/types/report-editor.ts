@@ -4,7 +4,20 @@
  */
 
 /**
- * Editable expense line with dirty tracking and validation.
+ * Split allocation within an expense.
+ */
+export interface SplitAllocation {
+  id: string // Temporary UI ID
+  glCode: string
+  departmentCode: string
+  percentage: number // User enters this OR amount
+  amount: number // Auto-calculated OR user entered
+  description?: string
+  entryMode: 'percentage' | 'amount' // Which field user is actively editing
+}
+
+/**
+ * Editable expense line with dirty tracking, validation, and split support.
  */
 export interface EditableExpenseLine {
   // Immutable identifiers
@@ -24,6 +37,12 @@ export interface EditableExpenseLine {
   hasReceipt: boolean
   isDirty: boolean
   validationWarnings: string[]
+
+  // Split allocation support
+  isSplit: boolean // Has been split into multiple allocations
+  isExpanded: boolean // UI expansion state
+  allocations: SplitAllocation[] // Child allocations (editing state)
+  appliedAllocations?: SplitAllocation[] // Saved allocations after Apply
 }
 
 /**
@@ -50,6 +69,16 @@ export type ReportEditorAction =
   | { type: 'SELECT_ALL' }
   | { type: 'CLEAR_SELECTION' }
   | { type: 'RESET_LINE'; id: string }
+  // Split allocation actions
+  | { type: 'START_SPLIT'; id: string }
+  | { type: 'CANCEL_SPLIT'; id: string }
+  | { type: 'ADD_ALLOCATION'; parentId: string }
+  | { type: 'REMOVE_ALLOCATION'; parentId: string; allocationId: string }
+  | { type: 'UPDATE_ALLOCATION'; parentId: string; allocationId: string; field: keyof SplitAllocation; value: any }
+  | { type: 'TOGGLE_ENTRY_MODE'; parentId: string; allocationId: string }
+  | { type: 'APPLY_SPLIT'; parentId: string }
+  | { type: 'REMOVE_SPLIT'; id: string }
+  | { type: 'TOGGLE_EXPANSION'; id: string }
 
 /**
  * Export request payload matching backend ExportPreviewRequest DTO.
@@ -70,6 +99,7 @@ export interface ExportLineDto {
   description: string
   hasReceipt: boolean
   amount: number
+  childAllocations?: ExportLineDto[] // Split allocations if this is a split parent
 }
 
 /**

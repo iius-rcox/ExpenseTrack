@@ -59,6 +59,11 @@ function reportEditorReducer(
             hasReceipt: line.hasReceipt || false,
             isDirty: false,
             validationWarnings: [],
+            // Split allocation fields (initialize as not split)
+            isSplit: false,
+            isExpanded: false,
+            allocations: [],
+            appliedAllocations: undefined,
           }
         }),
         selectedLineIds: new Set(),
@@ -185,6 +190,178 @@ function reportEditorReducer(
           line.id === action.id
             ? { ...line, isDirty: false, validationWarnings: [] }
             : line
+        ),
+      }
+    }
+
+    // Split allocation actions
+    case 'START_SPLIT': {
+      return {
+        ...state,
+        lines: state.lines.map((line) =>
+          line.id === action.id
+            ? {
+                ...line,
+                isExpanded: true,
+                allocations: [
+                  {
+                    id: crypto.randomUUID(),
+                    glCode: line.glCode,
+                    departmentCode: line.departmentCode,
+                    percentage: 50,
+                    amount: line.originalAmount * 0.5,
+                    entryMode: 'amount' as const,
+                  },
+                  {
+                    id: crypto.randomUUID(),
+                    glCode: '',
+                    departmentCode: '',
+                    percentage: 50,
+                    amount: line.originalAmount * 0.5,
+                    entryMode: 'amount' as const,
+                  },
+                ],
+              }
+            : line
+        ),
+      }
+    }
+
+    case 'CANCEL_SPLIT': {
+      return {
+        ...state,
+        lines: state.lines.map((line) =>
+          line.id === action.id
+            ? { ...line, isExpanded: false, allocations: [], isSplit: false }
+            : line
+        ),
+      }
+    }
+
+    case 'ADD_ALLOCATION': {
+      return {
+        ...state,
+        lines: state.lines.map((line) => {
+          if (line.id !== action.parentId) return line
+
+          const newAllocation = {
+            id: crypto.randomUUID(),
+            glCode: '',
+            departmentCode: '',
+            percentage: 0,
+            amount: 0,
+            entryMode: 'amount' as const,
+          }
+
+          return {
+            ...line,
+            allocations: [...line.allocations, newAllocation],
+          }
+        }),
+      }
+    }
+
+    case 'REMOVE_ALLOCATION': {
+      return {
+        ...state,
+        lines: state.lines.map((line) => {
+          if (line.id !== action.parentId) return line
+
+          return {
+            ...line,
+            allocations: line.allocations.filter((a) => a.id !== action.allocationId),
+          }
+        }),
+      }
+    }
+
+    case 'UPDATE_ALLOCATION': {
+      return {
+        ...state,
+        lines: state.lines.map((line) => {
+          if (line.id !== action.parentId) return line
+
+          return {
+            ...line,
+            allocations: line.allocations.map((alloc) => {
+              if (alloc.id !== action.allocationId) return alloc
+
+              const updated = { ...alloc, [action.field]: action.value }
+
+              // Auto-calculate: if user updates percentage, recalc amount
+              if (action.field === 'percentage') {
+                updated.amount = (line.originalAmount * Number(action.value)) / 100
+              }
+              // Auto-calculate: if user updates amount, recalc percentage
+              else if (action.field === 'amount') {
+                updated.percentage = (Number(action.value) / line.originalAmount) * 100
+              }
+
+              return updated
+            }),
+          }
+        }),
+      }
+    }
+
+    case 'TOGGLE_ENTRY_MODE': {
+      return {
+        ...state,
+        lines: state.lines.map((line) => {
+          if (line.id !== action.parentId) return line
+
+          return {
+            ...line,
+            allocations: line.allocations.map((alloc) =>
+              alloc.id === action.allocationId
+                ? { ...alloc, entryMode: alloc.entryMode === 'percentage' ? 'amount' as const : 'percentage' as const }
+                : alloc
+            ),
+          }
+        }),
+      }
+    }
+
+    case 'APPLY_SPLIT': {
+      return {
+        ...state,
+        lines: state.lines.map((line) => {
+          if (line.id !== action.parentId) return line
+
+          return {
+            ...line,
+            isSplit: true,
+            isExpanded: false,
+            appliedAllocations: [...line.allocations],
+            isDirty: true,
+          }
+        }),
+      }
+    }
+
+    case 'REMOVE_SPLIT': {
+      return {
+        ...state,
+        lines: state.lines.map((line) =>
+          line.id === action.id
+            ? {
+                ...line,
+                isSplit: false,
+                isExpanded: false,
+                allocations: [],
+                appliedAllocations: undefined,
+                isDirty: true,
+              }
+            : line
+        ),
+      }
+    }
+
+    case 'TOGGLE_EXPANSION': {
+      return {
+        ...state,
+        lines: state.lines.map((line) =>
+          line.id === action.id ? { ...line, isExpanded: !line.isExpanded } : line
         ),
       }
     }
