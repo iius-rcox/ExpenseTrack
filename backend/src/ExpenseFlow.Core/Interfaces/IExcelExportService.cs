@@ -1,3 +1,5 @@
+using ExpenseFlow.Shared.DTOs;
+
 namespace ExpenseFlow.Core.Interfaces;
 
 /// <summary>
@@ -12,4 +14,17 @@ public interface IExcelExportService
     /// <param name="ct">Cancellation token</param>
     /// <returns>Excel file as byte array</returns>
     Task<byte[]> GenerateExcelAsync(Guid reportId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Generates an Excel file from edited expense line data without database persistence.
+    /// Stateless export for the lightweight editable report workflow.
+    /// </summary>
+    /// <param name="request">Export request with period and edited lines</param>
+    /// <param name="employeeName">User display name for header</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Excel file as byte array</returns>
+    Task<byte[]> GenerateExcelFromPreviewAsync(
+        ExportPreviewRequest request,
+        string employeeName,
+        CancellationToken ct = default);
 }

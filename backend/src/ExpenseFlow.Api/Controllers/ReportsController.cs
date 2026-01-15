@@ -311,6 +311,112 @@ public class ReportsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Exports edited expense lines to Excel without database persistence.
+    /// Stateless export for the lightweight editable report workflow.
+    /// </summary>
+    /// <param name="request">Export request with period and edited lines</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Excel file as downloadable attachment</returns>
+    [HttpPost("export/preview/excel")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ExportPreviewExcel(
+        [FromBody] ExportPreviewRequest request,
+        CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = "Invalid export request. Check period format and line data."
+            });
+        }
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Exporting preview to Excel for user {UserId}, period {Period}, {LineCount} lines",
+            user.Id, request.Period, request.Lines.Count);
+
+        try
+        {
+            var excelBytes = await _excelExportService.GenerateExcelFromPreviewAsync(
+                request, user.DisplayName, ct);
+
+            var fileName = $"ExpenseReport_{request.Period}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.xlsx";
+
+            return File(
+                excelBytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Excel export from preview failed for period {Period}", request.Period);
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetailsResponse
+            {
+                Title = "Export Failed",
+                Detail = "An error occurred while generating the Excel file. Please try again."
+            });
+        }
+    }
+
+    /// <summary>
+    /// Exports edited expense lines to PDF without database persistence.
+    /// Generates summary table only (no receipt images).
+    /// </summary>
+    /// <param name="request">Export request with period and edited lines</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>PDF file as downloadable attachment</returns>
+    [HttpPost("export/preview/pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/pdf")]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ExportPreviewPdf(
+        [FromBody] ExportPreviewRequest request,
+        CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = "Invalid export request. Check period format and line data."
+            });
+        }
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Exporting preview to PDF for user {UserId}, period {Period}, {LineCount} lines",
+            user.Id, request.Period, request.Lines.Count);
+
+        try
+        {
+            var pdfBytes = await _pdfGenerationService.GenerateSummaryPdfAsync(
+                request, user.DisplayName, ct);
+
+            var fileName = $"ExpenseReport_{request.Period}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
+
+            return File(
+                pdfBytes,
+                "application/pdf",
+                fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PDF export from preview failed for period {Period}", request.Period);
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetailsResponse
+            {
+                Title = "Export Failed",
+                Detail = "An error occurred while generating the PDF file. Please try again."
+            });
+        }
+    }
+
+    /// <summary>
     /// Finalizes a draft report, changing status to Generated.
     /// Report must pass validation: each line needs category, amount > 0, and receipt.
     /// </summary>

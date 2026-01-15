@@ -505,4 +505,113 @@ public class PdfGenerationService : IPdfGenerationService
         await image.SaveAsJpegAsync(outputStream, ct);
         return outputStream.ToArray();
     }
+
+    /// <inheritdoc />
+    public Task<byte[]> GenerateSummaryPdfAsync(
+        ExportPreviewRequest request,
+        string employeeName,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation(
+            "Generating summary PDF from preview for period {Period} with {LineCount} lines",
+            request.Period, request.Lines.Count);
+
+        var document = new PdfDocument();
+        document.Info.Title = $"Expense Report - {request.Period}";
+        document.Info.Author = employeeName;
+
+        var page = document.AddPage();
+        var gfx = XGraphics.FromPdfPage(page);
+        var fontBold = new XFont(FontFamily, 14, XFontStyle.Bold);
+        var fontRegular = new XFont(FontFamily, 10, XFontStyle.Regular);
+        var fontSmall = new XFont(FontFamily, 8, XFontStyle.Regular);
+
+        double y = Margin;
+
+        // Header
+        gfx.DrawString(
+            $"EXPENSE REPORT - {request.Period}",
+            fontBold,
+            XBrushes.Black,
+            new XRect(Margin, y, PageWidth - (2 * Margin), 20),
+            XStringFormats.TopCenter);
+
+        y += 30;
+
+        gfx.DrawString(
+            $"Employee: {employeeName}",
+            fontRegular,
+            XBrushes.Black,
+            new XRect(Margin, y, PageWidth - (2 * Margin), 15),
+            XStringFormats.TopLeft);
+
+        y += 20;
+
+        gfx.DrawString(
+            $"Total Expenses: {request.Lines.Count} | Amount: {request.Lines.Sum(l => l.Amount):C}",
+            fontRegular,
+            XBrushes.Black,
+            new XRect(Margin, y, PageWidth - (2 * Margin), 15),
+            XStringFormats.TopLeft);
+
+        y += 30;
+
+        // Table header
+        var colWidths = new[] { 70.0, 120.0, 70.0, 60.0, 140.0, 60.0 }; // Date, Vendor, GL, Dept, Desc, Amount
+        var colX = Margin;
+
+        gfx.DrawString("Date", fontBold, XBrushes.Black, new XRect(colX, y, colWidths[0], 12), XStringFormats.TopLeft);
+        colX += colWidths[0];
+        gfx.DrawString("Vendor", fontBold, XBrushes.Black, new XRect(colX, y, colWidths[1], 12), XStringFormats.TopLeft);
+        colX += colWidths[1];
+        gfx.DrawString("GL Code", fontBold, XBrushes.Black, new XRect(colX, y, colWidths[2], 12), XStringFormats.TopLeft);
+        colX += colWidths[2];
+        gfx.DrawString("Dept", fontBold, XBrushes.Black, new XRect(colX, y, colWidths[3], 12), XStringFormats.TopLeft);
+        colX += colWidths[3];
+        gfx.DrawString("Description", fontBold, XBrushes.Black, new XRect(colX, y, colWidths[4], 12), XStringFormats.TopLeft);
+        colX += colWidths[4];
+        gfx.DrawString("Amount", fontBold, XBrushes.Black, new XRect(colX, y, colWidths[5], 12), XStringFormats.TopRight);
+
+        y += 15;
+        gfx.DrawLine(XPens.Black, Margin, y, PageWidth - Margin, y);
+        y += 5;
+
+        // Table rows
+        foreach (var line in request.Lines.Take(30)) // First 30 lines to fit on page
+        {
+            colX = Margin;
+
+            gfx.DrawString(line.ExpenseDate.ToString("MM/dd/yy"), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[0], 10), XStringFormats.TopLeft);
+            colX += colWidths[0];
+            gfx.DrawString(TruncateString(line.VendorName, 18), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[1], 10), XStringFormats.TopLeft);
+            colX += colWidths[1];
+            gfx.DrawString(line.GlCode, fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[2], 10), XStringFormats.TopLeft);
+            colX += colWidths[2];
+            gfx.DrawString(line.DepartmentCode, fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[3], 10), XStringFormats.TopLeft);
+            colX += colWidths[3];
+            gfx.DrawString(TruncateString(line.Description, 22), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[4], 10), XStringFormats.TopLeft);
+            colX += colWidths[4];
+            gfx.DrawString(line.Amount.ToString("C"), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[5], 10), XStringFormats.TopRight);
+
+            y += 12;
+
+            if (y > PageHeight - Margin - 20)
+            {
+                // Add new page if needed (simplified for MVP)
+                break;
+            }
+        }
+
+        // Save to memory stream
+        using var stream = new MemoryStream();
+        document.Save(stream, false);
+        return Task.FromResult(stream.ToArray());
+    }
+
+    private static string TruncateString(string value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
+            return value;
+        return value.Substring(0, maxLength - 3) + "...";
+    }
 }
