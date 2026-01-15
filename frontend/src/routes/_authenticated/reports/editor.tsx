@@ -137,10 +137,14 @@ function ReportEditorPage() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="text-sm font-medium min-w-[100px] text-center">
-              {new Date(period + '-01').toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-              })}
+              {(() => {
+                const [year, month] = period.split('-').map(Number)
+                const date = new Date(year, month - 1, 1) // month is 0-indexed in Date constructor
+                return date.toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                })
+              })()}
             </div>
             <Button
               variant="outline"
