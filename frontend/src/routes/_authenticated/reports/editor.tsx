@@ -250,7 +250,8 @@ function ReportEditorPage() {
                     <TableHead className="w-[40px]"></TableHead>
                     <TableHead className="w-[120px]">Date</TableHead>
                     <TableHead className="min-w-[180px]">Vendor</TableHead>
-                    <TableHead className="w-[100px]">GL Code</TableHead>
+                    <TableHead className="w-[90px]">GL Code</TableHead>
+                    <TableHead className="min-w-[200px]">GL Name</TableHead>
                     <TableHead className="w-[100px]">Department</TableHead>
                     <TableHead className="min-w-[250px]">Description</TableHead>
                     <TableHead className="w-[80px] text-center">Receipt</TableHead>
@@ -334,6 +335,13 @@ function ReportEditorPage() {
                             error={line.validationWarnings.find((w) => w.startsWith('glCode'))?.split(': ')[1]}
                           />
                         )}
+                      </TableCell>
+
+                      {/* GL Name (Vista Description) - Read-only */}
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground italic">
+                          {(line as any).glName || '-'}
+                        </span>
                       </TableCell>
 
                       <TableCell>
