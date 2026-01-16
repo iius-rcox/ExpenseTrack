@@ -15,6 +15,7 @@ export const reportKeys = {
   details: () => [...reportKeys.all, 'detail'] as const,
   detail: (id: string) => [...reportKeys.details(), id] as const,
   preview: (period: string) => [...reportKeys.all, 'preview', period] as const,
+  draftExists: (period: string) => [...reportKeys.all, 'draft-exists', period] as const,
 }
 
 interface ReportListParams {
@@ -54,6 +55,44 @@ export function useReportPreview(period: string) {
     enabled: !!period,
     staleTime: 60_000,
   })
+}
+
+/**
+ * Check if a draft report exists for the given period.
+ * Returns the draft ID if found.
+ */
+export function useCheckDraftExists(period: string) {
+  return useQuery({
+    queryKey: reportKeys.draftExists(period),
+    queryFn: async () => {
+      const response = await apiFetch<{ exists: boolean; reportId?: string }>(
+        `/reports/draft/exists?period=${period}`
+      )
+      return response
+    },
+    enabled: !!period,
+    staleTime: 0, // Always fresh check
+  })
+}
+
+/**
+ * Get or create draft report for period.
+ * If draft exists, loads it. If not, generates new draft.
+ */
+export function useGetOrCreateDraft(period: string) {
+  const { data: draftCheck, isLoading: checkingDraft } = useCheckDraftExists(period)
+  const generateReport = useGenerateReport()
+
+  const { data: existingDraft, isLoading: loadingDraft } = useReportDetail(draftCheck?.reportId || '', {
+    enabled: !!draftCheck?.reportId,
+  })
+
+  return {
+    draft: existingDraft,
+    isLoading: checkingDraft || loadingDraft || generateReport.isPending,
+    needsGeneration: draftCheck?.exists === false,
+    generateDraft: () => generateReport.mutate({ period }),
+  }
 }
 
 export function useGenerateReport() {

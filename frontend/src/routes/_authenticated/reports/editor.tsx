@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { useReportPreview } from '@/hooks/queries/use-reports'
+import { useReportPreview, useCheckDraftExists, useGenerateReport, useReportDetail, useUpdateReportLine } from '@/hooks/queries/use-reports'
 import { useReportEditor } from '@/hooks/use-report-editor'
 import { useExportPreview } from '@/hooks/queries/use-report-export'
 import { useGLAccounts, lookupGLName } from '@/hooks/queries/use-reference-data'
@@ -35,8 +35,23 @@ function ReportEditorPage() {
   const period = search.period
   const navigate = Route.useNavigate()
 
-  // Fetch preview data
-  const { data: previewLines, isLoading, error } = useReportPreview(period)
+  // Check if draft exists for this period
+  const { data: draftCheck, isLoading: checkingDraft } = useCheckDraftExists(period)
+  const hasDraft = draftCheck?.exists && draftCheck?.reportId
+
+  // Load existing draft or preview
+  const { data: existingDraft, isLoading: loadingDraft } = useReportDetail(
+    draftCheck?.reportId || '',
+    { enabled: !!hasDraft }
+  )
+  const { data: previewLines, isLoading: loadingPreview } = useReportPreview(period, {
+    enabled: !hasDraft
+  })
+
+  // Draft management
+  const [useDraft, setUseDraft] = useState(false)
+  const { mutate: generateDraft, isPending: generatingDraft } = useGenerateReport()
+  const { mutate: updateLine, isPending: savingLine } = useUpdateReportLine()
 
   // Fetch reference data for GL name lookups
   const { data: glAccounts = [] } = useGLAccounts()
@@ -47,6 +62,8 @@ function ReportEditorPage() {
   // Export mutation
   const { mutate: exportReport, isPending: isExporting } = useExportPreview()
 
+  const isLoading = checkingDraft || loadingDraft || loadingPreview || generatingDraft
+
   // Helper: Update GL Code and auto-lookup GL Name
   const handleGLCodeChange = (lineId: string, newGLCode: string) => {
     const glName = lookupGLName(newGLCode, glAccounts)
@@ -56,12 +73,18 @@ function ReportEditorPage() {
     dispatch({ type: 'UPDATE_LINE', id: lineId, field: 'glName', value: glName })
   }
 
-  // Load preview data into editor
+  // Load data into editor (draft or preview)
   useEffect(() => {
-    if (previewLines) {
+    if (existingDraft?.lines) {
+      // Load from existing draft
+      dispatch({ type: 'LOAD_PREVIEW', lines: existingDraft.lines })
+      setUseDraft(true)
+      toast.info('Resuming your draft...')
+    } else if (previewLines && !hasDraft) {
+      // Load preview (no draft exists yet)
       dispatch({ type: 'LOAD_PREVIEW', lines: previewLines })
     }
-  }, [previewLines, dispatch])
+  }, [existingDraft, previewLines, hasDraft, dispatch])
 
   // Unsaved changes warning
   useEffect(() => {
