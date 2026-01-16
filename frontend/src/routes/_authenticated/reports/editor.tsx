@@ -61,6 +61,12 @@ function ReportEditorPage() {
 
   const isLoading = checkingDraft || loadingDraft || loadingPreview || generatingDraft
 
+  // Helper: Strip index suffix from line ID for API calls
+  const getDbLineId = (lineId: string): string => {
+    // Frontend IDs have "-index" suffix, backend expects just the GUID
+    return lineId.split('-').slice(0, 5).join('-') // Take first 5 parts of GUID
+  }
+
   // Helper: Update GL Code and auto-lookup GL Name
   const handleGLCodeChange = (lineId: string, newGLCode: string) => {
     const glName = lookupGLName(newGLCode, glAccounts)
@@ -71,8 +77,9 @@ function ReportEditorPage() {
 
     // Save to database if using draft
     if (useDraft && reportId) {
+      const dbLineId = getDbLineId(lineId)
       updateLine(
-        { reportId, lineId, data: { glCode: newGLCode } },
+        { reportId, lineId: dbLineId, data: { glCode: newGLCode } },
         {
           onSuccess: () => {
             setLastSaved(new Date())
@@ -98,8 +105,9 @@ function ReportEditorPage() {
       // GL Code handled by handleGLCodeChange which also updates glName
 
       if (Object.keys(updateData).length > 0) {
+        const dbLineId = getDbLineId(lineId)
         updateLine(
-          { reportId, lineId, data: updateData },
+          { reportId, lineId: dbLineId, data: updateData },
           {
             onSuccess: () => {
               setLastSaved(new Date())
