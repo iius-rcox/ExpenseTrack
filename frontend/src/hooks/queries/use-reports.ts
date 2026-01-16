@@ -83,9 +83,7 @@ export function useGetOrCreateDraft(period: string) {
   const { data: draftCheck, isLoading: checkingDraft } = useCheckDraftExists(period)
   const generateReport = useGenerateReport()
 
-  const { data: existingDraft, isLoading: loadingDraft } = useReportDetail(draftCheck?.reportId || '', {
-    enabled: !!draftCheck?.reportId,
-  })
+  const { data: existingDraft, isLoading: loadingDraft } = useReportDetail(draftCheck?.reportId || '')
 
   return {
     draft: existingDraft,

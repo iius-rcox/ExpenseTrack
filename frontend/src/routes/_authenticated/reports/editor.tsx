@@ -11,14 +11,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { EditableTextCell } from '@/components/reports/editable-text-cell'
 import { EditableDateCell } from '@/components/reports/editable-date-cell'
 import { SplitExpansionPanel } from '@/components/reports/split-expansion-panel'
 import { SplitIndicatorBadge } from '@/components/reports/split-indicator-badge'
 import { DraftStatusBanner } from '@/components/reports/draft-status-banner'
 import { toast } from 'sonner'
-import { FileSpreadsheet, FileText, AlertCircle, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Split, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react'
+import { FileSpreadsheet, FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Split, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
 import type { ExportPreviewRequest, ExportLineDto } from '@/types/report-editor'
 
@@ -41,13 +40,8 @@ function ReportEditorPage() {
   const hasDraft = draftCheck?.exists && draftCheck?.reportId
 
   // Load existing draft or preview
-  const { data: existingDraft, isLoading: loadingDraft } = useReportDetail(
-    draftCheck?.reportId || '',
-    { enabled: !!hasDraft }
-  )
-  const { data: previewLines, isLoading: loadingPreview } = useReportPreview(period, {
-    enabled: !hasDraft
-  })
+  const { data: existingDraft, isLoading: loadingDraft } = useReportDetail(draftCheck?.reportId || '')
+  const { data: previewLines, isLoading: loadingPreview } = useReportPreview(period)
 
   // Draft management
   const [useDraft, setUseDraft] = useState(false)
@@ -206,17 +200,6 @@ function ReportEditorPage() {
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-96 w-full" />
       </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Failed to load expense data: {error.message}
-        </AlertDescription>
-      </Alert>
     )
   }
 
@@ -455,14 +438,7 @@ function ReportEditorPage() {
                         ) : (
                           <EditableTextCell
                             value={line.departmentCode}
-                            onChange={(value) =>
-                              dispatch({
-                                type: 'UPDATE_LINE',
-                                id: line.id,
-                                field: 'departmentCode',
-                                value,
-                              })
-                            }
+                            onChange={(value) => handleFieldUpdate(line.id, 'departmentCode', value)}
                             placeholder="Dept..."
                             error={line.validationWarnings.find((w) => w.startsWith('departmentCode'))?.split(': ')[1]}
                           />
@@ -472,14 +448,7 @@ function ReportEditorPage() {
                       <TableCell>
                         <EditableTextCell
                           value={line.description}
-                          onChange={(value) =>
-                            dispatch({
-                              type: 'UPDATE_LINE',
-                              id: line.id,
-                              field: 'description',
-                              value,
-                            })
-                          }
+                          onChange={(value) => handleFieldUpdate(line.id, 'description', value)}
                           placeholder="Description..."
                           error={line.validationWarnings.find((w) => w.startsWith('description'))?.split(': ')[1]}
                         />
