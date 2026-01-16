@@ -59,6 +59,7 @@ function reportEditorReducer(
             expenseDate,
             vendor: line.vendorName || line.vendor || '',
             glCode: line.glCode || line.glCodeSuggested || '',
+            glName: line.glName || '', // Vista GL account description
             departmentCode: line.departmentCode || line.departmentSuggested || '',
             description: line.normalizedDescription || line.description || line.originalDescription || '',
             hasReceipt: line.hasReceipt || false,

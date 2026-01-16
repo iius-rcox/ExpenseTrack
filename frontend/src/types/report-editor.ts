@@ -30,6 +30,7 @@ export interface EditableExpenseLine {
   expenseDate: string // ISO date string
   vendor: string
   glCode: string
+  glName?: string // Vista GL account description (read-only, for display)
   departmentCode: string
   description: string
 

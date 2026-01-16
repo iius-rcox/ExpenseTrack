@@ -340,7 +340,7 @@ function ReportEditorPage() {
                       {/* GL Name (Vista Description) - Read-only */}
                       <TableCell>
                         <span className="text-sm text-muted-foreground italic">
-                          {(line as any).glName || '-'}
+                          {line.glName || '-'}
                         </span>
                       </TableCell>
 
