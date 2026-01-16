@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { useReportPreview } from '@/hooks/queries/use-reports'
 import { useReportEditor } from '@/hooks/use-report-editor'
 import { useExportPreview } from '@/hooks/queries/use-report-export'
+import { useGLAccounts, lookupGLName } from '@/hooks/queries/use-reference-data'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -37,11 +38,23 @@ function ReportEditorPage() {
   // Fetch preview data
   const { data: previewLines, isLoading, error } = useReportPreview(period)
 
+  // Fetch reference data for GL name lookups
+  const { data: glAccounts = [] } = useGLAccounts()
+
   // Editor state
   const { state, dispatch, metrics } = useReportEditor(period)
 
   // Export mutation
   const { mutate: exportReport, isPending: isExporting } = useExportPreview()
+
+  // Helper: Update GL Code and auto-lookup GL Name
+  const handleGLCodeChange = (lineId: string, newGLCode: string) => {
+    const glName = lookupGLName(newGLCode, glAccounts)
+
+    // Update both GL Code and GL Name
+    dispatch({ type: 'UPDATE_LINE', id: lineId, field: 'glCode', value: newGLCode })
+    dispatch({ type: 'UPDATE_LINE', id: lineId, field: 'glName', value: glName })
+  }
 
   // Load preview data into editor
   useEffect(() => {
@@ -323,14 +336,7 @@ function ReportEditorPage() {
                         ) : (
                           <EditableTextCell
                             value={line.glCode}
-                            onChange={(value) =>
-                              dispatch({
-                                type: 'UPDATE_LINE',
-                                id: line.id,
-                                field: 'glCode',
-                                value,
-                              })
-                            }
+                            onChange={(value) => handleGLCodeChange(line.id, value)}
                             placeholder="GL code..."
                             error={line.validationWarnings.find((w) => w.startsWith('glCode'))?.split(': ')[1]}
                           />
