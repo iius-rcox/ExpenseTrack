@@ -526,9 +526,12 @@ public class CategorizationService : ICategorizationService
             cancellationToken: cancellationToken);
 
         var suggestedCode = response.Content?.Trim();
-        if (string.IsNullOrEmpty(suggestedCode))
+
+        // If AI fails to suggest or suggests invalid code, default to 63300 (Meals & Entertainment - general expense)
+        if (string.IsNullOrEmpty(suggestedCode) || !expenseGLAccounts.Any(g => g.Code == suggestedCode))
         {
-            return null;
+            suggestedCode = "63300"; // Default general expense code
+            _logger.LogWarning("AI failed to suggest valid GL code for '{Description}', using default 63300", description);
         }
 
         var glAccount = await _referenceDataService.GetGLAccountByCodeAsync(suggestedCode);
