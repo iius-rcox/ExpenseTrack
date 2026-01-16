@@ -50,6 +50,8 @@ function ReportEditorPage() {
 
   // Draft management
   const [useDraft, setUseDraft] = useState(false)
+  const [reportId, setReportId] = useState<string | null>(null)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const { mutate: generateDraft, isPending: generatingDraft } = useGenerateReport()
   const { mutate: updateLine, isPending: savingLine } = useUpdateReportLine()
 
@@ -68,9 +70,52 @@ function ReportEditorPage() {
   const handleGLCodeChange = (lineId: string, newGLCode: string) => {
     const glName = lookupGLName(newGLCode, glAccounts)
 
-    // Update both GL Code and GL Name
+    // Update both GL Code and GL Name in UI
     dispatch({ type: 'UPDATE_LINE', id: lineId, field: 'glCode', value: newGLCode })
     dispatch({ type: 'UPDATE_LINE', id: lineId, field: 'glName', value: glName })
+
+    // Save to database if using draft
+    if (useDraft && reportId) {
+      updateLine(
+        { reportId, lineId, data: { glCode: newGLCode } },
+        {
+          onSuccess: () => {
+            setLastSaved(new Date())
+          },
+          onError: (error) => {
+            toast.error(`Failed to save: ${error.message}`)
+          },
+        }
+      )
+    }
+  }
+
+  // Helper: Update any field with auto-save
+  const handleFieldUpdate = (lineId: string, field: string, value: any) => {
+    // Update UI immediately (optimistic)
+    dispatch({ type: 'UPDATE_LINE', id: lineId, field: field as any, value })
+
+    // Save to database if using draft
+    if (useDraft && reportId) {
+      const updateData: any = {}
+      if (field === 'departmentCode') updateData.departmentCode = value
+      if (field === 'description') updateData.description = value
+      // GL Code handled by handleGLCodeChange which also updates glName
+
+      if (Object.keys(updateData).length > 0) {
+        updateLine(
+          { reportId, lineId, data: updateData },
+          {
+            onSuccess: () => {
+              setLastSaved(new Date())
+            },
+            onError: (error) => {
+              toast.error(`Failed to save: ${error.message}`)
+            },
+          }
+        )
+      }
+    }
   }
 
   // Load data into editor (draft or preview)
@@ -79,10 +124,14 @@ function ReportEditorPage() {
       // Load from existing draft
       dispatch({ type: 'LOAD_PREVIEW', lines: existingDraft.lines })
       setUseDraft(true)
+      setReportId(existingDraft.id)
+      setLastSaved(new Date(existingDraft.updatedAt || existingDraft.createdAt))
       toast.info('Resuming your draft...')
     } else if (previewLines && !hasDraft) {
       // Load preview (no draft exists yet)
       dispatch({ type: 'LOAD_PREVIEW', lines: previewLines })
+      setUseDraft(false)
+      setReportId(null)
     }
   }, [existingDraft, previewLines, hasDraft, dispatch])
 
