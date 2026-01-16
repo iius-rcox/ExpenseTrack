@@ -16,6 +16,7 @@ import { EditableTextCell } from '@/components/reports/editable-text-cell'
 import { EditableDateCell } from '@/components/reports/editable-date-cell'
 import { SplitExpansionPanel } from '@/components/reports/split-expansion-panel'
 import { SplitIndicatorBadge } from '@/components/reports/split-indicator-badge'
+import { DraftStatusBanner } from '@/components/reports/draft-status-banner'
 import { toast } from 'sonner'
 import { FileSpreadsheet, FileText, AlertCircle, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Split, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
@@ -219,8 +220,34 @@ function ReportEditorPage() {
     )
   }
 
+  const handleCreateDraft = () => {
+    generateDraft(
+      { period },
+      {
+        onSuccess: (draft) => {
+          setReportId(draft.id)
+          setUseDraft(true)
+          dispatch({ type: 'LOAD_PREVIEW', lines: draft.lines })
+          toast.success('Draft created! Your edits will now be saved automatically.')
+        },
+        onError: (error) => {
+          toast.error(`Failed to create draft: ${error.message}`)
+        },
+      }
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {/* Draft Status Banner */}
+      <DraftStatusBanner
+        useDraft={useDraft}
+        lastSaved={lastSaved}
+        isSaving={savingLine}
+        onCreateDraft={handleCreateDraft}
+        onDiscardDraft={() => toast.info('Discard draft - to be implemented')}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
