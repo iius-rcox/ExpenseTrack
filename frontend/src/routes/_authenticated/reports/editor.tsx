@@ -115,20 +115,28 @@ function ReportEditorPage() {
 
   // Load data into editor (draft or preview)
   useEffect(() => {
-    if (existingDraft?.lines) {
-      // Load from existing draft
-      dispatch({ type: 'LOAD_PREVIEW', lines: existingDraft.lines })
+    if (existingDraft?.lines && glAccounts.length > 0) {
+      // Load from existing draft and populate glName from GL lookup
+      const linesWithGLNames = existingDraft.lines.map((line: any) => ({
+        ...line,
+        glName: line.glName || lookupGLName(line.glCode || '', glAccounts),
+      }))
+      dispatch({ type: 'LOAD_PREVIEW', lines: linesWithGLNames })
       setUseDraft(true)
       setReportId(existingDraft.id)
       setLastSaved(new Date(existingDraft.updatedAt || existingDraft.createdAt))
       toast.info('Resuming your draft...')
-    } else if (previewLines && !hasDraft) {
-      // Load preview (no draft exists yet)
-      dispatch({ type: 'LOAD_PREVIEW', lines: previewLines })
+    } else if (previewLines && !hasDraft && glAccounts.length > 0) {
+      // Load preview (no draft exists yet) and populate glName
+      const linesWithGLNames = previewLines.map((line: any) => ({
+        ...line,
+        glName: line.glName || lookupGLName(line.glCode || '', glAccounts),
+      }))
+      dispatch({ type: 'LOAD_PREVIEW', lines: linesWithGLNames })
       setUseDraft(false)
       setReportId(null)
     }
-  }, [existingDraft, previewLines, hasDraft, dispatch])
+  }, [existingDraft, previewLines, hasDraft, glAccounts, dispatch])
 
   // Unsaved changes warning
   useEffect(() => {
