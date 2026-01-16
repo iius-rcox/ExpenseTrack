@@ -20,6 +20,7 @@ public class ExpenseLineDto
 
     // GL Code with tiered categorization info
     public string? GlCode { get; set; }
+    public string? GlName { get; set; } // Vista account description (e.g., "Meals & Entertainment")
     public string? GlCodeSuggested { get; set; }
     public int? GlCodeTier { get; set; }
     public string? GlCodeSource { get; set; }

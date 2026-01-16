@@ -632,6 +632,7 @@ public class ReportService : IReportService
                     NormalizedDescription = transaction.Description,
                     VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName,
                     GlCode = categorization?.GL?.TopSuggestion?.Code,
+                    GlName = categorization?.GL?.TopSuggestion?.Name, // Vista description
                     GlCodeSuggested = categorization?.GL?.TopSuggestion?.Code,
                     DepartmentCode = categorization?.Department?.TopSuggestion?.Code,
                     DepartmentSuggested = categorization?.Department?.TopSuggestion?.Code,
@@ -663,6 +664,7 @@ public class ReportService : IReportService
                         NormalizedDescription = transaction.Description,
                         VendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName ?? group.Name,
                         GlCode = categorization?.GL?.TopSuggestion?.Code,
+                        GlName = categorization?.GL?.TopSuggestion?.Name, // Vista description
                         GlCodeSuggested = categorization?.GL?.TopSuggestion?.Code,
                         DepartmentCode = categorization?.Department?.TopSuggestion?.Code,
                         DepartmentSuggested = categorization?.Department?.TopSuggestion?.Code,

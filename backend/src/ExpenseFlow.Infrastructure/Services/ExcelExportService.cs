@@ -165,14 +165,14 @@ public class ExcelExportService : IExcelExportService
                     var description = $"{line.Description} (Split {j + 1}/{childCount})"; // Reviewer recommendation
 
                     WriteExcelRow(worksheet, currentRow++, child.ExpenseDate, line.VendorName,
-                        child.GlCode, child.DepartmentCode, description, line.HasReceipt, child.Amount, _options.DateFormat);
+                        child.GlCode, child.GlName, child.DepartmentCode, description, line.HasReceipt, child.Amount, _options.DateFormat);
                 }
             }
             else
             {
                 // Regular line (no split)
                 WriteExcelRow(worksheet, currentRow++, line.ExpenseDate, line.VendorName,
-                    line.GlCode, line.DepartmentCode, line.Description, line.HasReceipt, line.Amount, _options.DateFormat);
+                    line.GlCode, line.GlName, line.DepartmentCode, line.Description, line.HasReceipt, line.Amount, _options.DateFormat);
             }
         }
 
@@ -228,16 +228,17 @@ public class ExcelExportService : IExcelExportService
         var headerRow = 6;
         worksheet.Cell(headerRow, 1).Value = "Date";
         worksheet.Cell(headerRow, 2).Value = "Vendor";
-        worksheet.Cell(headerRow, 3).Value = "GL Acct/Job";
-        worksheet.Cell(headerRow, 4).Value = "Dept/Phase";
-        worksheet.Cell(headerRow, 5).Value = "Expense Description";
-        worksheet.Cell(headerRow, 6).Value = "Receipt";
-        worksheet.Cell(headerRow, 7).Value = "Units";
-        worksheet.Cell(headerRow, 8).Value = "Rate/Amount";
-        worksheet.Cell(headerRow, 9).Value = "Expense Total";
+        worksheet.Cell(headerRow, 3).Value = "GL Code";
+        worksheet.Cell(headerRow, 4).Value = "GL Name";
+        worksheet.Cell(headerRow, 5).Value = "Dept/Phase";
+        worksheet.Cell(headerRow, 6).Value = "Expense Description";
+        worksheet.Cell(headerRow, 7).Value = "Receipt";
+        worksheet.Cell(headerRow, 8).Value = "Units";
+        worksheet.Cell(headerRow, 9).Value = "Rate/Amount";
+        worksheet.Cell(headerRow, 10).Value = "Expense Total";
 
         // Style header row
-        var headerRange = worksheet.Range(headerRow, 1, headerRow, 9);
+        var headerRange = worksheet.Range(headerRow, 1, headerRow, 10);
         headerRange.Style.Font.Bold = true;
         headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
         headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
@@ -253,16 +254,17 @@ public class ExcelExportService : IExcelExportService
         var workbook = new XLWorkbook();
         var worksheet = workbook.Worksheets.Add("Expense Report");
 
-        // Set column widths (9 columns)
+        // Set column widths (10 columns)
         worksheet.Column(1).Width = 12; // Date
         worksheet.Column(2).Width = 25; // Vendor
-        worksheet.Column(3).Width = 15; // GL Acct/Job
-        worksheet.Column(4).Width = 12; // Dept/Phase
-        worksheet.Column(5).Width = 40; // Description
-        worksheet.Column(6).Width = 12; // Receipt Status
-        worksheet.Column(7).Width = 10; // Units
-        worksheet.Column(8).Width = 12; // Rate/Amount
-        worksheet.Column(9).Width = 14; // Total
+        worksheet.Column(3).Width = 10; // GL Code
+        worksheet.Column(4).Width = 30; // GL Name (Vista description)
+        worksheet.Column(5).Width = 12; // Dept/Phase
+        worksheet.Column(6).Width = 40; // Description
+        worksheet.Column(7).Width = 12; // Receipt Status
+        worksheet.Column(8).Width = 10; // Units
+        worksheet.Column(9).Width = 12; // Rate/Amount
+        worksheet.Column(10).Width = 14; // Total
 
         // Header section
         worksheet.Cell("A1").Value = "EXPENSE REPORT";
@@ -281,16 +283,17 @@ public class ExcelExportService : IExcelExportService
         var headerRow = 6;
         worksheet.Cell(headerRow, 1).Value = "Date";
         worksheet.Cell(headerRow, 2).Value = "Vendor";
-        worksheet.Cell(headerRow, 3).Value = "GL Acct/Job";
-        worksheet.Cell(headerRow, 4).Value = "Dept/Phase";
-        worksheet.Cell(headerRow, 5).Value = "Expense Description";
-        worksheet.Cell(headerRow, 6).Value = "Receipt";
-        worksheet.Cell(headerRow, 7).Value = "Units";
-        worksheet.Cell(headerRow, 8).Value = "Rate/Amount";
-        worksheet.Cell(headerRow, 9).Value = "Expense Total";
+        worksheet.Cell(headerRow, 3).Value = "GL Code";
+        worksheet.Cell(headerRow, 4).Value = "GL Name";
+        worksheet.Cell(headerRow, 5).Value = "Dept/Phase";
+        worksheet.Cell(headerRow, 6).Value = "Expense Description";
+        worksheet.Cell(headerRow, 7).Value = "Receipt";
+        worksheet.Cell(headerRow, 8).Value = "Units";
+        worksheet.Cell(headerRow, 9).Value = "Rate/Amount";
+        worksheet.Cell(headerRow, 10).Value = "Expense Total";
 
         // Style header row
-        var headerRange = worksheet.Range(headerRow, 1, headerRow, 9);
+        var headerRange = worksheet.Range(headerRow, 1, headerRow, 10);
         headerRange.Style.Font.Bold = true;
         headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
         headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
@@ -299,7 +302,7 @@ public class ExcelExportService : IExcelExportService
     }
 
     /// <summary>
-    /// Helper method to write a single expense row to Excel worksheet.
+    /// Helper method to write a single expense row to Excel worksheet (10 columns).
     /// </summary>
     private static void WriteExcelRow(
         IXLWorksheet worksheet,
@@ -307,6 +310,7 @@ public class ExcelExportService : IExcelExportService
         DateOnly expenseDate,
         string? vendorName,
         string? glCode,
+        string? glName,
         string? departmentCode,
         string description,
         bool hasReceipt,
@@ -316,11 +320,12 @@ public class ExcelExportService : IExcelExportService
         worksheet.Cell(row, 1).Value = expenseDate.ToString(dateFormat);
         worksheet.Cell(row, 2).Value = vendorName ?? "";
         worksheet.Cell(row, 3).Value = glCode ?? "";
-        worksheet.Cell(row, 4).Value = departmentCode ?? "";
-        worksheet.Cell(row, 5).Value = description;
-        worksheet.Cell(row, 6).Value = hasReceipt ? "Yes" : "Missing";
-        worksheet.Cell(row, 7).Value = 1; // Units
-        worksheet.Cell(row, 8).Value = amount;
-        worksheet.Cell(row, 9).SetFormulaA1($"=IF(ISBLANK(G{row}),\"\",G{row}*H{row})");
+        worksheet.Cell(row, 4).Value = glName ?? ""; // NEW: GL Name/Description
+        worksheet.Cell(row, 5).Value = departmentCode ?? "";
+        worksheet.Cell(row, 6).Value = description;
+        worksheet.Cell(row, 7).Value = hasReceipt ? "Yes" : "Missing";
+        worksheet.Cell(row, 8).Value = 1; // Units
+        worksheet.Cell(row, 9).Value = amount;
+        worksheet.Cell(row, 10).SetFormulaA1($"=IF(ISBLANK(H{row}),\"\",H{row}*I{row})");
     }
 }

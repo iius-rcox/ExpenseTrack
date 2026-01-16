@@ -28,6 +28,12 @@ public class ExportLineDto
     public string GlCode { get; set; } = string.Empty;
 
     /// <summary>
+    /// GL account name/description from Vista.
+    /// Example: "Meals & Entertainment" for GL 63300
+    /// </summary>
+    public string? GlName { get; set; }
+
+    /// <summary>
     /// Department or phase code.
     /// Example: "07" (Field Operations)
     /// </summary>
