@@ -791,7 +791,7 @@ public class PdfGenerationService : IPdfGenerationService
                     new XRect(colX, y, colWidths[1], 12), XStringFormats.TopLeft);
                 colX += colWidths[1];
 
-                gfx.DrawString(line.GlCode ?? "", fontSmall, XBrushes.Black,
+                gfx.DrawString(line.GLCode ?? "", fontSmall, XBrushes.Black,
                     new XRect(colX, y, colWidths[2], 12), XStringFormats.TopLeft);
                 colX += colWidths[2];
 
