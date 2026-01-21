@@ -28,4 +28,13 @@ public interface IPdfGenerationService
         ExportPreviewRequest request,
         string employeeName,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Generates a complete PDF report containing both the itemized expense list
+    /// and all associated receipt images in a single document.
+    /// </summary>
+    /// <param name="reportId">Report ID to export</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>PDF result with file contents, page count, and placeholder count</returns>
+    Task<ReceiptPdfDto> GenerateCompleteReportPdfAsync(Guid reportId, CancellationToken ct = default);
 }
