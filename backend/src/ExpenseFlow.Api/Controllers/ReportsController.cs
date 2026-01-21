@@ -533,6 +533,69 @@ public class ReportsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Exports a complete PDF report containing both the itemized expense list
+    /// and all associated receipt images in a single document.
+    /// </summary>
+    /// <param name="reportId">Report ID to export</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>PDF file as downloadable attachment</returns>
+    [HttpGet("{reportId:guid}/export/complete")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/pdf")]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ExportCompletePdf(Guid reportId, CancellationToken ct)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        // Verify user owns the report
+        var report = await _reportService.GetByIdAsync(user.Id, reportId, ct);
+        if (report == null)
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = $"Report with ID {reportId} was not found"
+            });
+        }
+
+        _logger.LogInformation(
+            "Exporting complete PDF (itemized + receipts) for report {ReportId} for user {UserId}",
+            reportId, user.Id);
+
+        try
+        {
+            var pdfResult = await _pdfGenerationService.GenerateCompleteReportPdfAsync(reportId, ct);
+
+            // Add custom headers with metadata
+            Response.Headers.Append("X-Page-Count", pdfResult.PageCount.ToString());
+            Response.Headers.Append("X-Placeholder-Count", pdfResult.PlaceholderCount.ToString());
+
+            return File(
+                pdfResult.FileContents,
+                pdfResult.ContentType,
+                pdfResult.FileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "Failed to generate complete PDF for report {ReportId}", reportId);
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = ex.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Complete PDF generation failed for report {ReportId}: {Error}", reportId, ex.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetailsResponse
+            {
+                Title = "PDF Generation Failed",
+                Detail = "An error occurred while generating the complete PDF report. Please try again or contact support."
+            });
+        }
+    }
+
+    /// <summary>
     /// Exports a consolidated PDF of all receipts for a report.
     /// Includes placeholder pages for missing receipts with justification details.
     /// </summary>

@@ -614,4 +614,290 @@ public class PdfGenerationService : IPdfGenerationService
             return value;
         return value.Substring(0, maxLength - 3) + "...";
     }
+
+    /// <inheritdoc />
+    public async Task<ReceiptPdfDto> GenerateCompleteReportPdfAsync(Guid reportId, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Generating complete PDF report (itemized + receipts) for report {ReportId}", reportId);
+
+        var report = await _reportRepository.GetByIdWithLinesAsync(reportId, ct)
+            ?? throw new InvalidOperationException($"Report {reportId} not found");
+
+        using var document = new PdfDocument();
+        document.Info.Title = $"Expense Report - {report.Period}";
+        document.Info.Author = report.User?.DisplayName ?? "ExpenseFlow";
+
+        var orderedLines = report.Lines
+            .OrderBy(l => l.LineOrder)
+            .Take(_options.MaxReceiptsPerPdf)
+            .ToList();
+
+        // Section 1: Generate itemized expense list pages
+        var summaryPageCount = AddItemizedSummarySection(document, report, orderedLines);
+
+        // Section 2: Add page break separator before receipts section
+        AddReceiptsSectionHeader(document);
+
+        // Section 3: Generate receipt pages
+        int receiptPageCount = 0;
+        int placeholderCount = 0;
+
+        foreach (var line in orderedLines)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (line.HasReceipt && line.Receipt != null)
+            {
+                var pagesAdded = await AddReceiptPageAsync(document, line, ct);
+                receiptPageCount += pagesAdded;
+            }
+            else
+            {
+                AddPlaceholderPage(document, line, report);
+                receiptPageCount++;
+                placeholderCount++;
+            }
+        }
+
+        // If no receipts at all, add informational page
+        if (receiptPageCount == 0)
+        {
+            AddNoReceiptsInfoPage(document);
+            receiptPageCount = 1;
+        }
+
+        await using var outputStream = new MemoryStream();
+        document.Save(outputStream, false);
+
+        var totalPageCount = summaryPageCount + 1 + receiptPageCount; // +1 for section header
+
+        _logger.LogInformation(
+            "Generated complete PDF report for {ReportId}: {SummaryPages} summary + {ReceiptPages} receipts ({Placeholders} placeholders)",
+            reportId, summaryPageCount, receiptPageCount, placeholderCount);
+
+        return new ReceiptPdfDto
+        {
+            FileName = $"{report.Period}-complete-report.pdf",
+            ContentType = "application/pdf",
+            FileContents = outputStream.ToArray(),
+            PageCount = totalPageCount,
+            PlaceholderCount = placeholderCount
+        };
+    }
+
+    private int AddItemizedSummarySection(PdfDocument document, ExpenseReport report, List<ExpenseLine> lines)
+    {
+        int pageCount = 0;
+        var linesPerPage = 30;
+        var totalPages = (int)Math.Ceiling((double)lines.Count / linesPerPage);
+
+        for (int pageNum = 0; pageNum < Math.Max(1, totalPages); pageNum++)
+        {
+            var page = document.AddPage();
+            page.Width = PageWidth;
+            page.Height = PageHeight;
+            pageCount++;
+
+            using var gfx = XGraphics.FromPdfPage(page);
+
+            var fontTitle = new XFont(FontFamily, 16, XFontStyle.Bold);
+            var fontHeader = new XFont(FontFamily, 11, XFontStyle.Bold);
+            var fontRegular = new XFont(FontFamily, 10, XFontStyle.Regular);
+            var fontSmall = new XFont(FontFamily, 8, XFontStyle.Regular);
+
+            double y = Margin;
+
+            // Title - only on first page
+            if (pageNum == 0)
+            {
+                gfx.DrawString(
+                    $"EXPENSE REPORT - {report.Period}",
+                    fontTitle,
+                    XBrushes.Black,
+                    new XRect(Margin, y, PageWidth - (2 * Margin), 24),
+                    XStringFormats.TopCenter);
+
+                y += 35;
+
+                gfx.DrawString(
+                    $"Employee: {report.User?.DisplayName ?? "Unknown"}",
+                    fontRegular,
+                    XBrushes.Black,
+                    new XRect(Margin, y, PageWidth - (2 * Margin), 16),
+                    XStringFormats.TopLeft);
+
+                y += 20;
+
+                var totalAmount = lines.Sum(l => l.Amount);
+                gfx.DrawString(
+                    $"Total Expenses: {lines.Count} items | Total Amount: {totalAmount:C}",
+                    fontRegular,
+                    XBrushes.Black,
+                    new XRect(Margin, y, PageWidth - (2 * Margin), 16),
+                    XStringFormats.TopLeft);
+
+                y += 30;
+            }
+            else
+            {
+                // Continuation header
+                gfx.DrawString(
+                    $"Expense Report - {report.Period} (Page {pageNum + 1})",
+                    fontHeader,
+                    XBrushes.Black,
+                    new XRect(Margin, y, PageWidth - (2 * Margin), 18),
+                    XStringFormats.TopLeft);
+                y += 25;
+            }
+
+            // Table header
+            var colWidths = new[] { 65.0, 100.0, 55.0, 50.0, 120.0, 60.0, 60.0 };
+            // Date, Vendor, GL, Dept, Description, Amount, Receipt
+            var colX = Margin;
+
+            gfx.DrawString("Date", fontHeader, XBrushes.Black, new XRect(colX, y, colWidths[0], 14), XStringFormats.TopLeft);
+            colX += colWidths[0];
+            gfx.DrawString("Vendor", fontHeader, XBrushes.Black, new XRect(colX, y, colWidths[1], 14), XStringFormats.TopLeft);
+            colX += colWidths[1];
+            gfx.DrawString("GL Code", fontHeader, XBrushes.Black, new XRect(colX, y, colWidths[2], 14), XStringFormats.TopLeft);
+            colX += colWidths[2];
+            gfx.DrawString("Dept", fontHeader, XBrushes.Black, new XRect(colX, y, colWidths[3], 14), XStringFormats.TopLeft);
+            colX += colWidths[3];
+            gfx.DrawString("Description", fontHeader, XBrushes.Black, new XRect(colX, y, colWidths[4], 14), XStringFormats.TopLeft);
+            colX += colWidths[4];
+            gfx.DrawString("Amount", fontHeader, XBrushes.Black, new XRect(colX, y, colWidths[5], 14), XStringFormats.TopRight);
+            colX += colWidths[5];
+            gfx.DrawString("Receipt", fontHeader, XBrushes.Black, new XRect(colX, y, colWidths[6], 14), XStringFormats.TopCenter);
+
+            y += 16;
+            gfx.DrawLine(XPens.Black, Margin, y, PageWidth - Margin, y);
+            y += 6;
+
+            // Draw table rows for this page
+            var pageLines = lines.Skip(pageNum * linesPerPage).Take(linesPerPage).ToList();
+            var lineIndex = pageNum * linesPerPage;
+
+            foreach (var line in pageLines)
+            {
+                colX = Margin;
+                lineIndex++;
+
+                gfx.DrawString(line.ExpenseDate.ToString("MM/dd/yy"), fontSmall, XBrushes.Black,
+                    new XRect(colX, y, colWidths[0], 12), XStringFormats.TopLeft);
+                colX += colWidths[0];
+
+                var vendorName = !string.IsNullOrEmpty(line.VendorName) ? line.VendorName : "Unknown";
+                gfx.DrawString(TruncateString(vendorName, 16), fontSmall, XBrushes.Black,
+                    new XRect(colX, y, colWidths[1], 12), XStringFormats.TopLeft);
+                colX += colWidths[1];
+
+                gfx.DrawString(line.GlCode ?? "", fontSmall, XBrushes.Black,
+                    new XRect(colX, y, colWidths[2], 12), XStringFormats.TopLeft);
+                colX += colWidths[2];
+
+                gfx.DrawString(line.DepartmentCode ?? "", fontSmall, XBrushes.Black,
+                    new XRect(colX, y, colWidths[3], 12), XStringFormats.TopLeft);
+                colX += colWidths[3];
+
+                gfx.DrawString(TruncateString(line.NormalizedDescription, 20), fontSmall, XBrushes.Black,
+                    new XRect(colX, y, colWidths[4], 12), XStringFormats.TopLeft);
+                colX += colWidths[4];
+
+                gfx.DrawString(line.Amount.ToString("C"), fontSmall, XBrushes.Black,
+                    new XRect(colX, y, colWidths[5], 12), XStringFormats.TopRight);
+                colX += colWidths[5];
+
+                // Receipt indicator with line reference
+                var receiptIndicator = line.HasReceipt ? $"#{lineIndex}" : "—";
+                var receiptBrush = line.HasReceipt ? XBrushes.DarkGreen : XBrushes.DarkOrange;
+                gfx.DrawString(receiptIndicator, fontSmall, receiptBrush,
+                    new XRect(colX, y, colWidths[6], 12), XStringFormats.TopCenter);
+
+                y += 14;
+
+                if (y > PageHeight - Margin - 30)
+                    break;
+            }
+
+            // Footer with page number
+            gfx.DrawString(
+                $"Page {pageNum + 1} of {Math.Max(1, totalPages)} (Itemized List)",
+                fontSmall,
+                XBrushes.Gray,
+                new XRect(0, PageHeight - Margin, PageWidth, 14),
+                XStringFormats.TopCenter);
+        }
+
+        return pageCount;
+    }
+
+    private void AddReceiptsSectionHeader(PdfDocument document)
+    {
+        var page = document.AddPage();
+        page.Width = PageWidth;
+        page.Height = PageHeight;
+
+        using var gfx = XGraphics.FromPdfPage(page);
+
+        var fontTitle = new XFont(FontFamily, 24, XFontStyle.Bold);
+        var fontSubtitle = new XFont(FontFamily, 12, XFontStyle.Regular);
+
+        // Center the section header
+        var y = PageHeight / 2 - 60;
+
+        gfx.DrawString(
+            "RECEIPT IMAGES",
+            fontTitle,
+            XBrushes.Black,
+            new XRect(0, y, PageWidth, 30),
+            XStringFormats.TopCenter);
+
+        y += 50;
+
+        gfx.DrawString(
+            "The following pages contain receipt images for the expense items listed above.",
+            fontSubtitle,
+            XBrushes.Gray,
+            new XRect(Margin, y, PageWidth - (2 * Margin), 20),
+            XStringFormats.TopCenter);
+
+        y += 25;
+
+        gfx.DrawString(
+            "Each receipt is labeled with its corresponding expense item reference number.",
+            fontSubtitle,
+            XBrushes.Gray,
+            new XRect(Margin, y, PageWidth - (2 * Margin), 20),
+            XStringFormats.TopCenter);
+    }
+
+    private void AddNoReceiptsInfoPage(PdfDocument document)
+    {
+        var page = document.AddPage();
+        page.Width = PageWidth;
+        page.Height = PageHeight;
+
+        using var gfx = XGraphics.FromPdfPage(page);
+
+        var fontTitle = new XFont(FontFamily, 14, XFontStyle.Bold);
+        var fontRegular = new XFont(FontFamily, 12, XFontStyle.Regular);
+
+        var y = PageHeight / 2 - 30;
+
+        gfx.DrawString(
+            "No Receipt Images Available",
+            fontTitle,
+            XBrushes.Gray,
+            new XRect(0, y, PageWidth, 20),
+            XStringFormats.TopCenter);
+
+        y += 30;
+
+        gfx.DrawString(
+            "No receipt images were found for this expense report.",
+            fontRegular,
+            XBrushes.Gray,
+            new XRect(0, y, PageWidth, 18),
+            XStringFormats.TopCenter);
+    }
 }
