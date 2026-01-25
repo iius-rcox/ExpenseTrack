@@ -158,7 +158,6 @@ public class PdfGenerationService : IPdfGenerationService
             using var gfx = XGraphics.FromPdfPage(page);
 
             // Load image using PdfSharpCore
-            using var imageMemStream = new MemoryStream(imageBytes);
             var xImage = XImage.FromStream(() => new MemoryStream(imageBytes));
 
             // Calculate scaling to fit page with margins
@@ -602,12 +601,12 @@ public class PdfGenerationService : IPdfGenerationService
             "Generating summary PDF from preview for period {Period} with {LineCount} lines",
             request.Period, request.Lines.Count);
 
-        var document = new PdfDocument();
+        using var document = new PdfDocument();
         document.Info.Title = $"Expense Report - {request.Period}";
         document.Info.Author = employeeName;
 
         var page = document.AddPage();
-        var gfx = XGraphics.FromPdfPage(page);
+        using var gfx = XGraphics.FromPdfPage(page);
         var fontBold = new XFont(FontFamily, 14, XFontStyle.Bold);
         var fontRegular = new XFont(FontFamily, 10, XFontStyle.Regular);
         var fontSmall = new XFont(FontFamily, 8, XFontStyle.Regular);
