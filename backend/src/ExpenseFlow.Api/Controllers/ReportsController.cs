@@ -533,6 +533,55 @@ public class ReportsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Unlocks a submitted report, returning it to Draft status for editing.
+    /// Requires explicit user confirmation on the frontend before calling.
+    /// </summary>
+    /// <param name="reportId">Report ID to unlock</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Unlock response with new status and timestamp</returns>
+    [HttpPost("{reportId:guid}/unlock")]
+    [ProducesResponseType(typeof(UnlockReportResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<UnlockReportResponseDto>> Unlock(
+        Guid reportId,
+        CancellationToken ct)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Unlocking report {ReportId} for user {UserId}",
+            reportId, user.Id);
+
+        try
+        {
+            var result = await _reportService.UnlockAsync(user.Id, reportId, ct);
+
+            _logger.LogInformation(
+                "Report {ReportId} successfully unlocked at {UnlockedAt}",
+                reportId, result.UnlockedAt);
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
     /// Exports a complete PDF report containing both the itemized expense list
     /// and all associated receipt images in a single document.
     /// </summary>

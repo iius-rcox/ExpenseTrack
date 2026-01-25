@@ -18,6 +18,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   useReportDetail,
   useSubmitReport,
+  useUnlockReport,
   useDeleteReport,
   useExportReport,
 } from '@/hooks/queries/use-reports'
@@ -60,6 +61,7 @@ import {
   Receipt,
   Loader2,
   X,
+  LockOpen,
 } from 'lucide-react'
 import { AutoSuggestedBadge, AutoSuggestedSummary } from '@/components/predictions'
 import {
@@ -83,6 +85,7 @@ function ReportDetailPage() {
 
   const { data: report, isLoading, error } = useReportDetail(reportId)
   const { mutate: submitReport, isPending: isSubmitting } = useSubmitReport()
+  const { mutate: unlockReport, isPending: isUnlocking } = useUnlockReport()
   const { mutate: deleteReport, isPending: isDeleting } = useDeleteReport()
   const { mutate: exportReport, isPending: isExporting } = useExportReport()
 
@@ -93,6 +96,17 @@ function ReportDetailPage() {
       },
       onError: (error) => {
         toast.error(`Failed to submit report: ${error.message}`)
+      },
+    })
+  }
+
+  const handleUnlock = () => {
+    unlockReport(reportId, {
+      onSuccess: () => {
+        toast.success('Report unlocked - you can now edit it')
+      },
+      onError: (error) => {
+        toast.error(`Failed to unlock report: ${error.message}`)
       },
     })
   }
@@ -211,26 +225,56 @@ function ReportDetailPage() {
             </>
           )}
           {report.status !== 'Draft' && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" disabled={isExporting}>
-                  {isExporting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="mr-2 h-4 w-4" />
-                  )}
-                  Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                  Export as PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('excel')}>
-                  Export as Excel
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <>
+              {/* Unlock button - only for Submitted reports */}
+              {report.status === 'Submitted' && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" disabled={isUnlocking}>
+                      {isUnlocking ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <LockOpen className="mr-2 h-4 w-4" />
+                      )}
+                      Unlock
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Unlock Report?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will return the report to Draft status, allowing you to make edits.
+                        You will need to submit the report again when finished.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleUnlock}>Unlock Report</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" disabled={isExporting}>
+                    {isExporting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                    Export as PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('excel')}>
+                    Export as Excel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
           )}
         </div>
       </div>

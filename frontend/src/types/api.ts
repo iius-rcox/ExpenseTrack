@@ -398,6 +398,14 @@ export interface BatchUpdateLinesResponse {
   failedLines: FailedLineUpdate[]
 }
 
+/** Response from unlocking a submitted report back to Draft status */
+export interface UnlockReportResponse {
+  reportId: string
+  status: string // "Draft"
+  unlockedAt: string // ISO datetime
+  previousStatus: string // "Submitted"
+}
+
 // Analytics Types
 export interface ComparisonSummary {
   currentTotal: number

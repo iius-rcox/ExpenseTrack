@@ -599,6 +599,45 @@ public class ReportService : IReportService
         };
     }
 
+    public async Task<UnlockReportResponseDto> UnlockAsync(Guid userId, Guid reportId, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Unlocking report {ReportId} for user {UserId}", reportId, userId);
+
+        var report = await _reportRepository.GetByIdAsync(reportId, ct);
+
+        if (report == null || report.UserId != userId)
+        {
+            throw new InvalidOperationException($"Report with ID {reportId} was not found");
+        }
+
+        // Only submitted reports can be unlocked
+        if (report.Status != ReportStatus.Submitted)
+        {
+            throw new InvalidOperationException("Only submitted reports can be unlocked");
+        }
+
+        var previousStatus = report.Status.ToString();
+
+        // Transition back to Draft status
+        report.Status = ReportStatus.Draft;
+        report.SubmittedAt = null; // Clear submitted timestamp
+        report.UpdatedAt = DateTime.UtcNow;
+
+        await _reportRepository.UpdateAsync(report, ct);
+
+        _logger.LogInformation(
+            "Report {ReportId} unlocked from {PreviousStatus} to Draft",
+            report.Id, previousStatus);
+
+        return new UnlockReportResponseDto
+        {
+            ReportId = report.Id,
+            Status = ReportStatus.Draft.ToString(),
+            UnlockedAt = DateTimeOffset.UtcNow,
+            PreviousStatus = previousStatus
+        };
+    }
+
     public async Task<List<ExpenseLineDto>> GetPreviewAsync(Guid userId, string period, CancellationToken ct = default)
     {
         _logger.LogInformation("Getting report preview for user {UserId}, period {Period}", userId, period);

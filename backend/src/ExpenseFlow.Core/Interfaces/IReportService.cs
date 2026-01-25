@@ -181,4 +181,15 @@ public interface IReportService
         Guid reportId,
         BatchUpdateLinesRequest request,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Unlocks a submitted report, returning it to Draft status for editing.
+    /// Only Submitted reports can be unlocked. The submittedAt timestamp is cleared.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="reportId">Report ID to unlock</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Response with reportId, new status (Draft), and unlockedAt timestamp</returns>
+    /// <exception cref="InvalidOperationException">Thrown if report not found, not owned by user, or not in Submitted status</exception>
+    Task<UnlockReportResponseDto> UnlockAsync(Guid userId, Guid reportId, CancellationToken ct = default);
 }

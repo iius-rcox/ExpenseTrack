@@ -10,6 +10,7 @@ import type {
   AvailableTransactionsResponse,
   BatchUpdateLinesRequest,
   BatchUpdateLinesResponse,
+  UnlockReportResponse,
 } from '@/types/api'
 
 export const reportKeys = {
@@ -157,6 +158,30 @@ export function useSubmitReport() {
     onSuccess: (_data, reportId) => {
       queryClient.invalidateQueries({ queryKey: reportKeys.detail(reportId) })
       queryClient.invalidateQueries({ queryKey: reportKeys.lists() })
+    },
+  })
+}
+
+/**
+ * Unlock a submitted report, returning it to Draft status for editing.
+ * Requires user confirmation before calling.
+ */
+export function useUnlockReport() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (reportId: string) => {
+      return apiFetch<UnlockReportResponse>(`/reports/${reportId}/unlock`, {
+        method: 'POST',
+      })
+    },
+    onSuccess: (_data, reportId) => {
+      // Invalidate the report detail to reflect new Draft status
+      queryClient.invalidateQueries({ queryKey: reportKeys.detail(reportId) })
+      // Invalidate lists to update status in report list
+      queryClient.invalidateQueries({ queryKey: reportKeys.lists() })
+      // Invalidate draft check for this period (report is now a draft again)
+      queryClient.invalidateQueries({ queryKey: reportKeys.all })
     },
   })
 }
