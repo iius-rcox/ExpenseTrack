@@ -7,10 +7,6 @@ Auto-generated from feature plans. Last updated: 2025-12-17
 - **ref.tools**: Use this to reference best practices when developing any feature
 - **shad.cn**: Use this for all frontend components and design choices
 
-## Project References
-- **Constitution**: `.specify/memory/constitution.md` - Core principles and governance
-- **Vista Integration**: `.specify/memory/vista-integration.md` - Viewpoint Vista ERP integration patterns
-
 ## Viewpoint Vista ERP Integration
 
 Reference data (departments, projects, GL accounts) is synced from Viewpoint Vista:
