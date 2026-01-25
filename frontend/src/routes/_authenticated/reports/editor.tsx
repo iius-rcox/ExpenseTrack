@@ -103,8 +103,9 @@ function ReportEditorPage() {
     // Save to database if using draft
     if (useDraft && reportId) {
       const updateData: any = {}
-      if (field === 'departmentCode') updateData.departmentCode = value
-      if (field === 'description') updateData.description = value
+      // Map frontend field names to API field names
+      if (field === 'departmentCode') updateData.department = value // API uses 'department'
+      if (field === 'description') updateData.notes = value // API uses 'notes'
       // GL Code handled by handleGLCodeChange which also updates glName
 
       if (Object.keys(updateData).length > 0) {
@@ -121,6 +122,37 @@ function ReportEditorPage() {
           }
         )
       }
+    }
+  }
+
+  // Helper: Save split allocations to database
+  const handleApplySplit = (lineId: string) => {
+    dispatch({ type: 'APPLY_SPLIT', parentId: lineId })
+
+    // Save split allocations to database if using draft
+    if (useDraft && reportId) {
+      const line = state.lines.find(l => l.id === lineId)
+      if (!line) return
+
+      const dbLineId = getDbLineId(lineId)
+      const splitAllocations = line.allocations.map(alloc => ({
+        department: alloc.departmentCode,
+        percentage: alloc.percentage,
+        // Note: GL code is at line level, not per-allocation in the API
+      }))
+
+      updateLine(
+        { reportId, lineId: dbLineId, data: { splitAllocations } },
+        {
+          onSuccess: () => {
+            setLastSaved(new Date())
+            toast.success('Split allocations saved')
+          },
+          onError: (error) => {
+            toast.error(`Failed to save split: ${error.message}`)
+          },
+        }
+      )
     }
   }
 
@@ -545,7 +577,7 @@ function ReportEditorPage() {
                             onBulkPaste={(allocations) =>
                               dispatch({ type: 'BULK_PASTE_ALLOCATIONS', parentId: line.id, allocations })
                             }
-                            onApply={() => dispatch({ type: 'APPLY_SPLIT', parentId: line.id })}
+                            onApply={() => handleApplySplit(line.id)}
                             onCancel={() => dispatch({ type: 'CANCEL_SPLIT', id: line.id })}
                           />
                         </TableCell>
