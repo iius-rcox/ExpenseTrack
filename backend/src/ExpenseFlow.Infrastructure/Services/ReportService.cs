@@ -1257,7 +1257,7 @@ public class ReportService : IReportService
 
                 // Allocation-specific values
                 Amount = Math.Round(childAmount, 2),
-                GLCode = alloc.GlCode ?? parentLine.GLCode,
+                GLCode = alloc.GLCode ?? parentLine.GLCode,
                 DepartmentCode = alloc.DepartmentCode,
 
                 // Mark as user-edited since user created the split
