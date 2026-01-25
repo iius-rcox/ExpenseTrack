@@ -4,6 +4,7 @@ import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { useMsal } from '@azure/msal-react'
 import { Loader2 } from 'lucide-react'
+import { isTestModeAuthenticated } from '@/auth/testAuth'
 
 export const Route = createFileRoute('/')({
   beforeLoad: ({ context }) => {
@@ -16,6 +17,11 @@ export const Route = createFileRoute('/')({
       // This is an OAuth callback - don't redirect, let MSAL handle it
       // The page will re-render after MSAL processes the response
       return
+    }
+
+    // Check for E2E test mode authentication first
+    if (isTestModeAuthenticated()) {
+      throw redirect({ to: '/dashboard' })
     }
 
     // Check MSAL instance directly for current auth state

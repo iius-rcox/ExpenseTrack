@@ -202,11 +202,11 @@ export function TransactionFilterPanel({
   }, [filters, onChange]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full max-w-full overflow-hidden">
       {/* Search Bar Row */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         {/* Search Input */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
@@ -229,7 +229,7 @@ export function TransactionFilterPanel({
         </div>
 
         {/* Quick Filters */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Pending Predictions Filter (Feature 023) */}
           <Button
             variant={filters.hasPendingPrediction ? 'default' : 'outline'}

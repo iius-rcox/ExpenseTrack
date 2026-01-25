@@ -2,9 +2,16 @@
 
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { AppShell } from '@/components/layout/app-shell'
+import { isTestModeAuthenticated } from '@/auth/testAuth'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ context }) => {
+    // Check for E2E test mode authentication first
+    // This allows Playwright tests to bypass MSAL
+    if (isTestModeAuthenticated()) {
+      return // User is authenticated in test mode
+    }
+
     // Check MSAL instance directly for current auth state
     // The static context.isAuthenticated may be stale after redirect
     const account = context.msalInstance.getActiveAccount()

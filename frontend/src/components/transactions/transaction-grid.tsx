@@ -390,12 +390,20 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
   , [rawExpandedGroupIds]);
 
   const parentRef = useRef<HTMLDivElement>(null);
-  const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile viewport
+  // Initialize isMobile based on window width to prevent desktop flash on mobile
+  // Use function to safely check window (SSR-safe)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
+
+  // Detect mobile viewport on resize
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
+    checkMobile(); // Re-check after hydration
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);

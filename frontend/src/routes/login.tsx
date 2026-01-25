@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { loginRequest } from '@/auth/authConfig'
+import { isTestModeAuthenticated } from '@/auth/testAuth'
 
 const loginSearchSchema = z.object({
   redirect: z.string().optional(),
@@ -14,6 +15,11 @@ const loginSearchSchema = z.object({
 export const Route = createFileRoute('/login')({
   validateSearch: loginSearchSchema,
   beforeLoad: ({ context, search }) => {
+    // Check for E2E test mode authentication first
+    if (isTestModeAuthenticated()) {
+      throw redirect({ to: search.redirect || '/dashboard' })
+    }
+
     // Check MSAL instance directly for current auth state
     // The static context.isAuthenticated may be stale after redirect
     const account = context.msalInstance.getActiveAccount()

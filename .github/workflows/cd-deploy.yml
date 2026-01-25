@@ -1,0 +1,336 @@
+name: CD Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - '.github/workflows/cd-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      component:
+        description: 'Component to deploy'
+        required: true
+        default: 'frontend'
+        type: choice
+        options:
+          - frontend
+          - backend
+          - both
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+concurrency:
+  group: cd-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  ACR_REGISTRY: iiusacr.azurecr.io
+  FRONTEND_IMAGE: expenseflow-frontend
+  BACKEND_IMAGE: expenseflow-api
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # Detect which components changed
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.changes.outputs.frontend }}
+      backend: ${{ steps.changes.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect Changes
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_COMPONENT: ${{ inputs.component }}
+        run: |
+          # For workflow_dispatch, use input
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$INPUT_COMPONENT" == "frontend" ]] || [[ "$INPUT_COMPONENT" == "both" ]]; then
+              echo "frontend=true" >> $GITHUB_OUTPUT
+            else
+              echo "frontend=false" >> $GITHUB_OUTPUT
+            fi
+            if [[ "$INPUT_COMPONENT" == "backend" ]] || [[ "$INPUT_COMPONENT" == "both" ]]; then
+              echo "backend=true" >> $GITHUB_OUTPUT
+            else
+              echo "backend=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            # For push events, detect from changed files
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+
+            if echo "$CHANGED_FILES" | grep -q "^frontend/"; then
+              echo "frontend=true" >> $GITHUB_OUTPUT
+            else
+              echo "frontend=false" >> $GITHUB_OUTPUT
+            fi
+
+            if echo "$CHANGED_FILES" | grep -q "^backend/"; then
+              echo "backend=true" >> $GITHUB_OUTPUT
+            else
+              echo "backend=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  # Build and push frontend
+  build-frontend:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Version
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="v$(date +'%Y.%m.%d')-${SHORT_SHA}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Generated version: ${VERSION}"
+
+      - name: Login to ACR
+        uses: azure/docker-login@v2
+        with:
+          login-server: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker Meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.ACR_REGISTRY }}/${{ env.FRONTEND_IMAGE }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=
+
+      - name: Build and Push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image Summary
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          echo "## Frontend Image Built" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Registry | \`$ACR_REGISTRY\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | \`$FRONTEND_IMAGE\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | \`$VERSION\` |" >> $GITHUB_STEP_SUMMARY
+
+  # Build and push backend
+  build-backend:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Version
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="v$(date +'%Y.%m.%d')-${SHORT_SHA}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Generated version: ${VERSION}"
+
+      - name: Login to ACR
+        uses: azure/docker-login@v2
+        with:
+          login-server: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker Meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.ACR_REGISTRY }}/${{ env.BACKEND_IMAGE }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=
+
+      - name: Build and Push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image Summary
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          echo "## Backend Image Built" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Registry | \`$ACR_REGISTRY\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | \`$BACKEND_IMAGE\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | \`$VERSION\` |" >> $GITHUB_STEP_SUMMARY
+
+  # Update Kubernetes manifests (GitOps)
+  update-manifests:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-frontend, build-backend]
+    if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success')
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine Environment
+        id: env
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "environment=$INPUT_ENVIRONMENT" >> $GITHUB_OUTPUT
+          else
+            # Auto-deploys to staging on push to main
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Frontend Manifest
+        if: needs.build-frontend.result == 'success'
+        env:
+          ENV: ${{ steps.env.outputs.environment }}
+          VERSION: ${{ needs.build-frontend.outputs.version }}
+        run: |
+          IMAGE="${ACR_REGISTRY}/${FRONTEND_IMAGE}:${VERSION}"
+          MANIFEST="infrastructure/kubernetes/${ENV}/frontend-deployment.yaml"
+
+          if [[ -f "$MANIFEST" ]]; then
+            # Update the image tag using sed
+            sed -i "s|image: iiusacr.azurecr.io/expenseflow-frontend:.*|image: ${IMAGE}|g" "$MANIFEST"
+            echo "Updated frontend manifest: ${IMAGE}"
+          else
+            echo "Manifest not found: $MANIFEST"
+            exit 1
+          fi
+
+      - name: Update Backend Manifest
+        if: needs.build-backend.result == 'success'
+        env:
+          ENV: ${{ steps.env.outputs.environment }}
+          VERSION: ${{ needs.build-backend.outputs.version }}
+        run: |
+          IMAGE="${ACR_REGISTRY}/${BACKEND_IMAGE}:${VERSION}"
+          MANIFEST="infrastructure/kubernetes/${ENV}/deployment.yaml"
+
+          if [[ -f "$MANIFEST" ]]; then
+            # Update the image tag using sed
+            sed -i "s|image: iiusacr.azurecr.io/expenseflow-api:.*|image: ${IMAGE}|g" "$MANIFEST"
+            echo "Updated backend manifest: ${IMAGE}"
+          else
+            echo "Manifest not found: $MANIFEST"
+            exit 1
+          fi
+
+      - name: Commit and Push Manifest Changes
+        env:
+          FRONTEND_RESULT: ${{ needs.build-frontend.result }}
+          BACKEND_RESULT: ${{ needs.build-backend.result }}
+          ENV: ${{ steps.env.outputs.environment }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if there are changes to commit
+          if git diff --quiet; then
+            echo "No manifest changes to commit"
+            exit 0
+          fi
+
+          # Build commit message
+          COMPONENTS=""
+          if [[ "$FRONTEND_RESULT" == "success" ]]; then
+            COMPONENTS="frontend"
+          fi
+          if [[ "$BACKEND_RESULT" == "success" ]]; then
+            if [[ -n "$COMPONENTS" ]]; then
+              COMPONENTS="${COMPONENTS}, backend"
+            else
+              COMPONENTS="backend"
+            fi
+          fi
+
+          SHORT_SHA=$(git rev-parse --short HEAD)
+
+          git add infrastructure/kubernetes/
+          git commit -m "chore(deploy): Update ${ENV} ${COMPONENTS} to ${SHORT_SHA}
+
+          Automated deployment by GitHub Actions
+
+          Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+
+          git push
+
+      - name: Deployment Summary
+        env:
+          ENV: ${{ steps.env.outputs.environment }}
+          FRONTEND_RESULT: ${{ needs.build-frontend.result }}
+          BACKEND_RESULT: ${{ needs.build-backend.result }}
+          FRONTEND_VERSION: ${{ needs.build-frontend.outputs.version }}
+          BACKEND_VERSION: ${{ needs.build-backend.outputs.version }}
+        run: |
+          echo "## Deployment to ${ENV}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Kubernetes manifests updated. ArgoCD will sync automatically." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Version | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          if [[ "$FRONTEND_RESULT" == "success" ]]; then
+            echo "| Frontend | \`$FRONTEND_VERSION\` | ✅ Deployed |" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "$BACKEND_RESULT" == "success" ]]; then
+            echo "| Backend | \`$BACKEND_VERSION\` | ✅ Deployed |" >> $GITHUB_STEP_SUMMARY
+          fi
