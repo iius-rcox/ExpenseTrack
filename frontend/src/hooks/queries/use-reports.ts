@@ -8,6 +8,8 @@ import type {
   ExpenseLine,
   AddLineRequest,
   AvailableTransactionsResponse,
+  BatchUpdateLinesRequest,
+  BatchUpdateLinesResponse,
 } from '@/types/api'
 
 export const reportKeys = {
@@ -266,18 +268,9 @@ export function useRemoveReportLine() {
       reportId: string
       lineId: string
     }) => {
-      console.log('[useRemoveReportLine] Making DELETE request')
-      console.log('[useRemoveReportLine] URL:', `/reports/${reportId}/lines/${lineId}`)
-      try {
-        const result = await apiFetch(`/reports/${reportId}/lines/${lineId}`, {
-          method: 'DELETE',
-        })
-        console.log('[useRemoveReportLine] Success, result:', result)
-        return result
-      } catch (error) {
-        console.error('[useRemoveReportLine] Error:', error)
-        throw error
-      }
+      return apiFetch(`/reports/${reportId}/lines/${lineId}`, {
+        method: 'DELETE',
+      })
     },
     onSuccess: (_data, variables) => {
       // Invalidate report detail and available transactions
@@ -285,6 +278,36 @@ export function useRemoveReportLine() {
       queryClient.invalidateQueries({
         queryKey: reportKeys.availableTransactions(variables.reportId),
       })
+    },
+  })
+}
+
+/**
+ * Save report - batch updates all dirty lines while keeping report in Draft status.
+ * CRITICAL: This does NOT finalize/lock the report. Report remains editable after save.
+ */
+export function useSaveReport() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      reportId,
+      lines,
+    }: {
+      reportId: string
+      lines: BatchUpdateLinesRequest['lines']
+    }) => {
+      const request: BatchUpdateLinesRequest = { lines }
+
+      return apiFetch<BatchUpdateLinesResponse>(`/reports/${reportId}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      })
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate report detail to refresh from server
+      queryClient.invalidateQueries({ queryKey: reportKeys.detail(variables.reportId) })
     },
   })
 }

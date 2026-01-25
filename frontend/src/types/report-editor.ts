@@ -86,6 +86,8 @@ export type ReportEditorAction =
   | { type: 'ADD_LINE'; line: EditableExpenseLine }
   | { type: 'REMOVE_LINE'; id: string }
   | { type: 'REMOVE_LINES'; ids: string[] }
+  // Clear dirty state after successful save
+  | { type: 'CLEAR_ALL_DIRTY' }
 
 /**
  * Export request payload matching backend ExportPreviewRequest DTO.

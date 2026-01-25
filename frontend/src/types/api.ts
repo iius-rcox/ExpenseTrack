@@ -362,6 +362,42 @@ export interface AvailableTransactionsResponse {
   reportPeriod: string // YYYY-MM
 }
 
+// Batch Save Types (Manual Save Button)
+export type MissingReceiptJustification =
+  | 'NotProvided'
+  | 'Lost'
+  | 'Digital'
+  | 'Under25'
+  | 'Parking'
+  | 'Other'
+
+export interface BatchLineUpdate {
+  lineId: string
+  glCode?: string
+  departmentCode?: string
+  missingReceiptJustification?: MissingReceiptJustification
+  justificationNote?: string
+}
+
+export interface BatchUpdateLinesRequest {
+  lines: BatchLineUpdate[]
+}
+
+export interface FailedLineUpdate {
+  lineId: string
+  error: string
+}
+
+export interface BatchUpdateLinesResponse {
+  reportId: string
+  updatedCount: number
+  failedCount: number
+  updatedAt: string // ISO datetime
+  /** Current report status - should always be "Draft" after save */
+  reportStatus?: string
+  failedLines: FailedLineUpdate[]
+}
+
 // Analytics Types
 export interface ComparisonSummary {
   currentTotal: number

@@ -453,6 +453,17 @@ function reportEditorReducer(
       }
     }
 
+    case 'CLEAR_ALL_DIRTY': {
+      // Clear isDirty flag on all lines after successful save
+      return {
+        ...state,
+        lines: state.lines.map((line) => ({
+          ...line,
+          isDirty: false,
+        })),
+      }
+    }
+
     default:
       return state
   }

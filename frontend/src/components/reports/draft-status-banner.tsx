@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { FileText, CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
+import { FileText, CheckCircle2, Loader2, RefreshCw, Save } from 'lucide-react'
 
 // Simple time ago formatter (no date-fns dependency)
 function timeAgo(date: Date): string {
@@ -14,20 +14,26 @@ function timeAgo(date: Date): string {
 
 interface DraftStatusBannerProps {
   useDraft: boolean
+  reportId: string | null
   lastSaved: Date | null
   isSaving: boolean
+  hasPendingChanges: boolean
   onCreateDraft: () => void
   onDiscardDraft: () => void
   onRegenerateDraft?: () => void
+  onSave?: () => void
 }
 
 export function DraftStatusBanner({
   useDraft,
+  reportId,
   lastSaved,
   isSaving,
+  hasPendingChanges,
   onCreateDraft,
   onDiscardDraft,
   onRegenerateDraft,
+  onSave,
 }: DraftStatusBannerProps) {
   if (!useDraft) {
     // Preview mode - show "Save as Draft" button
@@ -46,7 +52,9 @@ export function DraftStatusBanner({
     )
   }
 
-  // Draft mode - show auto-save status
+  // Draft mode - show save status and Save button
+  const showSaveButton = useDraft && reportId && hasPendingChanges && onSave
+
   return (
     <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3 flex items-center justify-between">
       <div className="flex items-center gap-3">
@@ -63,21 +71,48 @@ export function DraftStatusBanner({
         ) : lastSaved ? (
           <span className="text-sm text-muted-foreground flex items-center gap-1">
             <CheckCircle2 className="h-3 w-3 text-green-600" />
-            Auto-saved {timeAgo(lastSaved)}
+            Saved {timeAgo(lastSaved)}
           </span>
+        ) : hasPendingChanges ? (
+          <span className="text-sm text-yellow-600 dark:text-yellow-400">Unsaved changes</span>
         ) : (
-          <span className="text-sm text-muted-foreground">Unsaved changes</span>
+          <span className="text-sm text-muted-foreground">No changes</span>
         )}
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Save Button - only visible when there are pending changes */}
+        {showSaveButton && (
+          <Button
+            onClick={onSave}
+            size="sm"
+            variant="default"
+            disabled={isSaving}
+            data-testid="save-report-btn"
+            className="gap-1"
+          >
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Save
+          </Button>
+        )}
+
         {onRegenerateDraft && (
-          <Button onClick={onRegenerateDraft} size="sm" variant="ghost" title="Refresh from bank data">
+          <Button
+            onClick={onRegenerateDraft}
+            size="sm"
+            variant="ghost"
+            title="Refresh from bank data"
+            disabled={isSaving}
+          >
             <RefreshCw className="h-4 w-4 mr-1" />
             Refresh
           </Button>
         )}
-        <Button onClick={onDiscardDraft} size="sm" variant="ghost">
+        <Button onClick={onDiscardDraft} size="sm" variant="ghost" disabled={isSaving}>
           Discard Draft
         </Button>
       </div>

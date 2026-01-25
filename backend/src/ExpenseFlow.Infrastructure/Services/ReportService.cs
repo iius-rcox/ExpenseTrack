@@ -939,6 +939,130 @@ public class ReportService : IReportService
         };
     }
 
+    /// <summary>
+    /// Batch updates multiple expense lines in a report.
+    /// CRITICAL: Keeps report in Draft status - does NOT finalize/lock the report.
+    /// </summary>
+    public async Task<BatchUpdateLinesResponse> BatchUpdateLinesAsync(
+        Guid userId,
+        Guid reportId,
+        BatchUpdateLinesRequest request,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation(
+            "Batch updating {LineCount} lines in report {ReportId} for user {UserId}",
+            request.Lines.Count, reportId, userId);
+
+        // Verify report ownership
+        var report = await _reportRepository.GetByIdAsync(reportId, ct);
+        if (report == null || report.UserId != userId)
+        {
+            throw new InvalidOperationException($"Report with ID {reportId} was not found");
+        }
+
+        // Check if report is editable (must be Draft)
+        if (report.Status != ReportStatus.Draft)
+        {
+            throw new InvalidOperationException(
+                $"Cannot modify expense lines: report is in {report.Status} status and is locked for editing");
+        }
+
+        var updatedCount = 0;
+        var failedLines = new List<FailedLineUpdate>();
+
+        foreach (var lineUpdate in request.Lines)
+        {
+            try
+            {
+                var line = await _reportRepository.GetLineByIdAsync(reportId, lineUpdate.LineId, ct);
+                if (line == null)
+                {
+                    failedLines.Add(new FailedLineUpdate
+                    {
+                        LineId = lineUpdate.LineId,
+                        Error = "Line not found"
+                    });
+                    continue;
+                }
+
+                var wasEdited = false;
+
+                // Update GL code if provided
+                if (lineUpdate.GlCode != null)
+                {
+                    if (lineUpdate.GlCode != line.GLCodeSuggested)
+                    {
+                        wasEdited = true;
+                    }
+                    line.GLCode = lineUpdate.GlCode;
+                }
+
+                // Update department code if provided
+                if (lineUpdate.DepartmentCode != null)
+                {
+                    if (lineUpdate.DepartmentCode != line.DepartmentSuggested)
+                    {
+                        wasEdited = true;
+                    }
+                    line.DepartmentCode = lineUpdate.DepartmentCode;
+                }
+
+                // Update missing receipt justification if provided
+                if (lineUpdate.MissingReceiptJustification.HasValue)
+                {
+                    line.MissingReceiptJustification = lineUpdate.MissingReceiptJustification;
+                    line.JustificationNote = lineUpdate.JustificationNote;
+                }
+
+                // Mark as user-edited if changes differ from suggestions
+                if (wasEdited)
+                {
+                    line.IsUserEdited = true;
+
+                    // Trigger learning loop for user corrections (non-blocking)
+                    var updateRequest = new UpdateLineRequest
+                    {
+                        GlCode = lineUpdate.GlCode,
+                        DepartmentCode = lineUpdate.DepartmentCode
+                    };
+                    await TriggerLearningLoopAsync(line, updateRequest, ct);
+                }
+
+                line.UpdatedAt = DateTime.UtcNow;
+                await _reportRepository.UpdateLineAsync(line, ct);
+                updatedCount++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to update line {LineId} in batch operation", lineUpdate.LineId);
+                // Security: Don't expose internal exception details to client
+                failedLines.Add(new FailedLineUpdate
+                {
+                    LineId = lineUpdate.LineId,
+                    Error = "Failed to update line. Please try again."
+                });
+            }
+        }
+
+        // Update report timestamp (but NOT status - must remain Draft)
+        report.UpdatedAt = DateTime.UtcNow;
+        await _reportRepository.UpdateAsync(report, ct);
+
+        _logger.LogInformation(
+            "Batch update completed for report {ReportId}: {UpdatedCount} updated, {FailedCount} failed. Status remains {Status}",
+            reportId, updatedCount, failedLines.Count, report.Status);
+
+        return new BatchUpdateLinesResponse
+        {
+            ReportId = reportId,
+            UpdatedCount = updatedCount,
+            FailedCount = failedLines.Count,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            ReportStatus = report.Status.ToString(), // CRITICAL: Should always be "Draft"
+            FailedLines = failedLines
+        };
+    }
+
     #region Private Helpers
 
     private static (DateOnly StartDate, DateOnly EndDate) ParsePeriod(string period)

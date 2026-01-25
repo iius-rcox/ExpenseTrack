@@ -164,4 +164,21 @@ public interface IReportService
         int page,
         int pageSize,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Batch updates multiple expense lines in a report.
+    /// Used by the Save button to persist all dirty lines at once.
+    /// CRITICAL: This operation keeps the report in Draft status - it does NOT finalize/lock the report.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="reportId">Report ID</param>
+    /// <param name="request">Batch update request containing line updates</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Response with update counts and any failures</returns>
+    /// <exception cref="InvalidOperationException">Thrown if report not found, not owned by user, or not in Draft status</exception>
+    Task<BatchUpdateLinesResponse> BatchUpdateLinesAsync(
+        Guid userId,
+        Guid reportId,
+        BatchUpdateLinesRequest request,
+        CancellationToken ct = default);
 }

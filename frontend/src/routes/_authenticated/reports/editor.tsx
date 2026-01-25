@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { useReportPreview, useCheckDraftExists, useGenerateReport, useReportDetail, useUpdateReportLine, useAddReportLine, useRemoveReportLine } from '@/hooks/queries/use-reports'
+import { useReportPreview, useCheckDraftExists, useGenerateReport, useReportDetail, useUpdateReportLine, useAddReportLine, useRemoveReportLine, useSaveReport } from '@/hooks/queries/use-reports'
 import { useReportEditor } from '@/hooks/use-report-editor'
 import { useExportPreview, useExportCompletePdf } from '@/hooks/queries/use-report-export'
 import { useGLAccounts, lookupGLName } from '@/hooks/queries/use-reference-data'
@@ -55,6 +55,9 @@ function ReportEditorPage() {
   // Add/Remove line mutations
   const addLineMutation = useAddReportLine()
   const removeLineMutation = useRemoveReportLine()
+
+  // Save report mutation (batch update all dirty lines)
+  const saveReportMutation = useSaveReport()
 
   // Add/Remove UI state
   const [addSheetOpen, setAddSheetOpen] = useState(false)
@@ -138,12 +141,6 @@ function ReportEditorPage() {
   const handleRemoveLine = () => {
     if (!reportId || !lineToRemove) return
     const dbLineId = getDbLineId(lineToRemove.id)
-
-    // Debug logging for remove line
-    console.log('[RemoveLine] Frontend line ID:', lineToRemove.id)
-    console.log('[RemoveLine] Extracted DB line ID:', dbLineId)
-    console.log('[RemoveLine] Report ID:', reportId)
-    console.log('[RemoveLine] API URL will be:', `/reports/${reportId}/lines/${dbLineId}`)
 
     removeLineMutation.mutate(
       { reportId, lineId: dbLineId },
@@ -413,16 +410,66 @@ function ReportEditorPage() {
     )
   }
 
+  // Handler: Save all dirty lines to database
+  const handleSaveReport = () => {
+    if (!reportId) return
+
+    // Collect all dirty lines and prepare batch update request
+    const dirtyLines = state.lines
+      .filter((line) => line.isDirty)
+      .map((line) => ({
+        lineId: getDbLineId(line.id),
+        glCode: line.glCode || undefined,
+        departmentCode: line.departmentCode || undefined,
+        // Note: Other fields like missingReceiptJustification could be added here
+      }))
+
+    if (dirtyLines.length === 0) {
+      toast.info('No changes to save')
+      return
+    }
+
+    saveReportMutation.mutate(
+      { reportId, lines: dirtyLines },
+      {
+        onSuccess: (response) => {
+          // Clear dirty flags in the UI
+          dispatch({ type: 'CLEAR_ALL_DIRTY' })
+          setLastSaved(new Date(response.updatedAt))
+
+          if (response.failedCount > 0) {
+            toast.warning(
+              `Saved ${response.updatedCount} lines, ${response.failedCount} failed`
+            )
+          } else {
+            toast.success(`Saved ${response.updatedCount} lines`)
+          }
+
+          // Verify status remained Draft (critical requirement)
+          if (response.reportStatus && response.reportStatus !== 'Draft') {
+            toast.error('Unexpected: Report status changed. Please refresh.')
+          }
+        },
+        onError: (error) => {
+          toast.error(`Failed to save: ${error.message}`)
+        },
+      }
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Draft Status Banner */}
       <DraftStatusBanner
         useDraft={useDraft}
+        reportId={reportId}
         lastSaved={lastSaved}
-        isSaving={savingLine}
+        isSaving={savingLine || saveReportMutation.isPending}
+        hasPendingChanges={metrics.dirtyCount > 0}
         onCreateDraft={handleCreateDraft}
         onDiscardDraft={() => toast.info('Discard draft - to be implemented')}
         onRegenerateDraft={useDraft ? handleRegenerateDraft : undefined}
+        onSave={handleSaveReport}
       />
 
       {/* Header */}

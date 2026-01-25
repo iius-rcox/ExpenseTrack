@@ -754,6 +754,59 @@ public class ReportsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Saves all pending changes to a draft report.
+    /// Batch updates multiple expense lines while keeping the report in Draft status.
+    /// CRITICAL: This does NOT finalize the report - it remains editable after save.
+    /// </summary>
+    /// <param name="reportId">Report ID to save</param>
+    /// <param name="request">Batch update request with line changes</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Response with update counts and any failures</returns>
+    [HttpPost("{reportId:guid}/save")]
+    [ProducesResponseType(typeof(BatchUpdateLinesResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<BatchUpdateLinesResponse>> SaveReport(
+        Guid reportId,
+        [FromBody] BatchUpdateLinesRequest request,
+        CancellationToken ct)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Saving report {ReportId} with {LineCount} line updates for user {UserId}",
+            reportId, request.Lines.Count, user.Id);
+
+        try
+        {
+            var response = await _reportService.BatchUpdateLinesAsync(user.Id, reportId, request, ct);
+
+            _logger.LogInformation(
+                "Report {ReportId} saved: {UpdatedCount} updated, {FailedCount} failed. Status: {Status}",
+                reportId, response.UpdatedCount, response.FailedCount, response.ReportStatus);
+
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("locked for editing"))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
     /// Exports a consolidated PDF of all receipts for a report.
     /// Includes placeholder pages for missing receipts with justification details.
     /// </summary>
