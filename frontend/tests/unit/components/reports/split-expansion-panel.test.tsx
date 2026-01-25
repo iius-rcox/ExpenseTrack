@@ -26,6 +26,7 @@ describe('SplitExpansionPanel Tab Navigation', () => {
     onRemoveAllocation: vi.fn(),
     onUpdateAllocation: vi.fn(),
     onToggleEntryMode: vi.fn(),
+    onBulkPaste: vi.fn(),
     onApply: vi.fn(),
     onCancel: vi.fn(),
   };
@@ -138,7 +139,7 @@ describe('SplitExpansionPanel Tab Navigation', () => {
 
     const propsWithThree = {
       ...defaultProps,
-      allocations: [
+        allocations: [
         createAllocation({ id: 'alloc-1', percentage: 33.33, amount: 33.33 }),
         createAllocation({ id: 'alloc-2', percentage: 33.33, amount: 33.33 }),
         createAllocation({ id: 'alloc-3', percentage: 33.34, amount: 33.34 }),
@@ -173,6 +174,7 @@ describe('SplitExpansionPanel GL Code Display', () => {
     onRemoveAllocation: vi.fn(),
     onUpdateAllocation: vi.fn(),
     onToggleEntryMode: vi.fn(),
+    onBulkPaste: vi.fn(),
     onApply: vi.fn(),
     onCancel: vi.fn(),
   };

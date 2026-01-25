@@ -377,6 +377,31 @@ function reportEditorReducer(
       }
     }
 
+    case 'BULK_PASTE_ALLOCATIONS': {
+      return {
+        ...state,
+        lines: state.lines.map((line) => {
+          if (line.id !== action.parentId) return line
+
+          // Create new allocations from pasted data
+          const newAllocations = action.allocations.map((pastedAlloc) => ({
+            id: crypto.randomUUID(),
+            glCode: pastedAlloc.glCode ?? line.glCode, // Use pasted GL code or inherit from parent
+            departmentCode: pastedAlloc.departmentCode,
+            amount: pastedAlloc.amount,
+            percentage: (pastedAlloc.amount / line.originalAmount) * 100,
+            entryMode: 'amount' as const,
+          }))
+
+          return {
+            ...line,
+            isExpanded: true,
+            allocations: newAllocations,
+          }
+        }),
+      }
+    }
+
     default:
       return state
   }

@@ -80,6 +80,8 @@ export type ReportEditorAction =
   | { type: 'APPLY_SPLIT'; parentId: string }
   | { type: 'REMOVE_SPLIT'; id: string }
   | { type: 'TOGGLE_EXPANSION'; id: string }
+  // Bulk paste action for Excel copy/paste
+  | { type: 'BULK_PASTE_ALLOCATIONS'; parentId: string; allocations: { glCode?: string; departmentCode: string; amount: number }[] }
 
 /**
  * Export request payload matching backend ExportPreviewRequest DTO.

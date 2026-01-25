@@ -1,12 +1,14 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { EditableTextCell } from './editable-text-cell'
-import { Plus, X, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
+import { Plus, X, CheckCircle2, AlertTriangle, XCircle, ClipboardPaste } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
+import { parseExcelPaste, isExcelData } from '@/lib/parse-excel-paste'
 import type { SplitAllocation } from '@/types/report-editor'
+import { toast } from 'sonner'
 
 interface SplitExpansionPanelProps {
   parentId: string
@@ -16,6 +18,7 @@ interface SplitExpansionPanelProps {
   onRemoveAllocation: (allocationId: string) => void
   onUpdateAllocation: (allocationId: string, field: keyof SplitAllocation, value: any) => void
   onToggleEntryMode: (allocationId: string) => void
+  onBulkPaste: (allocations: { glCode?: string; departmentCode: string; amount: number }[]) => void
   onApply: () => void
   onCancel: () => void
 }
@@ -31,11 +34,55 @@ export function SplitExpansionPanel({
   onRemoveAllocation,
   onUpdateAllocation,
   onToggleEntryMode,
+  onBulkPaste,
   onApply,
   onCancel,
 }: SplitExpansionPanelProps) {
   // Refs for navigation - stores refs by allocation index and field type
   const cellRefs = useRef<Map<string, HTMLElement | null>>(new Map())
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [pasteHint, setPasteHint] = useState(false)
+
+  // Handle paste event for Excel data
+  const handlePaste = useCallback((e: ClipboardEvent) => {
+    const clipboardText = e.clipboardData?.getData('text/plain')
+    if (!clipboardText) return
+
+    // Check if it looks like Excel data (tab-separated)
+    if (!isExcelData(clipboardText)) return
+
+    // Prevent default paste behavior
+    e.preventDefault()
+
+    // Parse the Excel data
+    const result = parseExcelPaste(clipboardText)
+
+    if (!result.success) {
+      toast.error('Could not parse clipboard data', {
+        description: result.errors[0] || 'Invalid format',
+      })
+      return
+    }
+
+    // Apply the bulk paste
+    onBulkPaste(result.allocations)
+
+    // Show success message
+    toast.success(`Pasted ${result.allocations.length} allocations`, {
+      description: result.errors.length > 0
+        ? `${result.errors.length} row(s) skipped`
+        : undefined,
+    })
+  }, [onBulkPaste])
+
+  // Attach paste listener to panel
+  useEffect(() => {
+    const panel = panelRef.current
+    if (!panel) return
+
+    panel.addEventListener('paste', handlePaste)
+    return () => panel.removeEventListener('paste', handlePaste)
+  }, [handlePaste])
 
   // Calculate totals
   const totalAmount = allocations.reduce((sum, a) => sum + a.amount, 0)
@@ -103,10 +150,25 @@ export function SplitExpansionPanel({
   }, [handleTabNavigation])
 
   return (
-    <div className="p-4 bg-muted/30 border-l-2 border-l-blue-500" data-testid="split-expansion-panel">
+    <div
+      ref={panelRef}
+      className="p-4 bg-muted/30 border-l-2 border-l-blue-500 focus:outline-none"
+      data-testid="split-expansion-panel"
+      tabIndex={0}
+      onFocus={() => setPasteHint(true)}
+      onBlur={() => setPasteHint(false)}
+    >
       <div className="space-y-3">
         <div className="flex items-center justify-between mb-2">
-          <h4 className="text-sm font-medium">Split Allocations</h4>
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-medium">Split Allocations</h4>
+            {pasteHint && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <ClipboardPaste className="h-3 w-3" />
+                Paste from Excel (Ctrl+V)
+              </span>
+            )}
+          </div>
           <Badge variant={isValid ? 'default' : 'destructive'} className="gap-1">
             {isValid ? (
               <>

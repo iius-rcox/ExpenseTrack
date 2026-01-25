@@ -542,6 +542,9 @@ function ReportEditorPage() {
                             onToggleEntryMode={(allocationId) =>
                               dispatch({ type: 'TOGGLE_ENTRY_MODE', parentId: line.id, allocationId })
                             }
+                            onBulkPaste={(allocations) =>
+                              dispatch({ type: 'BULK_PASTE_ALLOCATIONS', parentId: line.id, allocations })
+                            }
                             onApply={() => dispatch({ type: 'APPLY_SPLIT', parentId: line.id })}
                             onCancel={() => dispatch({ type: 'CANCEL_SPLIT', id: line.id })}
                           />
