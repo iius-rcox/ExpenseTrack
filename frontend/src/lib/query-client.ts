@@ -35,10 +35,8 @@ function deepSanitizeEmptyObjects<T>(data: T): T {
   const obj = data as Record<string, unknown>;
   const keys = Object.keys(obj);
 
-  // Check if this is an empty object
+  // Convert empty objects to null (defensive against malformed API responses)
   if (keys.length === 0) {
-    // Log for debugging - this helps trace where empty objects come from
-    console.warn('[QueryClient] Empty object {} detected in query data, converting to null');
     return null as T;
   }
 

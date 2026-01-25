@@ -148,12 +148,9 @@ function isEmptyObject(val: unknown): boolean {
 /**
  * Safely coerce a value to string, protecting against empty objects.
  */
-function safeString(val: unknown, context?: string): string {
+function safeString(val: unknown, _context?: string): string {
   if (val === null || val === undefined) return '';
-  if (isEmptyObject(val)) {
-    console.error(`[safeString] Empty object detected${context ? ` in ${context}` : ''}, converting to empty string`);
-    return '';
-  }
+  if (isEmptyObject(val)) return '';
   return String(val);
 }
 
@@ -161,18 +158,13 @@ function safeString(val: unknown, context?: string): string {
  * Safely coerce a value to number, protecting against empty objects.
  * This prevents React Error #301 when numeric fields become empty objects.
  */
-function safeNumber(val: unknown, fallback: number = 0, context?: string): number {
+function safeNumber(val: unknown, fallback: number = 0, _context?: string): number {
   if (typeof val === 'number' && !isNaN(val)) return val;
   if (typeof val === 'string') {
     const parsed = Number(val);
     if (!isNaN(parsed)) return parsed;
   }
-  if (isEmptyObject(val)) {
-    console.error(`[safeNumber] Empty object detected${context ? ` in ${context}` : ''}, converting to ${fallback}`);
-    return fallback;
-  }
-  if (val === null || val === undefined) return fallback;
-  console.warn(`[safeNumber] Unexpected type ${typeof val}${context ? ` in ${context}` : ''}, using fallback ${fallback}`);
+  if (isEmptyObject(val) || val === null || val === undefined) return fallback;
   return fallback;
 }
 
@@ -386,58 +378,15 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
         `/transaction-groups/mixed?${searchParams}`
       );
 
-      // Use module-scope isEmptyObject, safeString, and safeNumber helpers for consistency
-
-      // DEBUG: Log raw API response - this ALWAYS runs now to help diagnose production issues
-      console.log('[useMixedTransactionList] Raw API response summary:', {
-        transactionCount: response.transactions?.length ?? 0,
-        groupCount: response.groups?.length ?? 0,
-      });
-
-      // Check for any empty objects in the raw response that could cause React Error #301
-      for (let i = 0; i < Math.min(3, response.transactions?.length ?? 0); i++) {
-        const tx = response.transactions[i];
-        if (tx.prediction) {
-          const pred = tx.prediction;
-          // Check ALL prediction fields for empty objects
-          const fieldsToCheck = Object.entries(pred);
-          for (const [key, value] of fieldsToCheck) {
-            if (isEmptyObject(value)) {
-              console.error(`[useMixedTransactionList] FOUND EMPTY OBJECT in prediction.${key} for tx ${tx.id}`);
-            }
-          }
-        }
-        // Also check if the prediction itself is an empty object
-        if (isEmptyObject(tx.prediction)) {
-          console.error(`[useMixedTransactionList] FOUND EMPTY OBJECT as prediction for tx ${tx.id}`);
-        }
-      }
-
       // Transform and merge transactions and groups into a single list
       const items: TransactionListItem[] = [];
 
       // Transform transactions to TransactionViewWithType
       for (const tx of response.transactions) {
-        // Skip processing if prediction is an empty object (convert to null)
-        let prediction = tx.prediction;
-        if (isEmptyObject(prediction)) {
-          console.error('[useMixedTransactionList] Skipping empty object prediction for tx:', tx.id);
-          prediction = null;
-        }
+        // Convert empty object prediction to null (defensive against malformed API responses)
+        const prediction = isEmptyObject(tx.prediction) ? null : tx.prediction;
 
-        // Additional validation: if prediction exists but has empty object fields
-        if (prediction) {
-          // Check each field and log any empty objects
-          const fields = ['id', 'transactionId', 'vendorName', 'confidenceLevel', 'status', 'suggestedCategory', 'suggestedGLCode'] as const;
-          for (const field of fields) {
-            const value = (prediction as Record<string, unknown>)[field];
-            if (isEmptyObject(value)) {
-              console.error(`[useMixedTransactionList] Empty object in prediction.${field} for tx ${tx.id}, will convert to safe value`);
-            }
-          }
-        }
-
-        // Apply defensive coercion to all fields, even the ones that should always be primitives
+        // Apply defensive coercion to all fields
         const txDescription = safeString(tx.description, 'tx.description');
         const txAmount = safeNumber(tx.amount, 0, 'tx.amount');
 
@@ -494,26 +443,6 @@ export function useMixedTransactionList(params: MixedListParams = {}) {
 
       // Transform groups to TransactionGroupView
       for (const group of response.groups) {
-        // Check for empty objects in group data
-        const groupFields = ['id', 'name', 'displayDate', 'combinedAmount', 'transactionCount', 'matchStatus'];
-        for (const field of groupFields) {
-          const value = (group as unknown as Record<string, unknown>)[field];
-          if (isEmptyObject(value)) {
-            console.error(`[useMixedTransactionList] FOUND EMPTY OBJECT in group.${field} for group ${group.id}`);
-          }
-        }
-        // Also check transactions array for any empty objects
-        if (group.transactions) {
-          for (const tx of group.transactions) {
-            const txFields = ['id', 'transactionDate', 'amount', 'description'];
-            for (const field of txFields) {
-              const value = (tx as unknown as Record<string, unknown>)[field];
-              if (isEmptyObject(value)) {
-                console.error(`[useMixedTransactionList] FOUND EMPTY OBJECT in group.transaction.${field} for group ${group.id}`);
-              }
-            }
-          }
-        }
         items.push(transformToGroupDetailView(group));
       }
 

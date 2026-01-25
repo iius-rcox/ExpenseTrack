@@ -22,6 +22,7 @@ import { Route as AuthenticatedMissingReceiptsIndexRouteImport } from './routes/
 import { Route as AuthenticatedMatchingIndexRouteImport } from './routes/_authenticated/matching/index'
 import { Route as AuthenticatedAnalyticsIndexRouteImport } from './routes/_authenticated/analytics/index'
 import { Route as AuthenticatedTransactionsTransactionIdRouteImport } from './routes/_authenticated/transactions/$transactionId'
+import { Route as AuthenticatedReportsEditorRouteImport } from './routes/_authenticated/reports/editor'
 import { Route as AuthenticatedReportsReportIdRouteImport } from './routes/_authenticated/reports/$reportId'
 import { Route as AuthenticatedReceiptsReceiptIdRouteImport } from './routes/_authenticated/receipts/$receiptId'
 import { Route as AuthenticatedPredictionsPatternsRouteImport } from './routes/_authenticated/predictions/patterns'
@@ -100,6 +101,12 @@ const AuthenticatedTransactionsTransactionIdRoute =
     path: '/transactions/$transactionId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedReportsEditorRoute =
+  AuthenticatedReportsEditorRouteImport.update({
+    id: '/reports/editor',
+    path: '/reports/editor',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedReportsReportIdRoute =
   AuthenticatedReportsReportIdRouteImport.update({
     id: '/reports/$reportId',
@@ -133,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/predictions/patterns': typeof AuthenticatedPredictionsPatternsRoute
   '/receipts/$receiptId': typeof AuthenticatedReceiptsReceiptIdRoute
   '/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
+  '/reports/editor': typeof AuthenticatedReportsEditorRoute
   '/transactions/$transactionId': typeof AuthenticatedTransactionsTransactionIdRoute
   '/analytics': typeof AuthenticatedAnalyticsIndexRoute
   '/matching': typeof AuthenticatedMatchingIndexRoute
@@ -151,6 +159,7 @@ export interface FileRoutesByTo {
   '/predictions/patterns': typeof AuthenticatedPredictionsPatternsRoute
   '/receipts/$receiptId': typeof AuthenticatedReceiptsReceiptIdRoute
   '/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
+  '/reports/editor': typeof AuthenticatedReportsEditorRoute
   '/transactions/$transactionId': typeof AuthenticatedTransactionsTransactionIdRoute
   '/analytics': typeof AuthenticatedAnalyticsIndexRoute
   '/matching': typeof AuthenticatedMatchingIndexRoute
@@ -171,6 +180,7 @@ export interface FileRoutesById {
   '/_authenticated/predictions/patterns': typeof AuthenticatedPredictionsPatternsRoute
   '/_authenticated/receipts/$receiptId': typeof AuthenticatedReceiptsReceiptIdRoute
   '/_authenticated/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
+  '/_authenticated/reports/editor': typeof AuthenticatedReportsEditorRoute
   '/_authenticated/transactions/$transactionId': typeof AuthenticatedTransactionsTransactionIdRoute
   '/_authenticated/analytics/': typeof AuthenticatedAnalyticsIndexRoute
   '/_authenticated/matching/': typeof AuthenticatedMatchingIndexRoute
@@ -191,6 +201,7 @@ export interface FileRouteTypes {
     | '/predictions/patterns'
     | '/receipts/$receiptId'
     | '/reports/$reportId'
+    | '/reports/editor'
     | '/transactions/$transactionId'
     | '/analytics'
     | '/matching'
@@ -209,6 +220,7 @@ export interface FileRouteTypes {
     | '/predictions/patterns'
     | '/receipts/$receiptId'
     | '/reports/$reportId'
+    | '/reports/editor'
     | '/transactions/$transactionId'
     | '/analytics'
     | '/matching'
@@ -228,6 +240,7 @@ export interface FileRouteTypes {
     | '/_authenticated/predictions/patterns'
     | '/_authenticated/receipts/$receiptId'
     | '/_authenticated/reports/$reportId'
+    | '/_authenticated/reports/editor'
     | '/_authenticated/transactions/$transactionId'
     | '/_authenticated/analytics/'
     | '/_authenticated/matching/'
@@ -338,6 +351,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTransactionsTransactionIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/reports/editor': {
+      id: '/_authenticated/reports/editor'
+      path: '/reports/editor'
+      fullPath: '/reports/editor'
+      preLoaderRoute: typeof AuthenticatedReportsEditorRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/reports/$reportId': {
       id: '/_authenticated/reports/$reportId'
       path: '/reports/$reportId'
@@ -375,6 +395,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPredictionsPatternsRoute: typeof AuthenticatedPredictionsPatternsRoute
   AuthenticatedReceiptsReceiptIdRoute: typeof AuthenticatedReceiptsReceiptIdRoute
   AuthenticatedReportsReportIdRoute: typeof AuthenticatedReportsReportIdRoute
+  AuthenticatedReportsEditorRoute: typeof AuthenticatedReportsEditorRoute
   AuthenticatedTransactionsTransactionIdRoute: typeof AuthenticatedTransactionsTransactionIdRoute
   AuthenticatedAnalyticsIndexRoute: typeof AuthenticatedAnalyticsIndexRoute
   AuthenticatedMatchingIndexRoute: typeof AuthenticatedMatchingIndexRoute
@@ -393,6 +414,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedPredictionsPatternsRoute: AuthenticatedPredictionsPatternsRoute,
   AuthenticatedReceiptsReceiptIdRoute: AuthenticatedReceiptsReceiptIdRoute,
   AuthenticatedReportsReportIdRoute: AuthenticatedReportsReportIdRoute,
+  AuthenticatedReportsEditorRoute: AuthenticatedReportsEditorRoute,
   AuthenticatedTransactionsTransactionIdRoute:
     AuthenticatedTransactionsTransactionIdRoute,
   AuthenticatedAnalyticsIndexRoute: AuthenticatedAnalyticsIndexRoute,
