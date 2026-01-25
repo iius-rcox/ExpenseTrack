@@ -116,11 +116,15 @@ public class ReportService : IReportService
             }
             else if (match.TransactionGroupId != null && match.TransactionGroup != null)
             {
-                // Group match - expand to all transactions in the group
+                // Group match - expand to transactions in the group that fall within the period
+                // CRITICAL: Filter by date - a group may span multiple months
                 var group = match.TransactionGroup;
                 var groupVendorName = receipt.VendorExtracted ?? match.MatchedVendorAlias?.DisplayName ?? group.Name;
 
-                foreach (var groupTransaction in group.Transactions.OrderBy(t => t.TransactionDate).ThenBy(t => t.CreatedAt))
+                foreach (var groupTransaction in group.Transactions
+                    .Where(t => t.TransactionDate >= startDate && t.TransactionDate <= endDate)
+                    .OrderBy(t => t.TransactionDate)
+                    .ThenBy(t => t.CreatedAt))
                 {
                     transactionsToProcess.Add((groupTransaction, groupVendorName));
                 }
@@ -644,7 +648,13 @@ public class ReportService : IReportService
             else if (match.TransactionGroupId != null && match.TransactionGroup != null)
             {
                 var group = match.TransactionGroup;
-                var groupTransactions = group.Transactions.OrderBy(t => t.TransactionDate).ThenBy(t => t.CreatedAt);
+                // CRITICAL: Filter group transactions to only include those within the period
+                // A group may span multiple months (e.g., hotel stay Nov 28 - Dec 2)
+                // Only include transactions whose date falls within the requested period
+                var groupTransactions = group.Transactions
+                    .Where(t => t.TransactionDate >= startDate && t.TransactionDate <= endDate)
+                    .OrderBy(t => t.TransactionDate)
+                    .ThenBy(t => t.CreatedAt);
 
                 foreach (var transaction in groupTransactions)
                 {
