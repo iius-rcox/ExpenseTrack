@@ -127,8 +127,10 @@ public class ExpenseReportRepository : IExpenseReportRepository
 
     public async Task<ExpenseLine?> GetLineByIdAsync(Guid reportId, Guid lineId, CancellationToken ct = default)
     {
+        // NOTE: Do NOT use .Include(l => l.Report) here - it causes entity tracking conflicts
+        // when the report is already tracked by the calling service. EF Core automatically
+        // translates navigation property access in Where() to SQL JOINs.
         return await _context.ExpenseLines
-            .Include(l => l.Report)
             .Where(l => l.ReportId == reportId && l.Id == lineId)
             .Where(l => !l.Report.IsDeleted)
             .FirstOrDefaultAsync(ct);
