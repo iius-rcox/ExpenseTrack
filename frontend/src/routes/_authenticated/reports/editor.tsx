@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { useReportPreview, useCheckDraftExists, useGenerateReport, useReportDetail, useUpdateReportLine } from '@/hooks/queries/use-reports'
+import { useReportPreview, useCheckDraftExists, useGenerateReport, useReportDetail, useUpdateReportLine, useAddReportLine, useRemoveReportLine } from '@/hooks/queries/use-reports'
 import { useReportEditor } from '@/hooks/use-report-editor'
 import { useExportPreview } from '@/hooks/queries/use-report-export'
 import { useGLAccounts, lookupGLName } from '@/hooks/queries/use-reference-data'
@@ -16,8 +16,10 @@ import { EditableDateCell } from '@/components/reports/editable-date-cell'
 import { SplitExpansionPanel } from '@/components/reports/split-expansion-panel'
 import { SplitIndicatorBadge } from '@/components/reports/split-indicator-badge'
 import { DraftStatusBanner } from '@/components/reports/draft-status-banner'
+import { AddTransactionSheet } from '@/components/reports/add-transaction-sheet'
+import { RemoveLineDialog } from '@/components/reports/remove-line-dialog'
 import { toast } from 'sonner'
-import { FileSpreadsheet, FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Split, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react'
+import { FileSpreadsheet, FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Split, ChevronDown, ChevronRight as ChevronRightIcon, Plus, Trash2 } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
 import type { ExportPreviewRequest, ExportLineDto } from '@/types/report-editor'
 
@@ -50,6 +52,16 @@ function ReportEditorPage() {
   const { mutate: generateDraft, isPending: generatingDraft } = useGenerateReport()
   const { mutate: updateLine, isPending: savingLine } = useUpdateReportLine()
 
+  // Add/Remove line mutations
+  const addLineMutation = useAddReportLine()
+  const removeLineMutation = useRemoveReportLine()
+
+  // Add/Remove UI state
+  const [addSheetOpen, setAddSheetOpen] = useState(false)
+  const [addingTransactionId, setAddingTransactionId] = useState<string | null>(null)
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
+  const [lineToRemove, setLineToRemove] = useState<{ id: string; vendor: string; amount: number } | null>(null)
+
   // Fetch reference data for GL name lookups
   const { data: glAccounts = [] } = useGLAccounts()
 
@@ -68,6 +80,74 @@ function ReportEditorPage() {
   const getDbLineId = (lineId: string): string => {
     // Frontend IDs have "-index" suffix, backend expects just the GUID
     return lineId.split('-').slice(0, 5).join('-') // Take first 5 parts of GUID
+  }
+
+  // Handler: Add transaction to report
+  const handleAddTransaction = (transactionId: string) => {
+    if (!reportId) return
+    setAddingTransactionId(transactionId)
+
+    addLineMutation.mutate(
+      { reportId, data: { transactionId } },
+      {
+        onSuccess: (newLine) => {
+          // Convert API response to EditableExpenseLine format
+          const expenseDate = newLine.transactionDate
+            ? new Date(newLine.transactionDate).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0]
+
+          const editableLine = {
+            id: `${newLine.id}-${Date.now()}`, // Unique frontend ID
+            transactionId: newLine.transactionId || '',
+            receiptId: newLine.receiptId || null,
+            originalAmount: newLine.amount || 0,
+            expenseDate,
+            vendor: newLine.vendor || '',
+            glCode: newLine.glCode || '',
+            glName: lookupGLName(newLine.glCode || '', glAccounts),
+            departmentCode: newLine.department || '',
+            description: newLine.normalizedDescription || newLine.description || '',
+            hasReceipt: newLine.hasReceipt || false,
+            isDirty: false,
+            validationWarnings: [],
+            isSplit: false,
+            isExpanded: false,
+            allocations: [],
+            appliedAllocations: undefined,
+          }
+
+          dispatch({ type: 'ADD_LINE', line: editableLine })
+          toast.success('Transaction added to report')
+          setAddSheetOpen(false)
+          setAddingTransactionId(null)
+        },
+        onError: (error) => {
+          toast.error(`Failed to add transaction: ${error.message}`)
+          setAddingTransactionId(null)
+        },
+      }
+    )
+  }
+
+  // Handler: Remove line from report
+  const handleRemoveLine = () => {
+    if (!reportId || !lineToRemove) return
+    const dbLineId = getDbLineId(lineToRemove.id)
+
+    removeLineMutation.mutate(
+      { reportId, lineId: dbLineId },
+      {
+        onSuccess: () => {
+          dispatch({ type: 'REMOVE_LINE', id: lineToRemove.id })
+          toast.success('Line removed from report')
+          setRemoveDialogOpen(false)
+          setLineToRemove(null)
+        },
+        onError: (error) => {
+          toast.error(`Failed to remove line: ${error.message}`)
+        },
+      }
+    )
   }
 
   // Helper: Update GL Code and auto-lookup GL Name
@@ -354,6 +434,19 @@ function ReportEditorPage() {
             </Button>
           </div>
 
+          {/* Add Transaction Button - Only for draft reports */}
+          {useDraft && reportId && (
+            <Button
+              variant="outline"
+              onClick={() => setAddSheetOpen(true)}
+              className="gap-2"
+              data-testid="add-transaction-btn"
+            >
+              <Plus className="h-4 w-4" />
+              Add Transaction
+            </Button>
+          )}
+
           {/* Export Buttons */}
           <Button
             onClick={() => handleExport('pdf')}
@@ -553,25 +646,45 @@ function ReportEditorPage() {
 
                       {/* Actions Column */}
                       <TableCell>
-                        {line.isSplit && line.appliedAllocations ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => dispatch({ type: 'REMOVE_SPLIT', id: line.id })}
-                          >
-                            Remove Split
-                          </Button>
-                        ) : line.isExpanded ? null : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => dispatch({ type: 'START_SPLIT', id: line.id })}
-                            className="gap-1"
-                          >
-                            <Split className="h-3 w-3" />
-                            Split
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {/* Remove Line Button - Only for draft reports */}
+                          {useDraft && reportId && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setLineToRemove({ id: line.id, vendor: line.vendor, amount: line.originalAmount })
+                                setRemoveDialogOpen(true)
+                              }}
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              data-testid={`remove-line-${getDbLineId(line.id)}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Remove line</span>
+                            </Button>
+                          )}
+
+                          {/* Split Actions */}
+                          {line.isSplit && line.appliedAllocations ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => dispatch({ type: 'REMOVE_SPLIT', id: line.id })}
+                            >
+                              Remove Split
+                            </Button>
+                          ) : line.isExpanded ? null : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => dispatch({ type: 'START_SPLIT', id: line.id })}
+                              className="gap-1"
+                            >
+                              <Split className="h-3 w-3" />
+                              Split
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
 
@@ -610,6 +723,35 @@ function ReportEditorPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Add Transaction Sheet */}
+      {reportId && (
+        <AddTransactionSheet
+          open={addSheetOpen}
+          onOpenChange={setAddSheetOpen}
+          reportId={reportId}
+          reportPeriod={period}
+          onAdd={handleAddTransaction}
+          isAdding={addLineMutation.isPending}
+          addingTransactionId={addingTransactionId}
+        />
+      )}
+
+      {/* Remove Line Confirmation Dialog */}
+      {lineToRemove && (
+        <RemoveLineDialog
+          open={removeDialogOpen}
+          onOpenChange={(open) => {
+            setRemoveDialogOpen(open)
+            if (!open) setLineToRemove(null)
+          }}
+          lineId={lineToRemove.id}
+          vendor={lineToRemove.vendor}
+          amount={lineToRemove.amount}
+          onConfirm={handleRemoveLine}
+          isRemoving={removeLineMutation.isPending}
+        />
+      )}
     </div>
   )
 }

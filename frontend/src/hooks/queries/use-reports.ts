@@ -6,6 +6,8 @@ import type {
   GenerateDraftRequest,
   UpdateLineRequest,
   ExpenseLine,
+  AddLineRequest,
+  AvailableTransactionsResponse,
 } from '@/types/api'
 
 export const reportKeys = {
@@ -16,6 +18,8 @@ export const reportKeys = {
   detail: (id: string) => [...reportKeys.details(), id] as const,
   preview: (period: string) => [...reportKeys.all, 'preview', period] as const,
   draftExists: (period: string) => [...reportKeys.all, 'draft-exists', period] as const,
+  availableTransactions: (reportId: string, search?: string, page?: number, pageSize?: number) =>
+    [...reportKeys.all, 'available-transactions', reportId, search, page, pageSize] as const,
 }
 
 interface ReportListParams {
@@ -185,6 +189,93 @@ export function useExportReport() {
       await apiDownload(`/reports/${reportId}/export?format=${format}`, filename)
 
       return { filename }
+    },
+  })
+}
+
+/**
+ * Get available transactions that can be added to a report.
+ * Excludes transactions already on any active report.
+ */
+export function useAvailableTransactions(
+  reportId: string,
+  search?: string,
+  page = 1,
+  pageSize = 20,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: reportKeys.availableTransactions(reportId, search, page, pageSize),
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (search) params.set('search', search)
+      params.set('page', String(page))
+      params.set('pageSize', String(pageSize))
+
+      return apiFetch<AvailableTransactionsResponse>(
+        `/reports/${reportId}/available-transactions?${params}`
+      )
+    },
+    enabled: enabled && !!reportId,
+    staleTime: 30_000, // Cache for 30 seconds
+  })
+}
+
+/**
+ * Add a transaction as a new expense line to a report.
+ */
+export function useAddReportLine() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      reportId,
+      data,
+    }: {
+      reportId: string
+      data: AddLineRequest
+    }) => {
+      return apiFetch<ExpenseLine>(`/reports/${reportId}/lines`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate report detail and available transactions
+      queryClient.invalidateQueries({ queryKey: reportKeys.detail(variables.reportId) })
+      queryClient.invalidateQueries({
+        queryKey: reportKeys.availableTransactions(variables.reportId),
+      })
+    },
+  })
+}
+
+/**
+ * Remove an expense line from a report.
+ * Transaction becomes available for other reports again.
+ */
+export function useRemoveReportLine() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      reportId,
+      lineId,
+    }: {
+      reportId: string
+      lineId: string
+    }) => {
+      return apiFetch(`/reports/${reportId}/lines/${lineId}`, {
+        method: 'DELETE',
+      })
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate report detail and available transactions
+      queryClient.invalidateQueries({ queryKey: reportKeys.detail(variables.reportId) })
+      queryClient.invalidateQueries({
+        queryKey: reportKeys.availableTransactions(variables.reportId),
+      })
     },
   })
 }

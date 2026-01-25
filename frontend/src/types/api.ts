@@ -336,6 +336,32 @@ export interface GenerateDraftRequest {
   period: string // YYYY-MM format
 }
 
+// Add/Remove Line Types (Manual Transaction Management)
+export interface AddLineRequest {
+  transactionId: string
+  glCode?: string
+  departmentCode?: string
+}
+
+export interface AvailableTransaction {
+  id: string
+  transactionDate: string // ISO date
+  description: string
+  originalDescription: string
+  amount: number
+  hasMatchedReceipt: boolean
+  receiptId: string | null
+  vendor: string | null
+  /** True if transaction date is outside the report period */
+  isOutsidePeriod: boolean
+}
+
+export interface AvailableTransactionsResponse {
+  transactions: AvailableTransaction[]
+  totalCount: number
+  reportPeriod: string // YYYY-MM
+}
+
 // Analytics Types
 export interface ComparisonSummary {
   currentTotal: number

@@ -1,6 +1,7 @@
 import { PublicClientApplication } from '@azure/msal-browser'
 import { msalConfig, apiScopes } from '@/auth/authConfig'
 import { ApiError, type ProblemDetails } from '@/types/api'
+import { isE2ETestMode, getMockToken } from '@/auth/testAuth'
 
 // MSAL instance - shared across the app
 let msalInstance: PublicClientApplication | null = null
@@ -21,6 +22,22 @@ export function getMsalInstance(): PublicClientApplication {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 async function getAuthHeaders(): Promise<HeadersInit> {
+  // Check for E2E test mode first - use mock token if available
+  if (isE2ETestMode()) {
+    const mockToken = getMockToken()
+    if (mockToken) {
+      return {
+        'Authorization': `Bearer ${mockToken}`,
+        'Content-Type': 'application/json',
+      }
+    }
+    // In E2E test mode but no token - allow request without auth (mocked APIs don't need it)
+    return {
+      'Content-Type': 'application/json',
+    }
+  }
+
+  // Production flow - use MSAL
   const instance = getMsalInstance()
   const accounts = instance.getAllAccounts()
 
@@ -113,17 +130,26 @@ export async function apiUpload<T>(
   formData: FormData,
   onProgress?: (progress: number) => void
 ): Promise<T> {
-  const instance = getMsalInstance()
-  const accounts = instance.getAllAccounts()
+  // Check for E2E test mode first
+  let authToken: string | null = null
 
-  if (accounts.length === 0) {
-    throw new ApiError(401, 'No authenticated account')
+  if (isE2ETestMode()) {
+    authToken = getMockToken()
+  } else {
+    // Production flow - use MSAL
+    const instance = getMsalInstance()
+    const accounts = instance.getAllAccounts()
+
+    if (accounts.length === 0) {
+      throw new ApiError(401, 'No authenticated account')
+    }
+
+    const response = await instance.acquireTokenSilent({
+      scopes: apiScopes.all,
+      account: accounts[0],
+    })
+    authToken = response.idToken
   }
-
-  const response = await instance.acquireTokenSilent({
-    scopes: apiScopes.all,
-    account: accounts[0],
-  })
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -159,31 +185,43 @@ export async function apiUpload<T>(
     })
 
     xhr.open('POST', `${API_BASE_URL}${url}`)
-    // Use idToken for consistency with getAuthHeaders()
-    xhr.setRequestHeader('Authorization', `Bearer ${response.idToken}`)
+    // Set auth header if we have a token
+    if (authToken) {
+      xhr.setRequestHeader('Authorization', `Bearer ${authToken}`)
+    }
     xhr.send(formData)
   })
 }
 
 // File download - returns blob URL
 export async function apiDownload(url: string, filename: string): Promise<void> {
-  const instance = getMsalInstance()
-  const accounts = instance.getAllAccounts()
+  // Check for E2E test mode first
+  let authToken: string | null = null
 
-  if (accounts.length === 0) {
-    throw new ApiError(401, 'No authenticated account')
+  if (isE2ETestMode()) {
+    authToken = getMockToken()
+  } else {
+    // Production flow - use MSAL
+    const instance = getMsalInstance()
+    const accounts = instance.getAllAccounts()
+
+    if (accounts.length === 0) {
+      throw new ApiError(401, 'No authenticated account')
+    }
+
+    const response = await instance.acquireTokenSilent({
+      scopes: apiScopes.all,
+      account: accounts[0],
+    })
+    authToken = response.idToken
   }
 
-  const response = await instance.acquireTokenSilent({
-    scopes: apiScopes.all,
-    account: accounts[0],
-  })
+  const headers: HeadersInit = authToken
+    ? { 'Authorization': `Bearer ${authToken}` }
+    : {}
 
   const fetchResponse = await fetch(`${API_BASE_URL}${url}`, {
-    headers: {
-      // Use idToken for consistency with getAuthHeaders()
-      'Authorization': `Bearer ${response.idToken}`,
-    },
+    headers,
   })
 
   if (!fetchResponse.ok) {

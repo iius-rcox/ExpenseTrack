@@ -82,6 +82,10 @@ export type ReportEditorAction =
   | { type: 'TOGGLE_EXPANSION'; id: string }
   // Bulk paste action for Excel copy/paste
   | { type: 'BULK_PASTE_ALLOCATIONS'; parentId: string; allocations: { glCode?: string; departmentCode: string; amount: number }[] }
+  // Manual transaction add/remove actions
+  | { type: 'ADD_LINE'; line: EditableExpenseLine }
+  | { type: 'REMOVE_LINE'; id: string }
+  | { type: 'REMOVE_LINES'; ids: string[] }
 
 /**
  * Export request payload matching backend ExportPreviewRequest DTO.

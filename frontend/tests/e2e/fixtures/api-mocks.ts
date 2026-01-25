@@ -145,6 +145,116 @@ export const mockSettings = {
   },
 }
 
+// Mock data for expense reports and available transactions
+export const mockExpenseReport = {
+  id: 'report-001',
+  period: '2026-01',
+  status: 'Draft',
+  title: 'January 2026 Expense Report',
+  lineCount: 3,
+  totalAmount: 268.73,
+  missingReceiptCount: 1,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  submittedAt: null,
+  lines: [
+    {
+      id: 'line-001',
+      transactionId: 'txn-001',
+      receiptId: 'rcpt-001',
+      transactionDate: '2026-01-15',
+      amount: 87.45,
+      description: 'WHOLE FOODS MARKET #10847',
+      normalizedDescription: 'Whole Foods grocery purchase',
+      vendor: 'Whole Foods',
+      glCode: '6200',
+      department: 'IT',
+      project: null,
+      category: 'Groceries',
+      hasReceipt: true,
+      missingReceiptJustification: null,
+      notes: null,
+      splitAllocations: [],
+    },
+    {
+      id: 'line-002',
+      transactionId: 'txn-002',
+      receiptId: null,
+      transactionDate: '2026-01-14',
+      amount: 24.50,
+      description: 'UBER *TRIP',
+      normalizedDescription: 'Uber ride',
+      vendor: 'Uber',
+      glCode: '6300',
+      department: 'IT',
+      project: null,
+      category: 'Transportation',
+      hasReceipt: false,
+      missingReceiptJustification: null,
+      notes: null,
+      splitAllocations: [],
+    },
+    {
+      id: 'line-003',
+      transactionId: 'txn-003',
+      receiptId: 'rcpt-003',
+      transactionDate: '2026-01-13',
+      amount: 156.78,
+      description: 'AMAZON.COM*123ABC',
+      normalizedDescription: 'Amazon office supplies',
+      vendor: 'Amazon',
+      glCode: '6100',
+      department: 'IT',
+      project: null,
+      category: 'Office Supplies',
+      hasReceipt: true,
+      missingReceiptJustification: null,
+      notes: null,
+      splitAllocations: [],
+    },
+  ],
+}
+
+export const mockAvailableTransactions = {
+  transactions: [
+    {
+      id: 'txn-available-001',
+      transactionDate: '2026-01-20',
+      description: 'STARBUCKS COFFEE',
+      originalDescription: 'STARBUCKS #12345',
+      amount: 12.50,
+      hasMatchedReceipt: false,
+      receiptId: null,
+      vendor: null,
+      isOutsidePeriod: false,
+    },
+    {
+      id: 'txn-available-002',
+      transactionDate: '2026-01-18',
+      description: 'OFFICE DEPOT',
+      originalDescription: 'OFFICE DEPOT #98765',
+      amount: 89.99,
+      hasMatchedReceipt: true,
+      receiptId: 'rcpt-003',
+      vendor: 'Office Depot',
+      isOutsidePeriod: false,
+    },
+    {
+      id: 'txn-outside-period',
+      transactionDate: '2025-12-15',
+      description: 'HOTEL BOOKING',
+      originalDescription: 'MARRIOTT HOTELS',
+      amount: 245.00,
+      hasMatchedReceipt: true,
+      receiptId: 'rcpt-004',
+      vendor: 'Marriott',
+      isOutsidePeriod: true, // Outside report period
+    },
+  ],
+  totalCount: 3,
+  reportPeriod: '2026-01',
+}
+
 // =============================================================================
 // Route Handler Setup
 // =============================================================================
@@ -153,8 +263,8 @@ export const mockSettings = {
  * Sets up all API route mocks for a Playwright page
  */
 export async function setupApiMocks(page: Page): Promise<void> {
-  // Dashboard
-  await page.route('**/api/dashboard/summary', async (route: Route) => {
+  // Dashboard - catch all dashboard endpoints
+  await page.route('**/api/dashboard/*', async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -224,6 +334,15 @@ export async function setupApiMocks(page: Page): Promise<void> {
     })
   })
 
+  // Analytics - categories endpoint (catch-all for category-related queries)
+  await page.route('**/api/analytics/categories*', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(mockAnalytics.spendingByCategory),
+    })
+  })
+
   // Analytics endpoints
   await page.route('**/api/analytics/spending-by-category', async (route: Route) => {
     await route.fulfill({
@@ -287,13 +406,127 @@ export async function setupApiMocks(page: Page): Promise<void> {
     })
   })
 
-  // Reports
-  await page.route('**/api/reports*', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ reports: [], totalCount: 0 }),
-    })
+  // Reports - catch all /api/reports/* endpoints with a single handler
+  // This avoids pattern matching issues with multiple overlapping routes
+  await page.route(/\/api\/reports/, async (route: Route) => {
+    const url = route.request().url()
+    const method = route.request().method()
+
+    // Debug: console.log('>>> MOCK: reports handler - URL:', url, 'Method:', method)
+
+    // Handle draft/exists check
+    if (url.includes('/draft/exists')) {
+      // Debug: console.log('>>> MOCK: draft/exists matched')
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          exists: true,
+          reportId: mockExpenseReport.id,
+        }),
+      })
+      return
+    }
+
+    // Handle preview
+    if (url.includes('/preview')) {
+      // Debug: console.log('>>> MOCK: preview matched')
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockExpenseReport.lines),
+      })
+      return
+    }
+
+    // Handle generate (POST)
+    if (url.includes('/generate') && method === 'POST') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockExpenseReport),
+      })
+      return
+    }
+
+    // Handle available-transactions endpoint
+    if (url.includes('/available-transactions')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockAvailableTransactions),
+      })
+      return
+    }
+
+    // Handle add line (POST to /lines)
+    if (url.includes('/lines') && method === 'POST') {
+      const body = JSON.parse(route.request().postData() || '{}')
+      const newLine = {
+        id: `line-new-${Date.now()}`,
+        transactionId: body.transactionId,
+        transactionDate: new Date().toISOString().split('T')[0],
+        amount: 12.50,
+        description: 'New transaction',
+        normalizedDescription: 'New transaction added',
+        vendor: 'Test Vendor',
+        glCode: body.glCode || '6000',
+        department: body.departmentCode || 'IT',
+        hasReceipt: false,
+      }
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify(newLine),
+      })
+      return
+    }
+
+    // Handle remove line (DELETE to /lines/:id)
+    if (url.includes('/lines/') && method === 'DELETE') {
+      await route.fulfill({
+        status: 204,
+      })
+      return
+    }
+
+    // Handle update line (PATCH to /lines/:id)
+    if (url.includes('/lines/') && method === 'PATCH') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockExpenseReport.lines[0]),
+      })
+      return
+    }
+
+    // Handle reports list (GET /api/reports)
+    if (method === 'GET' && url.match(/\/api\/reports(\?|$)/)) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          reports: [mockExpenseReport],
+          totalCount: 1,
+          page: 1,
+          pageSize: 20,
+        }),
+      })
+      return
+    }
+
+    // Handle individual report GET (e.g., /api/reports/{id})
+    if (method === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockExpenseReport),
+      })
+      return
+    }
+
+    // For anything else, continue to the network
+    await route.continue()
   })
 
   // Statements
@@ -305,7 +538,35 @@ export async function setupApiMocks(page: Page): Promise<void> {
     })
   })
 
-  // Reference data
+  // Reference data - GL accounts (required for editor to load data)
+  // Actual endpoint is /reference/gl-accounts (not /reference-data/)
+  await page.route('**/api/reference/gl-accounts*', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { code: '6100', name: 'Office Supplies' },
+        { code: '6200', name: 'Groceries & Food' },
+        { code: '6300', name: 'Transportation' },
+        { code: '6000', name: 'General Expense' },
+      ]),
+    })
+  })
+
+  // Reference data - departments
+  await page.route('**/api/reference/departments*', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { code: 'IT', name: 'Information Technology' },
+        { code: 'HR', name: 'Human Resources' },
+        { code: 'FIN', name: 'Finance' },
+      ]),
+    })
+  })
+
+  // Reference data - other endpoints (legacy reference-data pattern)
   await page.route('**/api/reference-data/*', async (route: Route) => {
     await route.fulfill({
       status: 200,

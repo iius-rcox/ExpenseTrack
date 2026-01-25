@@ -408,6 +408,41 @@ function reportEditorReducer(
       }
     }
 
+    // Manual transaction add/remove actions
+    case 'ADD_LINE': {
+      return {
+        ...state,
+        lines: [...state.lines, action.line],
+      }
+    }
+
+    case 'REMOVE_LINE': {
+      // Remove the line and any children (for split parents)
+      const lineToRemove = state.lines.find((l) => l.id === action.id)
+      if (!lineToRemove) return state
+
+      // If it's a split parent, also remove child allocations from lines
+      // (Note: In this editor, split children are stored in allocations, not as separate lines)
+      return {
+        ...state,
+        lines: state.lines.filter((line) => line.id !== action.id),
+        selectedLineIds: new Set(
+          [...state.selectedLineIds].filter((id) => id !== action.id)
+        ),
+      }
+    }
+
+    case 'REMOVE_LINES': {
+      const idsToRemove = new Set(action.ids)
+      return {
+        ...state,
+        lines: state.lines.filter((line) => !idsToRemove.has(line.id)),
+        selectedLineIds: new Set(
+          [...state.selectedLineIds].filter((id) => !idsToRemove.has(id))
+        ),
+      }
+    }
+
     default:
       return state
   }
