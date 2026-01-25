@@ -30,6 +30,11 @@ public class PdfGenerationService : IPdfGenerationService
     // Helvetica is a built-in PDF base font that doesn't require installation
     private const string FontFamily = "Helvetica";
 
+    // Security: Maximum image dimensions to prevent DoS via oversized images
+    private const int MaxImageWidth = 8000;
+    private const int MaxImageHeight = 8000;
+    private const long MaxImageBytes = 50 * 1024 * 1024; // 50MB max
+
     public PdfGenerationService(
         IExpenseReportRepository reportRepository,
         IBlobStorageService blobService,
@@ -135,10 +140,24 @@ public class PdfGenerationService : IPdfGenerationService
             // Detect image format and convert if necessary
             var imageBytes = memoryStream.ToArray();
 
+            // Security: Validate image size and dimensions before processing
+            if (!ValidateImageDimensions(imageBytes, out var validationError))
+            {
+                AddReceiptErrorPageWithRef(document, line, validationError!, lineRef);
+                return 1;
+            }
+
             // Handle HEIC/HEIF using ImageSharp
             if (IsHeicFormat(line.Receipt.ContentType, line.Receipt.OriginalFilename))
             {
                 imageBytes = await ConvertHeicToJpegAsync(imageBytes, ct);
+
+                // Re-validate converted image
+                if (!ValidateImageDimensions(imageBytes, out validationError))
+                {
+                    AddReceiptErrorPageWithRef(document, line, validationError!, lineRef);
+                    return 1;
+                }
             }
 
             // For PDF source files, we'd need special handling - for now, treat as image
@@ -189,7 +208,9 @@ public class PdfGenerationService : IPdfGenerationService
                 "Failed to process receipt image for line {LineId}, adding error placeholder",
                 line.Id);
 
-            AddReceiptErrorPageWithRef(document, line, ex.Message, lineRef);
+            // Security: Use sanitized error message - never expose internal details in PDF
+            var safeMessage = GetSafeErrorMessage(ex);
+            AddReceiptErrorPageWithRef(document, line, safeMessage, lineRef);
             return 1;
         }
     }
@@ -230,9 +251,13 @@ public class PdfGenerationService : IPdfGenerationService
 
         y += 18;
 
-        var description = !string.IsNullOrEmpty(line.VendorName)
-            ? $"{line.VendorName} - {line.Amount:C}"
-            : $"{line.NormalizedDescription} - {line.Amount:C}";
+        // Security: Sanitize user-controlled text before rendering
+        var vendorDisplay = SanitizeForPdf(line.VendorName, 50);
+        var descDisplay = SanitizeForPdf(line.NormalizedDescription, 50);
+
+        var description = !string.IsNullOrEmpty(vendorDisplay)
+            ? $"{vendorDisplay} - {line.Amount:C}"
+            : $"{descDisplay} - {line.Amount:C}";
 
         gfx.DrawString(
             description,
@@ -301,20 +326,21 @@ public class PdfGenerationService : IPdfGenerationService
         var textX = boxX + 15;
         var textWidth = boxWidth - 30;
 
-        // Expense details
+        // Expense details - sanitize all user-controlled text
         DrawLabelValue(gfx, fontHeader, fontRegular, "Employee:",
-            report.User?.DisplayName ?? "Unknown", textX, y, textWidth);
+            SanitizeForPdf(report.User?.DisplayName, 60) ?? "Unknown", textX, y, textWidth);
         y += lineHeight + 10;
 
         DrawLabelValue(gfx, fontHeader, fontRegular, "Report Period:",
-            report.Period, textX, y, textWidth);
+            SanitizeForPdf(report.Period, 30), textX, y, textWidth);
         y += lineHeight + 10;
 
         DrawLabelValue(gfx, fontHeader, fontRegular, "Expense Date:",
             line.ExpenseDate.ToString("MMMM d, yyyy"), textX, y, textWidth);
         y += lineHeight + 10;
 
-        var vendorName = !string.IsNullOrEmpty(line.VendorName) ? line.VendorName : "Unknown";
+        var vendorName = SanitizeForPdf(line.VendorName, 60);
+        vendorName = !string.IsNullOrEmpty(vendorName) ? vendorName : "Unknown";
         DrawLabelValue(gfx, fontHeader, fontRegular, "Vendor:",
             vendorName, textX, y, textWidth);
         y += lineHeight + 10;
@@ -324,7 +350,7 @@ public class PdfGenerationService : IPdfGenerationService
         y += lineHeight + 10;
 
         DrawLabelValue(gfx, fontHeader, fontRegular, "Description:",
-            line.NormalizedDescription, textX, y, textWidth);
+            SanitizeForPdf(line.NormalizedDescription, 80), textX, y, textWidth);
         y += lineHeight + 20;
 
         // Justification section
@@ -335,8 +361,9 @@ public class PdfGenerationService : IPdfGenerationService
 
         if (!string.IsNullOrEmpty(line.JustificationNote))
         {
+            // Security: User-provided justification notes need sanitization
             DrawLabelValue(gfx, fontHeader, fontRegular, "Additional Notes:",
-                line.JustificationNote, textX, y, textWidth);
+                SanitizeForPdf(line.JustificationNote, 150), textX, y, textWidth);
         }
 
         // Footer with reference
@@ -583,6 +610,90 @@ public class PdfGenerationService : IPdfGenerationService
         return extension is ".heic" or ".heif";
     }
 
+    /// <summary>
+    /// Sanitizes text for safe PDF rendering by removing control characters
+    /// and limiting length to prevent buffer/display issues.
+    /// </summary>
+    private static string SanitizeForPdf(string? text, int maxLength = 200)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        // Remove control characters (except newline/tab which are sometimes intentional)
+        var sanitized = new string(text
+            .Where(c => !char.IsControl(c) || c == '\n' || c == '\t')
+            .ToArray());
+
+        // Trim and limit length
+        sanitized = sanitized.Trim();
+        if (sanitized.Length > maxLength)
+            sanitized = sanitized[..(maxLength - 3)] + "...";
+
+        return sanitized;
+    }
+
+    /// <summary>
+    /// Creates a safe, generic error message for PDF display.
+    /// Actual error details are logged server-side only.
+    /// </summary>
+    private static string GetSafeErrorMessage(Exception ex)
+    {
+        // Map known exception types to user-friendly messages
+        // Never expose internal paths, stack traces, or implementation details
+        return ex switch
+        {
+            FileNotFoundException => "The receipt file could not be found.",
+            UnauthorizedAccessException => "Access to the receipt file was denied.",
+            InvalidOperationException when ex.Message.Contains("format", StringComparison.OrdinalIgnoreCase)
+                => "The receipt image format is not supported.",
+            _ => "The receipt could not be processed. Please contact support if this persists."
+        };
+    }
+
+    /// <summary>
+    /// Validates image dimensions are within safe limits to prevent DoS attacks.
+    /// </summary>
+    private bool ValidateImageDimensions(byte[] imageBytes, out string? errorMessage)
+    {
+        errorMessage = null;
+
+        if (imageBytes.Length > MaxImageBytes)
+        {
+            errorMessage = "Receipt image file size exceeds maximum allowed.";
+            _logger.LogWarning("Image rejected: size {Size} bytes exceeds limit {Limit}",
+                imageBytes.Length, MaxImageBytes);
+            return false;
+        }
+
+        try
+        {
+            using var stream = new MemoryStream(imageBytes);
+            var imageInfo = Image.Identify(stream);
+
+            if (imageInfo == null)
+            {
+                errorMessage = "Unable to read receipt image format.";
+                return false;
+            }
+
+            if (imageInfo.Width > MaxImageWidth || imageInfo.Height > MaxImageHeight)
+            {
+                errorMessage = "Receipt image dimensions exceed maximum allowed.";
+                _logger.LogWarning("Image rejected: dimensions {Width}x{Height} exceed limit {MaxW}x{MaxH}",
+                    imageInfo.Width, imageInfo.Height, MaxImageWidth, MaxImageHeight);
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to validate image dimensions");
+            errorMessage = "Unable to validate receipt image.";
+            return false;
+        }
+    }
+
     private static async Task<byte[]> ConvertHeicToJpegAsync(byte[] heicBytes, CancellationToken ct)
     {
         using var image = await Image.LoadAsync(new MemoryStream(heicBytes), ct);
@@ -623,8 +734,9 @@ public class PdfGenerationService : IPdfGenerationService
 
         y += 30;
 
+        // Security: Sanitize user-controlled employee name
         gfx.DrawString(
-            $"Employee: {employeeName}",
+            $"Employee: {SanitizeForPdf(employeeName, 60)}",
             fontRegular,
             XBrushes.Black,
             new XRect(Margin, y, PageWidth - (2 * Margin), 15),
@@ -668,13 +780,14 @@ public class PdfGenerationService : IPdfGenerationService
 
             gfx.DrawString(line.ExpenseDate.ToString("MM/dd/yy"), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[0], 10), XStringFormats.TopLeft);
             colX += colWidths[0];
-            gfx.DrawString(TruncateString(line.VendorName, 18), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[1], 10), XStringFormats.TopLeft);
+            // Security: Sanitize user-controlled text
+            gfx.DrawString(TruncateString(SanitizeForPdf(line.VendorName, 20), 18), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[1], 10), XStringFormats.TopLeft);
             colX += colWidths[1];
-            gfx.DrawString(line.GlCode, fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[2], 10), XStringFormats.TopLeft);
+            gfx.DrawString(SanitizeForPdf(line.GlCode, 15), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[2], 10), XStringFormats.TopLeft);
             colX += colWidths[2];
-            gfx.DrawString(line.DepartmentCode, fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[3], 10), XStringFormats.TopLeft);
+            gfx.DrawString(SanitizeForPdf(line.DepartmentCode, 10), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[3], 10), XStringFormats.TopLeft);
             colX += colWidths[3];
-            gfx.DrawString(TruncateString(line.Description, 22), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[4], 10), XStringFormats.TopLeft);
+            gfx.DrawString(TruncateString(SanitizeForPdf(line.Description, 25), 22), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[4], 10), XStringFormats.TopLeft);
             colX += colWidths[4];
             gfx.DrawString(line.Amount.ToString("C"), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[5], 10), XStringFormats.TopRight);
 
@@ -876,7 +989,9 @@ public class PdfGenerationService : IPdfGenerationService
                     new XRect(colX, y, colWidths[0], 12), XStringFormats.TopLeft);
                 colX += colWidths[0];
 
-                var vendorName = !string.IsNullOrEmpty(line.VendorName) ? line.VendorName : "Unknown";
+                // Security: Sanitize user-controlled vendor name
+                var vendorName = SanitizeForPdf(line.VendorName, 20);
+                vendorName = !string.IsNullOrEmpty(vendorName) ? vendorName : "Unknown";
                 gfx.DrawString(TruncateString(vendorName, 16), fontSmall, XBrushes.Black,
                     new XRect(colX, y, colWidths[1], 12), XStringFormats.TopLeft);
                 colX += colWidths[1];
@@ -893,7 +1008,9 @@ public class PdfGenerationService : IPdfGenerationService
                     new XRect(colX, y, colWidths[3], 12), XStringFormats.TopLeft);
                 colX += colWidths[3];
 
-                gfx.DrawString(TruncateString(line.NormalizedDescription, 20), fontSmall, XBrushes.Black,
+                // Security: Sanitize user-controlled description
+                var descriptionDisplay = SanitizeForPdf(line.NormalizedDescription, 25);
+                gfx.DrawString(TruncateString(descriptionDisplay, 20), fontSmall, XBrushes.Black,
                     new XRect(colX, y, colWidths[4], 12), XStringFormats.TopLeft);
                 colX += colWidths[4];
 
