@@ -78,8 +78,11 @@ function ReportEditorPage() {
 
   // Helper: Strip index suffix from line ID for API calls
   const getDbLineId = (lineId: string): string => {
-    // Frontend IDs have "-index" suffix, backend expects just the GUID
-    return lineId.split('-').slice(0, 5).join('-') // Take first 5 parts of GUID
+    // Frontend IDs have "-{index}" suffix added by the reducer (e.g., "abc-def-0")
+    // Remove just the last segment (the index) to get the original API ID
+    // Works for both GUIDs (5 segments) and simple IDs (like "line-001")
+    const parts = lineId.split('-')
+    return parts.slice(0, -1).join('-')
   }
 
   // Handler: Add transaction to report
