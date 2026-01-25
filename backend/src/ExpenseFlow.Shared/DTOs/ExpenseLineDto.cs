@@ -52,4 +52,30 @@ public class ExpenseLineDto
     /// The prediction ID that suggested this line (nullable).
     /// </summary>
     public Guid? PredictionId { get; set; }
+
+    // Split allocation support
+    /// <summary>
+    /// True if this line has been split into multiple allocations.
+    /// When true, ChildAllocations contains the breakdown.
+    /// </summary>
+    public bool IsSplitParent { get; set; }
+
+    /// <summary>
+    /// Child allocations for split expenses.
+    /// Only populated when IsSplitParent is true.
+    /// </summary>
+    public List<SplitAllocationLineDto>? ChildAllocations { get; set; }
+}
+
+/// <summary>
+/// DTO representing a child allocation of a split expense line.
+/// </summary>
+public class SplitAllocationLineDto
+{
+    public Guid Id { get; set; }
+    public string? GlCode { get; set; }
+    public string? DepartmentCode { get; set; }
+    public decimal Percentage { get; set; }
+    public decimal Amount { get; set; }
+    public int AllocationOrder { get; set; }
 }

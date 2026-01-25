@@ -51,6 +51,19 @@ function reportEditorReducer(
             ? `${line.id}-${index}`
             : `${crypto.randomUUID()}-${index}`
 
+          // Map child allocations from backend to frontend format
+          const hasChildAllocations = line.isSplitParent && line.childAllocations?.length > 0
+          const mappedAllocations = hasChildAllocations
+            ? line.childAllocations.map((child: any) => ({
+                id: child.id || crypto.randomUUID(),
+                glCode: child.glCode || '',
+                departmentCode: child.departmentCode || '',
+                percentage: child.percentage || 0,
+                amount: child.amount || 0,
+                entryMode: 'percentage' as const,
+              }))
+            : []
+
           return {
             id: uniqueId,
             transactionId: line.transactionId || '',
@@ -65,11 +78,11 @@ function reportEditorReducer(
             hasReceipt: line.hasReceipt || false,
             isDirty: false,
             validationWarnings: [],
-            // Split allocation fields (initialize as not split)
-            isSplit: false,
+            // Split allocation fields - restore from backend if exists
+            isSplit: hasChildAllocations,
             isExpanded: false,
-            allocations: [],
-            appliedAllocations: undefined,
+            allocations: mappedAllocations,
+            appliedAllocations: hasChildAllocations ? mappedAllocations : undefined,
           }
         }),
         selectedLineIds: new Set(),

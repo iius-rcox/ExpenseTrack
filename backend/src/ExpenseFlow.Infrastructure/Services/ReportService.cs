@@ -372,6 +372,9 @@ public class ReportService : IReportService
         {
             await UpdateSplitAllocationsAsync(report.Id, line, request.SplitAllocations, ct);
             wasEdited = true;
+
+            // Recalculate report totals to exclude split children from totals
+            await RecalculateReportTotalsAsync(report, ct);
         }
 
         // Mark as user-edited if changes were made that differ from suggestions
@@ -1274,6 +1277,30 @@ public class ReportService : IReportService
     }
 
     /// <summary>
+    /// Recalculates report totals excluding split child lines.
+    /// Call this after adding/removing splits to ensure accurate totals.
+    /// </summary>
+    private async Task RecalculateReportTotalsAsync(ExpenseReport report, CancellationToken ct)
+    {
+        // Reload all lines for this report
+        var reportWithLines = await _reportRepository.GetByIdWithLinesAsync(report.Id, ct);
+        if (reportWithLines == null) return;
+
+        // Only count parent lines (exclude IsSplitChild=true)
+        var parentLines = reportWithLines.Lines.Where(l => !l.IsSplitChild).ToList();
+
+        report.TotalAmount = parentLines.Sum(l => l.Amount);
+        report.LineCount = parentLines.Count;
+        report.MissingReceiptCount = parentLines.Count(l => !l.HasReceipt);
+
+        await _reportRepository.UpdateAsync(report, ct);
+
+        _logger.LogDebug(
+            "Recalculated report {ReportId} totals: {LineCount} lines, {TotalAmount:C}",
+            report.Id, report.LineCount, report.TotalAmount);
+    }
+
+    /// <summary>
     /// Triggers learning loop when user corrects categorization.
     /// Updates vendor aliases and description cache with user corrections.
     /// </summary>
@@ -1342,6 +1369,12 @@ public class ReportService : IReportService
 
     private static ExpenseReportDto MapToDto(ExpenseReport report)
     {
+        // Filter out split child lines - they are included as nested data in parent's ChildAllocations
+        var parentLines = report.Lines
+            .Where(l => !l.IsSplitChild)
+            .Select(MapLineToDto)
+            .ToList();
+
         return new ExpenseReportDto
         {
             Id = report.Id,
@@ -1355,7 +1388,7 @@ public class ReportService : IReportService
             Tier3HitCount = report.Tier3HitCount,
             CreatedAt = report.CreatedAt,
             UpdatedAt = report.UpdatedAt,
-            Lines = report.Lines.Select(MapLineToDto).ToList()
+            Lines = parentLines
         };
     }
 
@@ -1379,7 +1412,7 @@ public class ReportService : IReportService
 
     private static ExpenseLineDto MapLineToDto(ExpenseLine line)
     {
-        return new ExpenseLineDto
+        var dto = new ExpenseLineDto
         {
             Id = line.Id,
             ReportId = line.ReportId,
@@ -1407,8 +1440,29 @@ public class ReportService : IReportService
             UpdatedAt = line.UpdatedAt,
             // Feature 023: Auto-suggestion tracking
             IsAutoSuggested = line.IsAutoSuggested,
-            PredictionId = line.PredictionId
+            PredictionId = line.PredictionId,
+            // Split allocation support
+            IsSplitParent = line.IsSplitParent
         };
+
+        // Map child allocations if this is a split parent
+        if (line.IsSplitParent && line.ChildAllocations?.Count > 0)
+        {
+            dto.ChildAllocations = line.ChildAllocations
+                .OrderBy(c => c.AllocationOrder)
+                .Select(c => new SplitAllocationLineDto
+                {
+                    Id = c.Id,
+                    GlCode = c.GLCode,
+                    DepartmentCode = c.DepartmentCode,
+                    Percentage = c.SplitPercentage ?? 0,
+                    Amount = c.Amount,
+                    AllocationOrder = c.AllocationOrder ?? 0
+                })
+                .ToList();
+        }
+
+        return dto;
     }
 
     #endregion

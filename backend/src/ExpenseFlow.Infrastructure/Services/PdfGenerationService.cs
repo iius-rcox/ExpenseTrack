@@ -64,7 +64,10 @@ public class PdfGenerationService : IPdfGenerationService
         document.Info.Title = $"Expense Report Receipts - {report.Period}";
         document.Info.Author = report.User?.DisplayName ?? "ExpenseFlow";
 
+        // Filter out split child lines - only include parent lines
+        // (split children inherit receipt from parent, so we only need one copy)
         var orderedLines = report.Lines
+            .Where(l => !l.IsSplitChild)
             .OrderBy(l => l.LineOrder)
             .Take(_options.MaxReceiptsPerPdf)
             .ToList();
@@ -830,7 +833,10 @@ public class PdfGenerationService : IPdfGenerationService
         document.Info.Title = $"Expense Report - {report.Period}";
         document.Info.Author = report.User?.DisplayName ?? "ExpenseFlow";
 
+        // Filter out split child lines - only include parent lines
+        // (child allocations are shown as nested rows in the itemized section)
         var orderedLines = report.Lines
+            .Where(l => !l.IsSplitChild)
             .OrderBy(l => l.LineOrder)
             .Take(_options.MaxReceiptsPerPdf)
             .ToList();

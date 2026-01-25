@@ -158,13 +158,15 @@ public class ExcelExportService : IExcelExportService
             if (line.ChildAllocations != null && line.ChildAllocations.Count > 0)
             {
                 // Export each child allocation as a separate row
+                // Child allocations inherit date, vendor, hasReceipt from parent
                 var childCount = line.ChildAllocations.Count;
                 for (int j = 0; j < childCount; j++)
                 {
                     var child = line.ChildAllocations[j];
-                    var description = $"{line.Description} (Split {j + 1}/{childCount})"; // Reviewer recommendation
+                    var description = $"{line.Description} (Split {j + 1}/{childCount})";
 
-                    WriteExcelRow(worksheet, currentRow++, child.ExpenseDate, line.VendorName,
+                    // Use parent's date/vendor/hasReceipt since children inherit these
+                    WriteExcelRow(worksheet, currentRow++, line.ExpenseDate, line.VendorName,
                         child.GlCode, child.DepartmentCode, description, line.HasReceipt, child.Amount, _options.DateFormat);
                 }
             }
