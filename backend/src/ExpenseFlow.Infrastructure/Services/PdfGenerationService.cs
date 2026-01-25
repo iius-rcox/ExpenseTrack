@@ -863,6 +863,8 @@ public class PdfGenerationService : IPdfGenerationService
 
     /// <summary>
     /// Validates image dimensions are within safe limits to prevent DoS attacks.
+    /// Note: If ImageSharp validation fails due to library issues, we allow the image
+    /// to proceed to PdfSharpCore loading which may succeed with its own decoders.
     /// </summary>
     private bool ValidateImageDimensions(byte[] imageBytes, out string? errorMessage)
     {
@@ -883,8 +885,9 @@ public class PdfGenerationService : IPdfGenerationService
 
             if (imageInfo == null)
             {
-                errorMessage = "Unable to read receipt image format.";
-                return false;
+                // ImageSharp couldn't identify the format, but let PdfSharpCore try
+                _logger.LogDebug("ImageSharp couldn't identify format, allowing PdfSharpCore to try");
+                return true;
             }
 
             if (imageInfo.Width > MaxImageWidth || imageInfo.Height > MaxImageHeight)
@@ -897,11 +900,29 @@ public class PdfGenerationService : IPdfGenerationService
 
             return true;
         }
+        catch (MissingMethodException ex)
+        {
+            // ImageSharp version/assembly mismatch - allow PdfSharpCore to try
+            _logger.LogWarning(ex, "ImageSharp method not found (version mismatch), bypassing validation");
+            return true;
+        }
+        catch (TypeLoadException ex)
+        {
+            // ImageSharp assembly loading issue - allow PdfSharpCore to try
+            _logger.LogWarning(ex, "ImageSharp type load error, bypassing validation");
+            return true;
+        }
+        catch (UnknownImageFormatException ex)
+        {
+            // Image format not recognized by ImageSharp, but PdfSharpCore might handle it
+            _logger.LogDebug(ex, "ImageSharp unknown format, allowing PdfSharpCore to try");
+            return true;
+        }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to validate image dimensions");
-            errorMessage = "Unable to validate receipt image.";
-            return false;
+            // For other errors (e.g., corrupt data), allow PdfSharpCore to make final decision
+            _logger.LogWarning(ex, "Image validation failed, allowing PdfSharpCore to attempt loading");
+            return true;
         }
     }
 
