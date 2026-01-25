@@ -110,6 +110,18 @@ public class PdfGenerationService : IPdfGenerationService
         ExpenseLine line,
         CancellationToken ct)
     {
+        return await AddReceiptPageWithRefAsync(document, line, null, ct);
+    }
+
+    /// <summary>
+    /// Adds a receipt page with an optional line reference number for cross-referencing with the itemized list.
+    /// </summary>
+    private async Task<int> AddReceiptPageWithRefAsync(
+        PdfDocument document,
+        ExpenseLine line,
+        int? lineRef,
+        CancellationToken ct)
+    {
         if (line.Receipt == null)
             return 0;
 
@@ -134,7 +146,7 @@ public class PdfGenerationService : IPdfGenerationService
             {
                 // PDF embedding would require different handling
                 // For MVP, create a placeholder noting it's a PDF receipt
-                AddPdfReceiptPlaceholder(document, line);
+                AddPdfReceiptPlaceholderWithRef(document, line, lineRef);
                 return 1;
             }
 
@@ -164,8 +176,8 @@ public class PdfGenerationService : IPdfGenerationService
             var x = (PageWidth - scaledWidth) / 2;
             var y = Margin + 50; // After header
 
-            // Draw header
-            DrawReceiptHeader(gfx, line);
+            // Draw header with line reference
+            DrawReceiptHeaderWithRef(gfx, line, lineRef);
 
             // Draw image
             gfx.DrawImage(xImage, x, y, scaledWidth, scaledHeight);
@@ -178,23 +190,43 @@ public class PdfGenerationService : IPdfGenerationService
                 "Failed to process receipt image for line {LineId}, adding error placeholder",
                 line.Id);
 
-            AddReceiptErrorPage(document, line, ex.Message);
+            AddReceiptErrorPageWithRef(document, line, ex.Message, lineRef);
             return 1;
         }
     }
 
     private void DrawReceiptHeader(XGraphics gfx, ExpenseLine line)
     {
+        DrawReceiptHeaderWithRef(gfx, line, null);
+    }
+
+    /// <summary>
+    /// Draws receipt header with optional line reference (e.g., "#3" to match itemized list).
+    /// </summary>
+    private void DrawReceiptHeaderWithRef(XGraphics gfx, ExpenseLine line, int? lineRef)
+    {
         var fontBold = new XFont(FontFamily, 12, XFontStyle.Bold);
         var fontRegular = new XFont(FontFamily, 10, XFontStyle.Regular);
+        var fontRef = new XFont(FontFamily, 14, XFontStyle.Bold);
 
         var y = Margin;
+
+        // Line reference badge on the right
+        if (lineRef.HasValue)
+        {
+            gfx.DrawString(
+                $"#{lineRef.Value}",
+                fontRef,
+                XBrushes.DarkGreen,
+                new XRect(PageWidth - Margin - 40, y, 40, 20),
+                XStringFormats.TopRight);
+        }
 
         gfx.DrawString(
             $"Receipt - {line.ExpenseDate:MM/dd/yyyy}",
             fontBold,
             XBrushes.Black,
-            new XRect(Margin, y, PageWidth - (2 * Margin), 20),
+            new XRect(Margin, y, PageWidth - (2 * Margin) - 50, 20),
             XStringFormats.TopLeft);
 
         y += 18;
@@ -213,6 +245,14 @@ public class PdfGenerationService : IPdfGenerationService
 
     private void AddPlaceholderPage(PdfDocument document, ExpenseLine line, ExpenseReport report)
     {
+        AddPlaceholderPageWithRef(document, line, report, null);
+    }
+
+    /// <summary>
+    /// Adds a missing receipt placeholder page with optional line reference.
+    /// </summary>
+    private void AddPlaceholderPageWithRef(PdfDocument document, ExpenseLine line, ExpenseReport report, int? lineRef)
+    {
         var page = document.AddPage();
         page.Width = PageWidth;
         page.Height = PageHeight;
@@ -223,9 +263,21 @@ public class PdfGenerationService : IPdfGenerationService
         var fontHeader = new XFont(FontFamily, 14, XFontStyle.Bold);
         var fontRegular = new XFont(FontFamily, 12, XFontStyle.Regular);
         var fontSmall = new XFont(FontFamily, 10, XFontStyle.Regular);
+        var fontRef = new XFont(FontFamily, 16, XFontStyle.Bold);
 
         var y = Margin + 40;
         var lineHeight = 24;
+
+        // Line reference badge on the right (if provided)
+        if (lineRef.HasValue)
+        {
+            gfx.DrawString(
+                $"#{lineRef.Value}",
+                fontRef,
+                XBrushes.DarkOrange,
+                new XRect(PageWidth - Margin - 50, Margin + 10, 50, 24),
+                XStringFormats.TopRight);
+        }
 
         // Title
         gfx.DrawString(
@@ -335,6 +387,11 @@ public class PdfGenerationService : IPdfGenerationService
 
     private void AddPdfReceiptPlaceholder(PdfDocument document, ExpenseLine line)
     {
+        AddPdfReceiptPlaceholderWithRef(document, line, null);
+    }
+
+    private void AddPdfReceiptPlaceholderWithRef(PdfDocument document, ExpenseLine line, int? lineRef)
+    {
         var page = document.AddPage();
         page.Width = PageWidth;
         page.Height = PageHeight;
@@ -343,6 +400,18 @@ public class PdfGenerationService : IPdfGenerationService
 
         var fontTitle = new XFont(FontFamily, 14, XFontStyle.Bold);
         var fontRegular = new XFont(FontFamily, 12, XFontStyle.Regular);
+        var fontRef = new XFont(FontFamily, 16, XFontStyle.Bold);
+
+        // Line reference badge
+        if (lineRef.HasValue)
+        {
+            gfx.DrawString(
+                $"#{lineRef.Value}",
+                fontRef,
+                XBrushes.DarkGreen,
+                new XRect(PageWidth - Margin - 50, Margin + 10, 50, 24),
+                XStringFormats.TopRight);
+        }
 
         var y = PageHeight / 2 - 60;
 
@@ -383,6 +452,11 @@ public class PdfGenerationService : IPdfGenerationService
 
     private void AddReceiptErrorPage(PdfDocument document, ExpenseLine line, string errorMessage)
     {
+        AddReceiptErrorPageWithRef(document, line, errorMessage, null);
+    }
+
+    private void AddReceiptErrorPageWithRef(PdfDocument document, ExpenseLine line, string errorMessage, int? lineRef)
+    {
         var page = document.AddPage();
         page.Width = PageWidth;
         page.Height = PageHeight;
@@ -392,6 +466,18 @@ public class PdfGenerationService : IPdfGenerationService
         var fontTitle = new XFont(FontFamily, 14, XFontStyle.Bold);
         var fontRegular = new XFont(FontFamily, 12, XFontStyle.Regular);
         var fontSmall = new XFont(FontFamily, 10, XFontStyle.Regular);
+        var fontRef = new XFont(FontFamily, 16, XFontStyle.Bold);
+
+        // Line reference badge
+        if (lineRef.HasValue)
+        {
+            gfx.DrawString(
+                $"#{lineRef.Value}",
+                fontRef,
+                XBrushes.DarkRed,
+                new XRect(PageWidth - Margin - 50, Margin + 10, 50, 24),
+                XStringFormats.TopRight);
+        }
 
         var y = PageHeight / 2 - 80;
 
@@ -638,22 +724,24 @@ public class PdfGenerationService : IPdfGenerationService
         // Section 2: Add page break separator before receipts section
         AddReceiptsSectionHeader(document);
 
-        // Section 3: Generate receipt pages
+        // Section 3: Generate receipt pages with line references
         int receiptPageCount = 0;
         int placeholderCount = 0;
+        int lineRef = 0;
 
         foreach (var line in orderedLines)
         {
             ct.ThrowIfCancellationRequested();
+            lineRef++;
 
             if (line.HasReceipt && line.Receipt != null)
             {
-                var pagesAdded = await AddReceiptPageAsync(document, line, ct);
+                var pagesAdded = await AddReceiptPageWithRefAsync(document, line, lineRef, ct);
                 receiptPageCount += pagesAdded;
             }
             else
             {
-                AddPlaceholderPage(document, line, report);
+                AddPlaceholderPageWithRef(document, line, report, lineRef);
                 receiptPageCount++;
                 placeholderCount++;
             }
@@ -782,6 +870,9 @@ public class PdfGenerationService : IPdfGenerationService
                 colX = Margin;
                 lineIndex++;
 
+                // Check if this is a split parent with child allocations
+                var isSplitLine = line.IsSplitParent && line.ChildAllocations.Any();
+
                 gfx.DrawString(line.ExpenseDate.ToString("MM/dd/yy"), fontSmall, XBrushes.Black,
                     new XRect(colX, y, colWidths[0], 12), XStringFormats.TopLeft);
                 colX += colWidths[0];
@@ -791,11 +882,15 @@ public class PdfGenerationService : IPdfGenerationService
                     new XRect(colX, y, colWidths[1], 12), XStringFormats.TopLeft);
                 colX += colWidths[1];
 
-                gfx.DrawString(line.GLCode ?? "", fontSmall, XBrushes.Black,
+                // For split lines, show "[Split]" in GL column; otherwise show GL code
+                var glDisplay = isSplitLine ? "[Split]" : (line.GLCode ?? "");
+                gfx.DrawString(glDisplay, fontSmall, isSplitLine ? XBrushes.Blue : XBrushes.Black,
                     new XRect(colX, y, colWidths[2], 12), XStringFormats.TopLeft);
                 colX += colWidths[2];
 
-                gfx.DrawString(line.DepartmentCode ?? "", fontSmall, XBrushes.Black,
+                // For split lines, leave department blank (shown in allocations below)
+                var deptDisplay = isSplitLine ? "" : (line.DepartmentCode ?? "");
+                gfx.DrawString(deptDisplay, fontSmall, XBrushes.Black,
                     new XRect(colX, y, colWidths[3], 12), XStringFormats.TopLeft);
                 colX += colWidths[3];
 
@@ -814,6 +909,56 @@ public class PdfGenerationService : IPdfGenerationService
                     new XRect(colX, y, colWidths[6], 12), XStringFormats.TopCenter);
 
                 y += 14;
+
+                // Draw split allocation rows if this is a split parent
+                if (isSplitLine)
+                {
+                    var fontAlloc = new XFont(FontFamily, 7, XFontStyle.Italic);
+                    var allocations = line.ChildAllocations
+                        .OrderBy(a => a.AllocationOrder ?? 0)
+                        .ThenBy(a => a.DepartmentCode)
+                        .ToList();
+
+                    foreach (var alloc in allocations)
+                    {
+                        colX = Margin + 10; // Indent allocation rows
+
+                        // Arrow indicator for allocation row
+                        gfx.DrawString("└→", fontAlloc, XBrushes.Gray,
+                            new XRect(colX, y, 20, 10), XStringFormats.TopLeft);
+                        colX += colWidths[0] - 10;
+
+                        // Skip vendor column for allocations
+                        colX += colWidths[1];
+
+                        // GL Code for this allocation
+                        gfx.DrawString(alloc.GLCode ?? line.GLCode ?? "", fontAlloc, XBrushes.DarkBlue,
+                            new XRect(colX, y, colWidths[2], 10), XStringFormats.TopLeft);
+                        colX += colWidths[2];
+
+                        // Department for this allocation
+                        gfx.DrawString(alloc.DepartmentCode ?? "", fontAlloc, XBrushes.DarkBlue,
+                            new XRect(colX, y, colWidths[3], 10), XStringFormats.TopLeft);
+                        colX += colWidths[3];
+
+                        // Percentage in description column
+                        var percentText = alloc.SplitPercentage.HasValue
+                            ? $"{alloc.SplitPercentage.Value:F1}%"
+                            : "";
+                        gfx.DrawString(percentText, fontAlloc, XBrushes.Gray,
+                            new XRect(colX, y, colWidths[4], 10), XStringFormats.TopLeft);
+                        colX += colWidths[4];
+
+                        // Amount for this allocation
+                        gfx.DrawString(alloc.Amount.ToString("C"), fontAlloc, XBrushes.DarkBlue,
+                            new XRect(colX, y, colWidths[5], 10), XStringFormats.TopRight);
+
+                        y += 11;
+
+                        if (y > PageHeight - Margin - 30)
+                            break;
+                    }
+                }
 
                 if (y > PageHeight - Margin - 30)
                     break;
