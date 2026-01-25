@@ -21,6 +21,10 @@ async function initializeApp() {
   // Initialize MSAL instance
   await msalInstance.initialize()
 
+  // Check if this is an OAuth callback (code in URL)
+  const hash = window.location.hash
+  const isOAuthCallback = hash.includes('code=') || hash.includes('error=')
+
   // CRITICAL: Wait for redirect promise to complete before rendering
   // This handles the case when the user returns from Microsoft login
   try {
@@ -28,9 +32,31 @@ async function initializeApp() {
     if (response) {
       // User just logged in via redirect - set them as active
       msalInstance.setActiveAccount(response.account)
+      console.info('[Auth] Login successful, account set:', response.account?.username)
+
+      // Clear the hash to prevent re-processing
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search)
+      }
+    } else if (isOAuthCallback) {
+      // We had an OAuth callback but got no response - this means MSAL couldn't process it
+      // This can happen due to state mismatch (localStorage cleared, different browser tab, etc.)
+      console.warn('[Auth] OAuth callback detected but handleRedirectPromise returned null')
+      console.warn('[Auth] This usually means state mismatch - clearing hash and redirecting to login')
+
+      // Clear the problematic hash to break the loop
+      window.history.replaceState(null, '', window.location.pathname)
+
+      // Small delay to ensure state is cleared before potential redirect
+      await new Promise(resolve => setTimeout(resolve, 100))
     }
   } catch (error) {
-    console.error('Redirect error:', error)
+    console.error('[Auth] Redirect error:', error)
+
+    // Clear hash on error to prevent infinite loop
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname)
+    }
   }
 
   // Set active account on login success (for popup flow, if used later)
