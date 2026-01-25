@@ -6,9 +6,13 @@ using ExpenseFlow.Shared.DTOs;
 using ExpenseFlow.Shared.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MigraDocCore.DocumentObjectModel.MigraDoc.DocumentObjectModel.Shapes;
 using PdfSharpCore.Drawing;
 using PdfSharpCore.Pdf;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Bmp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace ExpenseFlow.Infrastructure.Services;
 
@@ -227,8 +231,10 @@ public class PdfGenerationService : IPdfGenerationService
 
             using var gfx = XGraphics.FromPdfPage(page);
 
-            // Load image using PdfSharpCore
-            var xImage = XImage.FromStream(() => new MemoryStream(imageBytes));
+            // Load image using our custom ImageSharp 3.x compatible implementation
+            // (bypasses PdfSharpCore's internal ImageSharp 2.x API calls)
+            using var imageSource = ImageSharp3ImageSource.FromBytes(imageBytes);
+            var xImage = XImage.FromImageSource(imageSource);
 
             // Calculate scaling to fit page with margins
             var availableWidth = PageWidth - (2 * Margin);
@@ -571,7 +577,9 @@ public class PdfGenerationService : IPdfGenerationService
 
             using var gfx = XGraphics.FromPdfPage(page);
 
-            var xImage = XImage.FromStream(() => new MemoryStream(imageBytes));
+            // Use custom ImageSharp 3.x compatible image source
+            using var imageSource = ImageSharp3ImageSource.FromBytes(imageBytes);
+            var xImage = XImage.FromImageSource(imageSource);
 
             // Calculate scaling to fit page with margins
             var availableWidth = PageWidth - (2 * Margin);
@@ -1392,5 +1400,89 @@ public class PdfGenerationService : IPdfGenerationService
             XBrushes.Gray,
             new XRect(0, y, PageWidth, 18),
             XStringFormats.TopCenter);
+    }
+
+    /// <summary>
+    /// Custom IImageSource implementation that uses ImageSharp 3.x APIs.
+    /// This bypasses PdfSharpCore's internal ImageSharp usage which is incompatible with ImageSharp 3.x.
+    /// </summary>
+    private sealed class ImageSharp3ImageSource : IImageSource, IDisposable
+    {
+        private readonly Image<Rgba32> _image;
+        private readonly int _quality;
+        private bool _disposed;
+
+        public int Width => _image.Width;
+        public int Height => _image.Height;
+        public string Name { get; }
+        public bool Transparent { get; set; }
+
+        private ImageSharp3ImageSource(string name, Image<Rgba32> image, int quality, bool isTransparent)
+        {
+            Name = name;
+            _image = image;
+            _quality = quality;
+            Transparent = isTransparent;
+        }
+
+        /// <summary>
+        /// Creates an IImageSource from a byte array using ImageSharp 3.x APIs.
+        /// </summary>
+        public static IImageSource FromBytes(byte[] imageBytes, int quality = 75)
+        {
+            using var stream = new MemoryStream(imageBytes);
+            var image = Image.Load<Rgba32>(stream);
+
+            // Detect if image has transparency (PNG with alpha channel)
+            var hasTransparency = false;
+            if (image.PixelType.AlphaRepresentation != null)
+            {
+                // Check a sample of pixels for actual transparency
+                hasTransparency = HasActualTransparency(image);
+            }
+
+            return new ImageSharp3ImageSource(
+                Guid.NewGuid().ToString(),
+                image,
+                quality,
+                hasTransparency);
+        }
+
+        private static bool HasActualTransparency(Image<Rgba32> image)
+        {
+            // Sample a subset of pixels to check for transparency
+            var step = Math.Max(1, Math.Min(image.Width, image.Height) / 20);
+            for (var y = 0; y < image.Height; y += step)
+            {
+                for (var x = 0; x < image.Width; x += step)
+                {
+                    if (image[x, y].A < 255)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        public void SaveAsJpeg(MemoryStream ms)
+        {
+            _image.SaveAsJpeg(ms, new JpegEncoder { Quality = _quality });
+        }
+
+        public void SaveAsPdfBitmap(MemoryStream ms)
+        {
+            var encoder = new BmpEncoder { BitsPerPixel = BmpBitsPerPixel.Pixel32 };
+            _image.Save(ms, encoder);
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _image.Dispose();
+                _disposed = true;
+            }
+        }
     }
 }
