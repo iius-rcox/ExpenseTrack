@@ -138,8 +138,51 @@ public class PdfGenerationService : IPdfGenerationService
         if (line.Receipt == null)
             return 0;
 
+        // Validate BlobUrl exists before attempting download
+        if (string.IsNullOrWhiteSpace(line.Receipt.BlobUrl))
+        {
+            _logger.LogWarning(
+                "Receipt {ReceiptId} for line {LineId} has no BlobUrl - cannot download image",
+                line.Receipt.Id, line.Id);
+            AddReceiptErrorPageWithRef(document, line, "Receipt image not available.", lineRef);
+            return 1;
+        }
+
         try
         {
+            // Handle HTML email receipts - they can't be loaded as images directly
+            // Use thumbnail if available, otherwise create a placeholder
+            if (IsHtmlContentType(line.Receipt.ContentType))
+            {
+                _logger.LogDebug(
+                    "Receipt {ReceiptId} is HTML content type, checking for thumbnail",
+                    line.Receipt.Id);
+
+                if (!string.IsNullOrWhiteSpace(line.Receipt.ThumbnailUrl))
+                {
+                    // Use the thumbnail image instead of the HTML content
+                    _logger.LogDebug(
+                        "Using thumbnail for HTML receipt {ReceiptId}: {ThumbnailUrl}",
+                        line.Receipt.Id, line.Receipt.ThumbnailUrl);
+
+                    return await AddThumbnailPageAsync(document, line, lineRef, ct);
+                }
+                else
+                {
+                    // No thumbnail available - create placeholder for HTML receipt
+                    _logger.LogDebug(
+                        "No thumbnail available for HTML receipt {ReceiptId}, adding placeholder",
+                        line.Receipt.Id);
+
+                    AddHtmlReceiptPlaceholderWithRef(document, line, lineRef);
+                    return 1;
+                }
+            }
+
+            _logger.LogDebug(
+                "Downloading receipt image for line {LineId}, ReceiptId: {ReceiptId}, BlobUrl: {BlobUrl}",
+                line.Id, line.Receipt.Id, line.Receipt.BlobUrl);
+
             using var imageStream = await _blobService.DownloadAsync(line.Receipt.BlobUrl);
             using var memoryStream = new MemoryStream();
             await imageStream.CopyToAsync(memoryStream, ct);
@@ -213,8 +256,8 @@ public class PdfGenerationService : IPdfGenerationService
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
-                "Failed to process receipt image for line {LineId}, adding error placeholder",
-                line.Id);
+                "Failed to process receipt image for line {LineId}, ReceiptId: {ReceiptId}, BlobUrl: {BlobUrl}. Adding error placeholder.",
+                line.Id, line.Receipt?.Id, line.Receipt?.BlobUrl);
 
             // Security: Use sanitized error message - never expose internal details in PDF
             var safeMessage = GetSafeErrorMessage(ex);
@@ -478,6 +521,166 @@ public class PdfGenerationService : IPdfGenerationService
 
         gfx.DrawString(
             "(Original PDF receipt available separately)",
+            fontRegular,
+            XBrushes.Gray,
+            new XRect(0, y, PageWidth, 18),
+            XStringFormats.TopCenter);
+    }
+
+    /// <summary>
+    /// Checks if the content type indicates an HTML receipt (email receipts).
+    /// </summary>
+    private static bool IsHtmlContentType(string? contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+            return false;
+
+        return contentType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase) ||
+               contentType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Adds a page using the receipt's thumbnail image (for HTML receipts with thumbnails).
+    /// </summary>
+    private async Task<int> AddThumbnailPageAsync(
+        PdfDocument document,
+        ExpenseLine line,
+        int? lineRef,
+        CancellationToken ct)
+    {
+        try
+        {
+            using var imageStream = await _blobService.DownloadAsync(line.Receipt!.ThumbnailUrl!);
+            using var memoryStream = new MemoryStream();
+            await imageStream.CopyToAsync(memoryStream, ct);
+            memoryStream.Position = 0;
+
+            var imageBytes = memoryStream.ToArray();
+
+            // Validate thumbnail dimensions
+            if (!ValidateImageDimensions(imageBytes, out var validationError))
+            {
+                AddReceiptErrorPageWithRef(document, line, validationError!, lineRef);
+                return 1;
+            }
+
+            // Add thumbnail image to PDF
+            var page = document.AddPage();
+            page.Width = PageWidth;
+            page.Height = PageHeight;
+
+            using var gfx = XGraphics.FromPdfPage(page);
+
+            var xImage = XImage.FromStream(() => new MemoryStream(imageBytes));
+
+            // Calculate scaling to fit page with margins
+            var availableWidth = PageWidth - (2 * Margin);
+            var availableHeight = PageHeight - (2 * Margin) - 60;
+
+            var scale = Math.Min(
+                availableWidth / xImage.PixelWidth,
+                availableHeight / xImage.PixelHeight);
+
+            var scaledWidth = xImage.PixelWidth * scale;
+            var scaledHeight = xImage.PixelHeight * scale;
+
+            var x = (PageWidth - scaledWidth) / 2;
+            var y = Margin + 50;
+
+            // Draw header
+            DrawReceiptHeaderWithRef(gfx, line, lineRef);
+
+            // Draw thumbnail image
+            gfx.DrawImage(xImage, x, y, scaledWidth, scaledHeight);
+
+            // Add note that this is a thumbnail
+            var fontSmall = new XFont(FontFamily, 8, XFontStyle.Italic);
+            gfx.DrawString(
+                "(Email receipt - thumbnail preview)",
+                fontSmall,
+                XBrushes.Gray,
+                new XRect(0, PageHeight - Margin - 10, PageWidth, 12),
+                XStringFormats.BottomCenter);
+
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to load thumbnail for HTML receipt {ReceiptId}, adding placeholder",
+                line.Receipt?.Id);
+
+            AddHtmlReceiptPlaceholderWithRef(document, line, lineRef);
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// Creates a placeholder page for HTML email receipts without thumbnails.
+    /// </summary>
+    private void AddHtmlReceiptPlaceholderWithRef(PdfDocument document, ExpenseLine line, int? lineRef)
+    {
+        var page = document.AddPage();
+        page.Width = PageWidth;
+        page.Height = PageHeight;
+
+        using var gfx = XGraphics.FromPdfPage(page);
+
+        var fontTitle = new XFont(FontFamily, 14, XFontStyle.Bold);
+        var fontRegular = new XFont(FontFamily, 12, XFontStyle.Regular);
+        var fontRef = new XFont(FontFamily, 16, XFontStyle.Bold);
+
+        // Line reference badge
+        if (lineRef.HasValue)
+        {
+            gfx.DrawString(
+                $"#{lineRef.Value}",
+                fontRef,
+                XBrushes.DarkBlue,
+                new XRect(PageWidth - Margin - 50, Margin + 10, 50, 24),
+                XStringFormats.TopRight);
+        }
+
+        var y = PageHeight / 2 - 80;
+
+        gfx.DrawString(
+            "Email Receipt",
+            fontTitle,
+            XBrushes.DarkBlue,
+            new XRect(0, y, PageWidth, 20),
+            XStringFormats.TopCenter);
+
+        y += 30;
+
+        gfx.DrawString(
+            line.VendorName ?? "Unknown Vendor",
+            fontRegular,
+            XBrushes.Black,
+            new XRect(0, y, PageWidth, 18),
+            XStringFormats.TopCenter);
+
+        y += 30;
+
+        gfx.DrawString(
+            $"Date: {line.ExpenseDate:MM/dd/yyyy}",
+            fontRegular,
+            XBrushes.DarkGray,
+            new XRect(0, y, PageWidth, 18),
+            XStringFormats.TopCenter);
+
+        y += 24;
+
+        gfx.DrawString(
+            $"Amount: {line.Amount.ToString("C", UsCulture)}",
+            fontRegular,
+            XBrushes.DarkGray,
+            new XRect(0, y, PageWidth, 18),
+            XStringFormats.TopCenter);
+
+        y += 40;
+
+        gfx.DrawString(
+            "(Original email receipt available in system)",
             fontRegular,
             XBrushes.Gray,
             new XRect(0, y, PageWidth, 18),

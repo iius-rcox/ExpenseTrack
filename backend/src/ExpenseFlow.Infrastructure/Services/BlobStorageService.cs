@@ -97,11 +97,30 @@ public class BlobStorageService : IBlobStorageService
 
     public async Task<Stream> DownloadAsync(string blobUrl)
     {
+        if (string.IsNullOrWhiteSpace(blobUrl))
+        {
+            throw new ArgumentException("BlobUrl cannot be null or empty", nameof(blobUrl));
+        }
+
+        // Validate that the URL's storage account matches our configured account
+        var blobUri = new Uri(blobUrl);
+        var configuredAccountHost = _blobServiceClient.Uri.Host;
+        if (!blobUri.Host.Equals(configuredAccountHost, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogError(
+                "Blob URL host mismatch: URL points to {UrlHost} but configured account is {ConfiguredHost}. BlobUrl: {BlobUrl}",
+                blobUri.Host, configuredAccountHost, blobUrl);
+            throw new InvalidOperationException(
+                $"Blob URL host '{blobUri.Host}' does not match configured storage account '{configuredAccountHost}'");
+        }
+
         var blobClient = GetBlobClientFromUrl(blobUrl);
+
+        _logger.LogDebug("Attempting to download blob from {BlobUrl}", blobUrl);
 
         var response = await blobClient.DownloadAsync();
 
-        _logger.LogDebug("Downloaded blob from {BlobUrl}", blobUrl);
+        _logger.LogDebug("Successfully downloaded blob from {BlobUrl}", blobUrl);
 
         return response.Value.Content;
     }
