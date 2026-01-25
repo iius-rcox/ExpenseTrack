@@ -6,7 +6,7 @@ using ExpenseFlow.Shared.DTOs;
 using ExpenseFlow.Shared.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MigraDocCore.DocumentObjectModel.MigraDoc.DocumentObjectModel.Shapes;
+using static MigraDocCore.DocumentObjectModel.MigraDoc.DocumentObjectModel.Shapes.ImageSource;
 using PdfSharpCore.Drawing;
 using PdfSharpCore.Pdf;
 using SixLabors.ImageSharp;
