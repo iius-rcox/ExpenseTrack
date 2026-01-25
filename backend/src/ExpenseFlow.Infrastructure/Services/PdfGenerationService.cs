@@ -1,3 +1,4 @@
+using System.Globalization;
 using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Infrastructure.Configuration;
@@ -29,6 +30,10 @@ public class PdfGenerationService : IPdfGenerationService
     // Font family name - use a cross-platform compatible font
     // Helvetica is a built-in PDF base font that doesn't require installation
     private const string FontFamily = "Helvetica";
+
+    // Currency formatting - always use US culture for consistent $ display
+    // This ensures "$" instead of culture-dependent symbols like "¤" in containers
+    private static readonly CultureInfo UsCulture = CultureInfo.CreateSpecificCulture("en-US");
 
     // Security: Maximum image dimensions to prevent DoS via oversized images
     private const int MaxImageWidth = 8000;
@@ -256,8 +261,8 @@ public class PdfGenerationService : IPdfGenerationService
         var descDisplay = SanitizeForPdf(line.NormalizedDescription, 50);
 
         var description = !string.IsNullOrEmpty(vendorDisplay)
-            ? $"{vendorDisplay} - {line.Amount:C}"
-            : $"{descDisplay} - {line.Amount:C}";
+            ? $"{vendorDisplay} - {line.Amount.ToString("C", UsCulture)}"
+            : $"{descDisplay} - {line.Amount.ToString("C", UsCulture)}";
 
         gfx.DrawString(
             description,
@@ -346,7 +351,7 @@ public class PdfGenerationService : IPdfGenerationService
         y += lineHeight + 10;
 
         DrawLabelValue(gfx, fontHeader, fontRegular, "Amount:",
-            line.Amount.ToString("C"), textX, y, textWidth);
+            line.Amount.ToString("C", UsCulture), textX, y, textWidth);
         y += lineHeight + 10;
 
         DrawLabelValue(gfx, fontHeader, fontRegular, "Description:",
@@ -460,7 +465,7 @@ public class PdfGenerationService : IPdfGenerationService
         y += 24;
 
         gfx.DrawString(
-            $"Amount: {line.Amount:C}",
+            $"Amount: {line.Amount.ToString("C", UsCulture)}",
             fontRegular,
             XBrushes.DarkGray,
             new XRect(0, y, PageWidth, 18),
@@ -526,7 +531,7 @@ public class PdfGenerationService : IPdfGenerationService
         y += 24;
 
         gfx.DrawString(
-            $"Amount: {line.Amount:C}",
+            $"Amount: {line.Amount.ToString("C", UsCulture)}",
             fontRegular,
             XBrushes.Black,
             new XRect(0, y, PageWidth, 18),
@@ -745,7 +750,7 @@ public class PdfGenerationService : IPdfGenerationService
         y += 20;
 
         gfx.DrawString(
-            $"Total Expenses: {request.Lines.Count} | Amount: {request.Lines.Sum(l => l.Amount):C}",
+            $"Total Expenses: {request.Lines.Count} | Amount: {request.Lines.Sum(l => l.Amount).ToString("C", UsCulture)}",
             fontRegular,
             XBrushes.Black,
             new XRect(Margin, y, PageWidth - (2 * Margin), 15),
@@ -789,7 +794,7 @@ public class PdfGenerationService : IPdfGenerationService
             colX += colWidths[3];
             gfx.DrawString(TruncateString(SanitizeForPdf(line.Description, 25), 22), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[4], 10), XStringFormats.TopLeft);
             colX += colWidths[4];
-            gfx.DrawString(line.Amount.ToString("C"), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[5], 10), XStringFormats.TopRight);
+            gfx.DrawString(line.Amount.ToString("C", UsCulture), fontSmall, XBrushes.Black, new XRect(colX, y, colWidths[5], 10), XStringFormats.TopRight);
 
             y += 12;
 
@@ -930,7 +935,7 @@ public class PdfGenerationService : IPdfGenerationService
 
                 var totalAmount = lines.Sum(l => l.Amount);
                 gfx.DrawString(
-                    $"Total Expenses: {lines.Count} items | Total Amount: {totalAmount:C}",
+                    $"Total Expenses: {lines.Count} items | Total Amount: {totalAmount.ToString("C", UsCulture)}",
                     fontRegular,
                     XBrushes.Black,
                     new XRect(Margin, y, PageWidth - (2 * Margin), 16),
@@ -1014,7 +1019,7 @@ public class PdfGenerationService : IPdfGenerationService
                     new XRect(colX, y, colWidths[4], 12), XStringFormats.TopLeft);
                 colX += colWidths[4];
 
-                gfx.DrawString(line.Amount.ToString("C"), fontSmall, XBrushes.Black,
+                gfx.DrawString(line.Amount.ToString("C", UsCulture), fontSmall, XBrushes.Black,
                     new XRect(colX, y, colWidths[5], 12), XStringFormats.TopRight);
                 colX += colWidths[5];
 
@@ -1066,7 +1071,7 @@ public class PdfGenerationService : IPdfGenerationService
                         colX += colWidths[4];
 
                         // Amount for this allocation
-                        gfx.DrawString(alloc.Amount.ToString("C"), fontAlloc, XBrushes.DarkBlue,
+                        gfx.DrawString(alloc.Amount.ToString("C", UsCulture), fontAlloc, XBrushes.DarkBlue,
                             new XRect(colX, y, colWidths[5], 10), XStringFormats.TopRight);
 
                         y += 11;

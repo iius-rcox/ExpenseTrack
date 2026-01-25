@@ -5,7 +5,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { useReportPreview, useCheckDraftExists, useGenerateReport, useReportDetail, useUpdateReportLine, useAddReportLine, useRemoveReportLine } from '@/hooks/queries/use-reports'
 import { useReportEditor } from '@/hooks/use-report-editor'
-import { useExportPreview } from '@/hooks/queries/use-report-export'
+import { useExportPreview, useExportCompletePdf } from '@/hooks/queries/use-report-export'
 import { useGLAccounts, lookupGLName } from '@/hooks/queries/use-reference-data'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -68,8 +68,10 @@ function ReportEditorPage() {
   // Editor state
   const { state, dispatch, metrics } = useReportEditor(period)
 
-  // Export mutation
-  const { mutate: exportReport, isPending: isExporting } = useExportPreview()
+  // Export mutations
+  const { mutate: exportPreview, isPending: isExportingPreview } = useExportPreview()
+  const { mutate: exportComplete, isPending: isExportingComplete } = useExportCompletePdf()
+  const isExporting = isExportingPreview || isExportingComplete
 
   // Track if we've loaded data for the current period to prevent re-loading on refetch
   const [loadedPeriod, setLoadedPeriod] = useState<string | null>(null)
@@ -296,6 +298,24 @@ function ReportEditorPage() {
   }, [metrics.dirtyCount])
 
   const handleExport = (format: 'excel' | 'pdf') => {
+    // For PDF exports when we have a saved draft, use the complete endpoint
+    // which includes receipt images and proper split rendering
+    if (format === 'pdf' && useDraft && reportId) {
+      exportComplete(
+        { reportId, period },
+        {
+          onSuccess: ({ filename }) => {
+            toast.success(`Downloaded ${filename}`)
+          },
+          onError: (err) => {
+            toast.error(`Export failed: ${err.message}`)
+          },
+        }
+      )
+      return
+    }
+
+    // For Excel or PDF without a saved draft, use the preview endpoint
     const request: ExportPreviewRequest = {
       period,
       lines: state.lines.map((line) => {
@@ -326,7 +346,7 @@ function ReportEditorPage() {
       }),
     }
 
-    exportReport(
+    exportPreview(
       { request, format },
       {
         onSuccess: ({ filename }) => {
