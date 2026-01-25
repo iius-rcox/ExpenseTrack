@@ -286,6 +286,24 @@ function ReportEditorPage() {
     )
   }
 
+  const handleRegenerateDraft = () => {
+    // Regenerate draft from bank data - backend will delete existing draft and create new one
+    generateDraft(
+      { period },
+      {
+        onSuccess: (draft) => {
+          setReportId(draft.id)
+          setUseDraft(true)
+          dispatch({ type: 'LOAD_PREVIEW', lines: draft.lines })
+          toast.success('Draft refreshed from bank data!')
+        },
+        onError: (error) => {
+          toast.error(`Failed to refresh draft: ${error.message}`)
+        },
+      }
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Draft Status Banner */}
@@ -295,6 +313,7 @@ function ReportEditorPage() {
         isSaving={savingLine}
         onCreateDraft={handleCreateDraft}
         onDiscardDraft={() => toast.info('Discard draft - to be implemented')}
+        onRegenerateDraft={useDraft ? handleRegenerateDraft : undefined}
       />
 
       {/* Header */}

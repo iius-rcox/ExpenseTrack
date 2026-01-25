@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { FileText, CheckCircle2, Loader2 } from 'lucide-react'
+import { FileText, CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 
 // Simple time ago formatter (no date-fns dependency)
 function timeAgo(date: Date): string {
@@ -18,6 +18,7 @@ interface DraftStatusBannerProps {
   isSaving: boolean
   onCreateDraft: () => void
   onDiscardDraft: () => void
+  onRegenerateDraft?: () => void
 }
 
 export function DraftStatusBanner({
@@ -26,6 +27,7 @@ export function DraftStatusBanner({
   isSaving,
   onCreateDraft,
   onDiscardDraft,
+  onRegenerateDraft,
 }: DraftStatusBannerProps) {
   if (!useDraft) {
     // Preview mode - show "Save as Draft" button
@@ -68,9 +70,17 @@ export function DraftStatusBanner({
         )}
       </div>
 
-      <Button onClick={onDiscardDraft} size="sm" variant="ghost">
-        Discard Draft
-      </Button>
+      <div className="flex items-center gap-2">
+        {onRegenerateDraft && (
+          <Button onClick={onRegenerateDraft} size="sm" variant="ghost" title="Refresh from bank data">
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Refresh
+          </Button>
+        )}
+        <Button onClick={onDiscardDraft} size="sm" variant="ghost">
+          Discard Draft
+        </Button>
+      </div>
     </div>
   )
 }
