@@ -137,6 +137,12 @@ function ReportEditorPage() {
     if (!reportId || !lineToRemove) return
     const dbLineId = getDbLineId(lineToRemove.id)
 
+    // Debug logging for remove line
+    console.log('[RemoveLine] Frontend line ID:', lineToRemove.id)
+    console.log('[RemoveLine] Extracted DB line ID:', dbLineId)
+    console.log('[RemoveLine] Report ID:', reportId)
+    console.log('[RemoveLine] API URL will be:', `/reports/${reportId}/lines/${dbLineId}`)
+
     removeLineMutation.mutate(
       { reportId, lineId: dbLineId },
       {

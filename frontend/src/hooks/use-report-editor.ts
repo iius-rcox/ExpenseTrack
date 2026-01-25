@@ -38,6 +38,14 @@ function reportEditorReducer(
 ): ReportEditorState {
   switch (action.type) {
     case 'LOAD_PREVIEW': {
+      // Debug: Log all line IDs from API response
+      console.log('[LOAD_PREVIEW] Lines from API:', action.lines.map((l: any, i: number) => ({
+        index: i,
+        id: l.id,
+        isNilGuid: l.id === '00000000-0000-0000-0000-000000000000',
+        vendor: l.vendorName || l.vendor,
+      })))
+
       return {
         ...state,
         lines: action.lines.map((line: any, index: number) => {
@@ -50,6 +58,8 @@ function reportEditorReducer(
           const uniqueId = line.id && line.id !== '00000000-0000-0000-0000-000000000000'
             ? `${line.id}-${index}`
             : `${crypto.randomUUID()}-${index}`
+
+          console.log(`[LOAD_PREVIEW] Line ${index}: API id="${line.id}" -> Frontend id="${uniqueId}"`)
 
           return {
             id: uniqueId,

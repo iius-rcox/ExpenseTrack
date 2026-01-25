@@ -266,9 +266,18 @@ export function useRemoveReportLine() {
       reportId: string
       lineId: string
     }) => {
-      return apiFetch(`/reports/${reportId}/lines/${lineId}`, {
-        method: 'DELETE',
-      })
+      console.log('[useRemoveReportLine] Making DELETE request')
+      console.log('[useRemoveReportLine] URL:', `/reports/${reportId}/lines/${lineId}`)
+      try {
+        const result = await apiFetch(`/reports/${reportId}/lines/${lineId}`, {
+          method: 'DELETE',
+        })
+        console.log('[useRemoveReportLine] Success, result:', result)
+        return result
+      } catch (error) {
+        console.error('[useRemoveReportLine] Error:', error)
+        throw error
+      }
     },
     onSuccess: (_data, variables) => {
       // Invalidate report detail and available transactions
