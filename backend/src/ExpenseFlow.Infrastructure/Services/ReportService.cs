@@ -360,6 +360,12 @@ public class ReportService : IReportService
             line.DepartmentCode = request.DepartmentCode;
         }
 
+        // Update notes/description if provided
+        if (request.Notes != null)
+        {
+            line.NormalizedDescription = request.Notes;
+        }
+
         // Update missing receipt justification
         if (request.MissingReceiptJustification.HasValue)
         {
