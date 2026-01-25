@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,46 +43,45 @@ export function SplitExpansionPanel({
   const panelRef = useRef<HTMLDivElement>(null)
   const [pasteHint, setPasteHint] = useState(false)
 
-  // Handle paste event for Excel data
-  const handlePaste = useCallback((e: ClipboardEvent) => {
-    const clipboardText = e.clipboardData?.getData('text/plain')
-    if (!clipboardText) return
-
-    // Check if it looks like Excel data (tab-separated)
-    if (!isExcelData(clipboardText)) return
-
-    // Prevent default paste behavior
-    e.preventDefault()
-
-    // Parse the Excel data
-    const result = parseExcelPaste(clipboardText)
-
-    if (!result.success) {
-      toast.error('Could not parse clipboard data', {
-        description: result.errors[0] || 'Invalid format',
-      })
-      return
-    }
-
-    // Apply the bulk paste
-    onBulkPaste(result.allocations)
-
-    // Show success message
-    toast.success(`Pasted ${result.allocations.length} allocations`, {
-      description: result.errors.length > 0
-        ? `${result.errors.length} row(s) skipped`
-        : undefined,
-    })
-  }, [onBulkPaste])
-
-  // Attach paste listener to panel
+  // Attach paste listener to panel - defined inside effect to ensure proper cleanup
   useEffect(() => {
     const panel = panelRef.current
     if (!panel) return
 
+    const handlePaste = (e: ClipboardEvent) => {
+      const clipboardText = e.clipboardData?.getData('text/plain')
+      if (!clipboardText) return
+
+      // Check if it looks like Excel data (tab-separated)
+      if (!isExcelData(clipboardText)) return
+
+      // Prevent default paste behavior
+      e.preventDefault()
+
+      // Parse the Excel data
+      const result = parseExcelPaste(clipboardText)
+
+      if (!result.success) {
+        toast.error('Could not parse clipboard data', {
+          description: result.errors[0] || 'Invalid format',
+        })
+        return
+      }
+
+      // Apply the bulk paste
+      onBulkPaste(result.allocations)
+
+      // Show success message
+      toast.success(`Pasted ${result.allocations.length} allocations`, {
+        description: result.errors.length > 0
+          ? `${result.errors.length} row(s) skipped`
+          : undefined,
+      })
+    }
+
     panel.addEventListener('paste', handlePaste)
     return () => panel.removeEventListener('paste', handlePaste)
-  }, [handlePaste])
+  }, [onBulkPaste])
 
   // Calculate totals
   const totalAmount = allocations.reduce((sum, a) => sum + a.amount, 0)

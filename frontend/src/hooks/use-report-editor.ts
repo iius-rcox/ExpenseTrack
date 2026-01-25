@@ -378,6 +378,9 @@ function reportEditorReducer(
     }
 
     case 'BULK_PASTE_ALLOCATIONS': {
+      // No-op if empty allocations array
+      if (action.allocations.length === 0) return state
+
       return {
         ...state,
         lines: state.lines.map((line) => {
@@ -389,7 +392,10 @@ function reportEditorReducer(
             glCode: pastedAlloc.glCode ?? line.glCode, // Use pasted GL code or inherit from parent
             departmentCode: pastedAlloc.departmentCode,
             amount: pastedAlloc.amount,
-            percentage: (pastedAlloc.amount / line.originalAmount) * 100,
+            // Guard against division by zero
+            percentage: line.originalAmount > 0
+              ? (pastedAlloc.amount / line.originalAmount) * 100
+              : 0,
             entryMode: 'amount' as const,
           }))
 
