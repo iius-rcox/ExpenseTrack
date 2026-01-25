@@ -59,6 +59,9 @@ function ReportEditorPage() {
   // Export mutation
   const { mutate: exportReport, isPending: isExporting } = useExportPreview()
 
+  // Track if we've loaded data for the current period to prevent re-loading on refetch
+  const [loadedPeriod, setLoadedPeriod] = useState<string | null>(null)
+
   const isLoading = checkingDraft || loadingDraft || loadingPreview || generatingDraft
 
   // Helper: Strip index suffix from line ID for API calls
@@ -121,9 +124,20 @@ function ReportEditorPage() {
     }
   }
 
-  // Load data into editor (draft or preview)
+  // Load data into editor (draft or preview) - ONLY ONCE per period
+  // This prevents refetches from overwriting user edits
   useEffect(() => {
-    if (existingDraft?.lines && glAccounts.length > 0) {
+    // Skip if we've already loaded this period's data
+    if (loadedPeriod === period) {
+      return
+    }
+
+    // Skip if GL accounts aren't loaded yet
+    if (glAccounts.length === 0) {
+      return
+    }
+
+    if (existingDraft?.lines) {
       // Load from existing draft and populate glName from GL lookup
       const linesWithGLNames = existingDraft.lines.map((line: any) => ({
         ...line,
@@ -133,8 +147,9 @@ function ReportEditorPage() {
       setUseDraft(true)
       setReportId(existingDraft.id)
       setLastSaved(new Date(existingDraft.updatedAt || existingDraft.createdAt))
+      setLoadedPeriod(period)
       toast.info('Resuming your draft...')
-    } else if (previewLines && !hasDraft && glAccounts.length > 0) {
+    } else if (previewLines && !hasDraft) {
       // Load preview (no draft exists yet) and populate glName
       const linesWithGLNames = previewLines.map((line: any) => ({
         ...line,
@@ -143,8 +158,9 @@ function ReportEditorPage() {
       dispatch({ type: 'LOAD_PREVIEW', lines: linesWithGLNames })
       setUseDraft(false)
       setReportId(null)
+      setLoadedPeriod(period)
     }
-  }, [existingDraft, previewLines, hasDraft, glAccounts, dispatch])
+  }, [existingDraft, previewLines, hasDraft, glAccounts, dispatch, period, loadedPeriod])
 
   // Unsaved changes warning
   useEffect(() => {
@@ -207,6 +223,8 @@ function ReportEditorPage() {
     const date = new Date(year, month - 1, 1)
     date.setMonth(date.getMonth() + (direction === 'next' ? 1 : -1))
     const newPeriod = date.toISOString().slice(0, 7)
+    // Reset loaded state so new period data will be loaded
+    setLoadedPeriod(null)
     navigate({ search: { period: newPeriod } } as any)
   }
 
