@@ -319,7 +319,7 @@ export interface ReportSummary {
 export interface UpdateLineRequest {
   category?: string
   glCode?: string
-  department?: string
+  departmentCode?: string
   project?: string
   notes?: string
   missingReceiptJustification?: string

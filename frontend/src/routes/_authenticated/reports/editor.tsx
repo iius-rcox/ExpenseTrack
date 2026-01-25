@@ -192,7 +192,7 @@ function ReportEditorPage() {
     if (useDraft && reportId) {
       const updateData: any = {}
       // Map frontend field names to API field names
-      if (field === 'departmentCode') updateData.department = value // API uses 'department'
+      if (field === 'departmentCode') updateData.departmentCode = value
       if (field === 'description') updateData.notes = value // API uses 'notes'
       // GL Code handled by handleGLCodeChange which also updates glName
 
