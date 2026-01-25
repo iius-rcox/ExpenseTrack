@@ -500,6 +500,25 @@ export async function setupApiMocks(page: Page): Promise<void> {
       return
     }
 
+    // Handle batch save (POST to /reports/:id/save)
+    if (url.includes('/save') && method === 'POST') {
+      const body = JSON.parse(route.request().postData() || '{}')
+      const lineCount = body.lines?.length || 0
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          reportId: mockExpenseReport.id,
+          updatedCount: lineCount,
+          failedCount: 0,
+          updatedAt: new Date().toISOString(),
+          reportStatus: 'Draft',
+          failedLines: [],
+        }),
+      })
+      return
+    }
+
     // Handle reports list (GET /api/reports)
     if (method === 'GET' && url.match(/\/api\/reports(\?|$)/)) {
       await route.fulfill({
