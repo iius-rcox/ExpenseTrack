@@ -32,6 +32,9 @@ public class ExpenseReportRepository : IExpenseReportRepository
         return await _context.ExpenseReports
             .AsNoTracking()
             .Include(r => r.Lines.OrderBy(l => l.LineOrder))
+                .ThenInclude(l => l.Receipt)
+            .Include(r => r.Lines)
+                .ThenInclude(l => l.ChildAllocations.OrderBy(c => c.AllocationOrder))
             .Where(r => !r.IsDeleted)
             .FirstOrDefaultAsync(r => r.Id == id, ct);
     }

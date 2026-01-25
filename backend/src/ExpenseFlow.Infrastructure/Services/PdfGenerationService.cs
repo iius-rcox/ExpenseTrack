@@ -838,10 +838,7 @@ public class PdfGenerationService : IPdfGenerationService
         // Section 1: Generate itemized expense list pages
         var summaryPageCount = AddItemizedSummarySection(document, report, orderedLines);
 
-        // Section 2: Add page break separator before receipts section
-        AddReceiptsSectionHeader(document);
-
-        // Section 3: Generate receipt pages with line references
+        // Section 2: Generate receipt pages with line references
         int receiptPageCount = 0;
         int placeholderCount = 0;
         int lineRef = 0;
@@ -874,7 +871,7 @@ public class PdfGenerationService : IPdfGenerationService
         await using var outputStream = new MemoryStream();
         document.Save(outputStream, false);
 
-        var totalPageCount = summaryPageCount + 1 + receiptPageCount; // +1 for section header
+        var totalPageCount = summaryPageCount + receiptPageCount;
 
         _logger.LogInformation(
             "Generated complete PDF report for {ReportId}: {SummaryPages} summary + {ReceiptPages} receipts ({Placeholders} placeholders)",
