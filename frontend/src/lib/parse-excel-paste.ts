@@ -29,10 +29,24 @@ export interface ParseResult {
   format: '2-column' | '3-column' | 'unknown'
 }
 
+// DoS protection limits
+const MAX_CLIPBOARD_SIZE = 50_000 // ~50KB of text data
+const MAX_ROWS = 100 // Reasonable limit for split allocations
+
 /**
  * Parses tab-separated clipboard text into allocation data.
  */
 export function parseExcelPaste(clipboardText: string): ParseResult {
+  // DoS protection: reject oversized clipboard data
+  if (clipboardText.length > MAX_CLIPBOARD_SIZE) {
+    return {
+      success: false,
+      allocations: [],
+      errors: [`Clipboard data too large (${Math.round(clipboardText.length / 1000)}KB). Maximum is 50KB.`],
+      format: 'unknown',
+    }
+  }
+
   const errors: string[] = []
   const allocations: ParsedAllocation[] = []
 
@@ -49,6 +63,16 @@ export function parseExcelPaste(clipboardText: string): ParseResult {
       success: false,
       allocations: [],
       errors: ['No data found in clipboard'],
+      format: 'unknown',
+    }
+  }
+
+  // DoS protection: reject too many rows
+  if (rows.length > MAX_ROWS) {
+    return {
+      success: false,
+      allocations: [],
+      errors: [`Too many rows (${rows.length}). Maximum is ${MAX_ROWS}.`],
       format: 'unknown',
     }
   }

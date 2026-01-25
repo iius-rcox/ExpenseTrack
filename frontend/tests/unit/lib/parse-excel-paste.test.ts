@@ -208,7 +208,53 @@ GL-5100\t11\t200.00`
   })
 })
 
-describe('isExcelData', () => {
+describe('DoS protection', () => {
+    it('should reject clipboard data exceeding 50KB', () => {
+      // Create ~60KB of data (exceeds 50KB limit)
+      const largeData = '07\t100.00\n'.repeat(6000) // ~60KB
+
+      const result = parseExcelPaste(largeData)
+
+      expect(result.success).toBe(false)
+      expect(result.errors[0]).toContain('too large')
+      expect(result.errors[0]).toContain('50KB')
+    })
+
+    it('should reject more than 100 rows', () => {
+      // Create 150 rows (exceeds 100 row limit)
+      const manyRows = Array.from({ length: 150 }, (_, i) => `${i}\t${i}.00`).join('\n')
+
+      const result = parseExcelPaste(manyRows)
+
+      expect(result.success).toBe(false)
+      expect(result.errors[0]).toContain('Too many rows')
+      expect(result.errors[0]).toContain('150')
+      expect(result.errors[0]).toContain('100')
+    })
+
+    it('should accept exactly 100 rows', () => {
+      // Create exactly 100 rows (at the limit)
+      const maxRows = Array.from({ length: 100 }, (_, i) => `${i}\t${i}.00`).join('\n')
+
+      const result = parseExcelPaste(maxRows)
+
+      expect(result.success).toBe(true)
+      expect(result.allocations).toHaveLength(100)
+    })
+
+    it('should check size limit before row limit', () => {
+      // Create ~60KB of data - should fail on size, not rows
+      const largeData = '07\t100.00\n'.repeat(6000) // ~60KB, 6000 rows
+
+      const result = parseExcelPaste(largeData)
+
+      expect(result.success).toBe(false)
+      // Should mention size, not rows (size check comes first)
+      expect(result.errors[0]).toContain('too large')
+    })
+  })
+
+  describe('isExcelData', () => {
   it('should return true for tab-separated data', () => {
     expect(isExcelData('07\t100.00')).toBe(true)
     expect(isExcelData('a\tb\tc')).toBe(true)
