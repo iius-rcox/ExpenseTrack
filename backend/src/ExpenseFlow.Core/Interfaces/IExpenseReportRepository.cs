@@ -92,4 +92,51 @@ public interface IExpenseReportRepository
     /// <param name="line">Line to update</param>
     /// <param name="ct">Cancellation token</param>
     Task UpdateLineAsync(ExpenseLine line, CancellationToken ct = default);
+
+    /// <summary>
+    /// Adds an expense line to a report.
+    /// </summary>
+    /// <param name="line">Line to add</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Added line with generated ID</returns>
+    Task<ExpenseLine> AddLineAsync(ExpenseLine line, CancellationToken ct = default);
+
+    /// <summary>
+    /// Removes an expense line and its child allocations from a report.
+    /// If the line is a split parent, all child allocations are also removed (cascade).
+    /// </summary>
+    /// <param name="reportId">Report ID</param>
+    /// <param name="lineId">Line ID to remove</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Tuple of (success, childCount) - childCount is the number of child lines removed if parent was split</returns>
+    Task<(bool Success, int ChildCount)> RemoveLineAsync(Guid reportId, Guid lineId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Checks if a transaction is already on any active (non-deleted) report for the user.
+    /// Used to enforce transaction exclusivity.
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <param name="transactionId">Transaction ID to check</param>
+    /// <param name="excludeReportId">Optional report ID to exclude from check (for moves)</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>True if transaction is on another report</returns>
+    Task<bool> IsTransactionOnAnyReportAsync(Guid userId, Guid transactionId, Guid? excludeReportId = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets the set of transaction IDs that are already on any active (non-deleted) report for the user.
+    /// Used to efficiently filter available transactions without N+1 queries.
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <param name="transactionIds">Collection of transaction IDs to check</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>HashSet of transaction IDs that are already on reports</returns>
+    Task<HashSet<Guid>> GetTransactionIdsOnReportsAsync(Guid userId, IEnumerable<Guid> transactionIds, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets the maximum line order for a report (for appending new lines).
+    /// </summary>
+    /// <param name="reportId">Report ID</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Maximum line order, or 0 if no lines exist</returns>
+    Task<int> GetMaxLineOrderAsync(Guid reportId, CancellationToken ct = default);
 }

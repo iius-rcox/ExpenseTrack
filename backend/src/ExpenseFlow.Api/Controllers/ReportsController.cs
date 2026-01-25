@@ -596,6 +596,164 @@ public class ReportsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Adds a transaction as a new expense line to a report.
+    /// Enforces transaction exclusivity - a transaction can only be on one report at a time.
+    /// </summary>
+    /// <param name="reportId">Report ID</param>
+    /// <param name="request">Request containing transaction ID and optional categorization</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Created expense line</returns>
+    [HttpPost("{reportId:guid}/lines")]
+    [ProducesResponseType(typeof(ExpenseLineDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ExpenseLineDto>> AddLine(
+        Guid reportId,
+        [FromBody] AddLineRequest request,
+        CancellationToken ct)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Adding transaction {TransactionId} to report {ReportId} for user {UserId}",
+            request.TransactionId, reportId, user.Id);
+
+        try
+        {
+            var line = await _reportService.AddLineAsync(user.Id, reportId, request, ct);
+
+            return CreatedAtAction(
+                nameof(UpdateLine),
+                new { reportId, lineId = line.Id },
+                line);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already assigned"))
+        {
+            return Conflict(new ProblemDetailsResponse
+            {
+                Title = "Conflict",
+                Detail = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("locked for editing"))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Removes an expense line from a report.
+    /// If the line is a split parent, all child allocations are removed (cascade delete).
+    /// </summary>
+    /// <param name="reportId">Report ID</param>
+    /// <param name="lineId">Line ID to remove</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>No content if successful</returns>
+    [HttpDelete("{reportId:guid}/lines/{lineId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveLine(
+        Guid reportId,
+        Guid lineId,
+        CancellationToken ct)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        _logger.LogInformation(
+            "Removing line {LineId} from report {ReportId} for user {UserId}",
+            lineId, reportId, user.Id);
+
+        try
+        {
+            var removed = await _reportService.RemoveLineAsync(user.Id, reportId, lineId, ct);
+
+            if (!removed)
+            {
+                return NotFound(new ProblemDetailsResponse
+                {
+                    Title = "Not Found",
+                    Detail = $"Line with ID {lineId} was not found in report {reportId}"
+                });
+            }
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("locked for editing"))
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Validation Error",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Gets transactions available to add to a report.
+    /// Excludes transactions already on any active report.
+    /// </summary>
+    /// <param name="reportId">Report ID (to determine period)</param>
+    /// <param name="search">Optional search term</param>
+    /// <param name="page">Page number (1-based)</param>
+    /// <param name="pageSize">Items per page (max 100)</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Available transactions with period awareness</returns>
+    [HttpGet("{reportId:guid}/available-transactions")]
+    [ProducesResponseType(typeof(AvailableTransactionsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AvailableTransactionsResponse>> GetAvailableTransactions(
+        Guid reportId,
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 20;
+        if (pageSize > 100) pageSize = 100;
+
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        try
+        {
+            var response = await _reportService.GetAvailableTransactionsAsync(
+                user.Id, reportId, search, page, pageSize, ct);
+
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Not Found",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
     /// Exports a consolidated PDF of all receipts for a report.
     /// Includes placeholder pages for missing receipts with justification details.
     /// </summary>

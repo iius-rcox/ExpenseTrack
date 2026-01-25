@@ -692,6 +692,253 @@ public class ReportService : IReportService
         return previewLines;
     }
 
+    public async Task<ExpenseLineDto> AddLineAsync(
+        Guid userId,
+        Guid reportId,
+        AddLineRequest request,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation(
+            "Adding transaction {TransactionId} to report {ReportId} for user {UserId}",
+            request.TransactionId, reportId, userId);
+
+        // Verify report ownership and status
+        var report = await _reportRepository.GetByIdAsync(reportId, ct);
+        if (report == null || report.UserId != userId)
+        {
+            throw new InvalidOperationException($"Report with ID {reportId} was not found");
+        }
+
+        if (report.Status != ReportStatus.Draft)
+        {
+            throw new InvalidOperationException(
+                $"Cannot add expense line: report is in {report.Status} status and is locked for editing");
+        }
+
+        // Check transaction exclusivity - cannot be on another report
+        var isOnOtherReport = await _reportRepository.IsTransactionOnAnyReportAsync(
+            userId, request.TransactionId, excludeReportId: reportId, ct);
+        if (isOnOtherReport)
+        {
+            throw new InvalidOperationException(
+                "Transaction is already assigned to another report. Remove it from the other report first.");
+        }
+
+        // Get the transaction
+        var transaction = await _transactionRepository.GetByIdAsync(userId, request.TransactionId);
+        if (transaction == null)
+        {
+            throw new InvalidOperationException($"Transaction with ID {request.TransactionId} was not found");
+        }
+
+        // Check if transaction has a matched receipt
+        var matchedReceipt = await _matchRepository.GetByTransactionIdAsync(userId, request.TransactionId);
+
+        // Get max line order for positioning
+        var maxLineOrder = await _reportRepository.GetMaxLineOrderAsync(reportId, ct);
+
+        // Get categorization (use provided values or get suggestions)
+        var glCode = request.GlCode;
+        var departmentCode = request.DepartmentCode;
+        string? glCodeSuggested = null;
+        string? departmentSuggested = null;
+        int? glCodeTier = null;
+        int? departmentTier = null;
+        string? glCodeSource = null;
+        string? departmentSource = null;
+
+        if (string.IsNullOrEmpty(glCode) || string.IsNullOrEmpty(departmentCode))
+        {
+            var categorization = await GetCategorizationSafeAsync(request.TransactionId, userId, ct);
+            if (categorization?.GL?.TopSuggestion != null && string.IsNullOrEmpty(glCode))
+            {
+                glCode = categorization.GL.TopSuggestion.Code;
+                glCodeSuggested = categorization.GL.TopSuggestion.Code;
+                glCodeTier = categorization.GL.TopSuggestion.Tier;
+                glCodeSource = categorization.GL.TopSuggestion.Source;
+            }
+            if (categorization?.Department?.TopSuggestion != null && string.IsNullOrEmpty(departmentCode))
+            {
+                departmentCode = categorization.Department.TopSuggestion.Code;
+                departmentSuggested = categorization.Department.TopSuggestion.Code;
+                departmentTier = categorization.Department.TopSuggestion.Tier;
+                departmentSource = categorization.Department.TopSuggestion.Source;
+            }
+        }
+
+        // Normalize description
+        var normalizedDesc = await NormalizeDescriptionSafeAsync(transaction.OriginalDescription, userId, ct);
+
+        // Create the expense line
+        var line = new ExpenseLine
+        {
+            ReportId = reportId,
+            ReceiptId = matchedReceipt?.ReceiptId,
+            TransactionId = request.TransactionId,
+            LineOrder = maxLineOrder + 1,
+            ExpenseDate = transaction.TransactionDate,
+            Amount = transaction.Amount,
+            OriginalDescription = transaction.OriginalDescription,
+            NormalizedDescription = normalizedDesc,
+            VendorName = matchedReceipt?.Receipt?.VendorExtracted,
+            GLCode = glCode,
+            GLCodeSuggested = glCodeSuggested,
+            GLCodeTier = glCodeTier,
+            GLCodeSource = glCodeSource,
+            DepartmentCode = departmentCode,
+            DepartmentSuggested = departmentSuggested,
+            DepartmentTier = departmentTier,
+            DepartmentSource = departmentSource,
+            HasReceipt = matchedReceipt != null,
+            MissingReceiptJustification = matchedReceipt == null ? MissingReceiptJustification.NotProvided : null,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Save the line
+        await _reportRepository.AddLineAsync(line, ct);
+
+        // Update report summary
+        report.LineCount++;
+        report.TotalAmount += line.Amount;
+        if (!line.HasReceipt)
+        {
+            report.MissingReceiptCount++;
+        }
+        await _reportRepository.UpdateAsync(report, ct);
+
+        _logger.LogInformation(
+            "Added expense line {LineId} from transaction {TransactionId} to report {ReportId}",
+            line.Id, request.TransactionId, reportId);
+
+        return MapLineToDto(line);
+    }
+
+    public async Task<bool> RemoveLineAsync(
+        Guid userId,
+        Guid reportId,
+        Guid lineId,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation(
+            "Removing line {LineId} from report {ReportId} for user {UserId}",
+            lineId, reportId, userId);
+
+        // Verify report ownership and status
+        var report = await _reportRepository.GetByIdAsync(reportId, ct);
+        if (report == null || report.UserId != userId)
+        {
+            throw new InvalidOperationException($"Report with ID {reportId} was not found");
+        }
+
+        if (report.Status != ReportStatus.Draft)
+        {
+            throw new InvalidOperationException(
+                $"Cannot remove expense line: report is in {report.Status} status and is locked for editing");
+        }
+
+        // Get the line before removing (for summary update)
+        var line = await _reportRepository.GetLineByIdAsync(reportId, lineId, ct);
+        if (line == null)
+        {
+            return false;
+        }
+
+        // Remove the line (cascade delete handles split children)
+        var (removed, childCount) = await _reportRepository.RemoveLineAsync(reportId, lineId, ct);
+        if (!removed)
+        {
+            return false;
+        }
+
+        // Update report summary (including child lines if split parent)
+        report.LineCount -= (1 + childCount);  // Parent + any children
+        report.TotalAmount -= line.Amount;
+        if (!line.HasReceipt)
+        {
+            report.MissingReceiptCount--;
+        }
+        await _reportRepository.UpdateAsync(report, ct);
+
+        _logger.LogInformation(
+            "Removed expense line {LineId} from report {ReportId}. Transaction {TransactionId} is now available. Child lines removed: {ChildCount}",
+            lineId, reportId, line.TransactionId, childCount);
+
+        return true;
+    }
+
+    public async Task<AvailableTransactionsResponse> GetAvailableTransactionsAsync(
+        Guid userId,
+        Guid reportId,
+        string? search,
+        int page,
+        int pageSize,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation(
+            "Getting available transactions for report {ReportId}, user {UserId}, search: {Search}",
+            reportId, userId, search ?? "(none)");
+
+        // Get the report to determine period
+        var report = await _reportRepository.GetByIdAsync(reportId, ct);
+        if (report == null || report.UserId != userId)
+        {
+            throw new InvalidOperationException($"Report with ID {reportId} was not found");
+        }
+
+        var (periodStart, periodEnd) = ParsePeriod(report.Period);
+
+        // Get paginated transactions
+        var (transactions, totalCount, _) = await _transactionRepository.GetPagedAsync(
+            userId,
+            page,
+            pageSize,
+            search: search,
+            sortBy: "date",
+            sortOrder: "desc");
+
+        // Extract all transaction IDs for batch lookups (fixes N+1 query problem)
+        var transactionIds = transactions.Select(t => t.Id).ToList();
+
+        // Batch lookup: which transactions are already on reports?
+        var transactionsOnReports = await _reportRepository.GetTransactionIdsOnReportsAsync(userId, transactionIds, ct);
+
+        // Filter to only available transactions
+        var availableTransactionIds = transactionIds.Where(id => !transactionsOnReports.Contains(id)).ToList();
+
+        // Batch lookup: get receipt matches for available transactions
+        var receiptMatches = await _matchRepository.GetConfirmedByTransactionIdsAsync(availableTransactionIds, userId);
+
+        // Build response using in-memory lookups (no additional database queries)
+        var availableTransactions = new List<AvailableTransactionDto>();
+        foreach (var txn in transactions)
+        {
+            if (transactionsOnReports.Contains(txn.Id))
+                continue;
+
+            receiptMatches.TryGetValue(txn.Id, out var match);
+
+            availableTransactions.Add(new AvailableTransactionDto
+            {
+                Id = txn.Id,
+                TransactionDate = txn.TransactionDate,
+                Description = txn.Description,
+                OriginalDescription = txn.OriginalDescription,
+                Amount = txn.Amount,
+                HasMatchedReceipt = match != null,
+                ReceiptId = match?.ReceiptId,
+                Vendor = match?.Receipt?.VendorExtracted,
+                IsOutsidePeriod = txn.TransactionDate < periodStart || txn.TransactionDate > periodEnd
+            });
+        }
+
+        return new AvailableTransactionsResponse
+        {
+            Transactions = availableTransactions,
+            TotalCount = availableTransactions.Count, // Return count of available transactions in this page
+            ReportPeriod = report.Period
+        };
+    }
+
     #region Private Helpers
 
     private static (DateOnly StartDate, DateOnly EndDate) ParsePeriod(string period)

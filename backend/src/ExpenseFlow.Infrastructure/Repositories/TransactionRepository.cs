@@ -19,6 +19,22 @@ public class TransactionRepository : ITransactionRepository
         _context = context;
     }
 
+    /// <summary>
+    /// Escapes special characters in ILIKE patterns to prevent SQL injection.
+    /// PostgreSQL ILIKE special chars: %, _, \ (backslash is the escape character)
+    /// </summary>
+    private static string EscapeILikePattern(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        // Escape backslash first (it's the escape character), then % and _
+        return input
+            .Replace("\\", "\\\\")
+            .Replace("%", "\\%")
+            .Replace("_", "\\_");
+    }
+
     public async Task<Transaction?> GetByIdAsync(Guid userId, Guid transactionId)
     {
         return await _context.Transactions
@@ -80,9 +96,11 @@ public class TransactionRepository : ITransactionRepository
         }
 
         // Apply text search on description (case-insensitive)
+        // Escape ILIKE special characters to prevent pattern injection
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(t => EF.Functions.ILike(t.Description, $"%{search}%"));
+            var escapedSearch = EscapeILikePattern(search);
+            query = query.Where(t => EF.Functions.ILike(t.Description, $"%{escapedSearch}%"));
         }
 
         // Apply amount range filters

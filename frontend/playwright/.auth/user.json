@@ -1,0 +1,45 @@
+{
+  "cookies": [
+    {
+      "name": "msal.cache.encryption",
+      "value": "%7B%22id%22%3A%22019bf312-28ee-778c-85d0-95074d0088a1%22%2C%22key%22%3A%22EfWHTZfiTznbK6YSZlTTN3qvmG3-kmtzs8c2LnxuGeY%22%7D",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "msal.active-account",
+          "value": "test-home-account-id.test-tenant-id"
+        },
+        {
+          "name": "msal.token.test-home-account-id.test-tenant-id.idtoken",
+          "value": "{\"credentialType\":\"IdToken\",\"secret\":\"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LXVzZXItaWQiLCJuYW1lIjoiVGVzdCBVc2VyIiwib2lkIjoiMTIzNDU2Nzg5MCIsInRpZCI6InRlc3QtdGVuYW50LWlkIn0.test-signature\",\"homeAccountId\":\"test-home-account-id.test-tenant-id\",\"environment\":\"login.microsoftonline.com\",\"realm\":\"test-tenant-id\"}"
+        },
+        {
+          "name": "test-home-account-id.test-tenant-id-login.microsoftonline.com-test-tenant-id",
+          "value": "{\"homeAccountId\":\"test-home-account-id.test-tenant-id\",\"environment\":\"login.microsoftonline.com\",\"tenantId\":\"test-tenant-id\",\"username\":\"testuser@expenseflow.example.com\",\"localAccountId\":\"test-local-account-id\",\"name\":\"Test User\",\"idTokenClaims\":{\"aud\":\"test-client-id\",\"iss\":\"https://login.microsoftonline.com/test-tenant-id/v2.0\",\"name\":\"Test User\",\"preferred_username\":\"testuser@expenseflow.example.com\"}}"
+        },
+        {
+          "name": "msal.token.test-home-account-id.test-tenant-id.accesstoken",
+          "value": "{\"credentialType\":\"AccessToken\",\"secret\":\"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LXVzZXItaWQiLCJuYW1lIjoiVGVzdCBVc2VyIiwiaWF0IjoxNTE2MjM5MDIyfQ.test-signature\",\"expiresOn\":1769313210,\"homeAccountId\":\"test-home-account-id.test-tenant-id\",\"environment\":\"login.microsoftonline.com\",\"realm\":\"test-tenant-id\",\"target\":\"api://expenseflow/.default\"}"
+        },
+        {
+          "name": "msal.version",
+          "value": "4.27.0"
+        },
+        {
+          "name": "msal.account.keys",
+          "value": "[\"test-home-account-id.test-tenant-id-login.microsoftonline.com-test-tenant-id\"]"
+        }
+      ]
+    }
+  ]
+}

@@ -43,6 +43,15 @@ public interface IMatchRepository
     Task<ReceiptTransactionMatch?> GetByTransactionIdAsync(Guid transactionId, Guid userId);
 
     /// <summary>
+    /// Gets confirmed matches for multiple transaction IDs in a single query.
+    /// Used to avoid N+1 queries when checking receipt matches for a batch of transactions.
+    /// </summary>
+    /// <param name="transactionIds">Collection of transaction IDs to look up</param>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <returns>Dictionary mapping transaction IDs to their confirmed matches (only includes matches found)</returns>
+    Task<Dictionary<Guid, ReceiptTransactionMatch>> GetConfirmedByTransactionIdsAsync(IEnumerable<Guid> transactionIds, Guid userId);
+
+    /// <summary>
     /// Gets proposed matches for a user with pagination.
     /// </summary>
     /// <param name="userId">User ID for row-level security</param>

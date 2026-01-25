@@ -68,6 +68,28 @@ public class MatchRepository : IMatchRepository
             .FirstOrDefaultAsync();
     }
 
+    public async Task<Dictionary<Guid, ReceiptTransactionMatch>> GetConfirmedByTransactionIdsAsync(
+        IEnumerable<Guid> transactionIds,
+        Guid userId)
+    {
+        var transactionIdList = transactionIds.ToList();
+        if (transactionIdList.Count == 0)
+            return new Dictionary<Guid, ReceiptTransactionMatch>();
+
+        // Single query to get all confirmed matches for the given transaction IDs
+        var matches = await _context.ReceiptTransactionMatches
+            .Include(m => m.Receipt)
+            .Where(m => m.TransactionId != null && transactionIdList.Contains(m.TransactionId.Value))
+            .Where(m => m.UserId == userId)
+            .Where(m => m.Status == MatchProposalStatus.Confirmed)
+            .ToListAsync();
+
+        // Convert to dictionary keyed by TransactionId
+        return matches
+            .Where(m => m.TransactionId.HasValue)
+            .ToDictionary(m => m.TransactionId!.Value);
+    }
+
     public async Task<(List<ReceiptTransactionMatch> Items, int TotalCount)> GetProposedByUserIdAsync(
         Guid userId,
         int page = 1,

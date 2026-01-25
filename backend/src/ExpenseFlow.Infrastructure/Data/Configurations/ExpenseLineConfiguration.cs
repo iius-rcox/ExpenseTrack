@@ -189,6 +189,14 @@ public class ExpenseLineConfiguration : IEntityTypeConfiguration<ExpenseLine>
         builder.HasIndex(e => e.TransactionId)
             .HasDatabaseName("ix_expense_lines_transaction");
 
+        // Unique filtered index to enforce transaction exclusivity across active reports
+        // A transaction can only be on one non-deleted report at a time
+        // This prevents race conditions in AddLineAsync
+        builder.HasIndex(e => e.TransactionId)
+            .HasDatabaseName("ix_expense_lines_transaction_unique_active")
+            .IsUnique()
+            .HasFilter("transaction_id IS NOT NULL");
+
         // Partial index on parent_line_id for efficient child lookups (reviewer recommendation)
         builder.HasIndex(e => e.ParentLineId)
             .HasDatabaseName("ix_expense_lines_parent")

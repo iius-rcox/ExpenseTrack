@@ -19,6 +19,22 @@ public class ReceiptRepository : IReceiptRepository
         _context = context;
     }
 
+    /// <summary>
+    /// Escapes special characters in ILIKE patterns to prevent SQL injection.
+    /// PostgreSQL ILIKE special chars: %, _, \ (backslash is the escape character)
+    /// </summary>
+    private static string EscapeILikePattern(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        // Escape backslash first (it's the escape character), then % and _
+        return input
+            .Replace("\\", "\\\\")
+            .Replace("%", "\\%")
+            .Replace("_", "\\_");
+    }
+
     public async Task<Receipt> AddAsync(Receipt receipt)
     {
         _context.Receipts.Add(receipt);
@@ -87,10 +103,12 @@ public class ReceiptRepository : IReceiptRepository
         }
 
         // Vendor search (case-insensitive)
+        // Escape ILIKE special characters to prevent pattern injection
         if (!string.IsNullOrWhiteSpace(vendor))
         {
+            var escapedVendor = EscapeILikePattern(vendor);
             query = query.Where(r => r.VendorExtracted != null &&
-                EF.Functions.ILike(r.VendorExtracted, $"%{vendor}%"));
+                EF.Functions.ILike(r.VendorExtracted, $"%{escapedVendor}%"));
         }
 
         // Receipt date filter (DateExtracted)

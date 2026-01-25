@@ -140,4 +140,89 @@ public class ExpenseReportRepository : IExpenseReportRepository
         _context.ExpenseLines.Update(line);
         await _context.SaveChangesAsync(ct);
     }
+
+    public async Task<ExpenseLine> AddLineAsync(ExpenseLine line, CancellationToken ct = default)
+    {
+        line.CreatedAt = DateTime.UtcNow;
+        _context.ExpenseLines.Add(line);
+        await _context.SaveChangesAsync(ct);
+        return line;
+    }
+
+    public async Task<(bool Success, int ChildCount)> RemoveLineAsync(Guid reportId, Guid lineId, CancellationToken ct = default)
+    {
+        // Find the line to remove
+        var line = await _context.ExpenseLines
+            .Include(l => l.Report)
+            .Where(l => l.ReportId == reportId && l.Id == lineId)
+            .Where(l => !l.Report.IsDeleted)
+            .FirstOrDefaultAsync(ct);
+
+        if (line == null)
+            return (false, 0);
+
+        var childCount = 0;
+
+        // If this is a split parent, remove all child allocations first (cascade delete)
+        if (line.IsSplitParent)
+        {
+            var childLines = await _context.ExpenseLines
+                .Where(l => l.ParentLineId == lineId)
+                .ToListAsync(ct);
+
+            childCount = childLines.Count;
+            _context.ExpenseLines.RemoveRange(childLines);
+        }
+
+        // Remove the line itself
+        _context.ExpenseLines.Remove(line);
+        await _context.SaveChangesAsync(ct);
+
+        return (true, childCount);
+    }
+
+    public async Task<bool> IsTransactionOnAnyReportAsync(Guid userId, Guid transactionId, Guid? excludeReportId = null, CancellationToken ct = default)
+    {
+        var query = _context.ExpenseLines
+            .Include(l => l.Report)
+            .Where(l => l.TransactionId == transactionId)
+            .Where(l => l.Report.UserId == userId)
+            .Where(l => !l.Report.IsDeleted);
+
+        if (excludeReportId.HasValue)
+        {
+            query = query.Where(l => l.ReportId != excludeReportId.Value);
+        }
+
+        return await query.AnyAsync(ct);
+    }
+
+    public async Task<int> GetMaxLineOrderAsync(Guid reportId, CancellationToken ct = default)
+    {
+        var maxOrder = await _context.ExpenseLines
+            .Where(l => l.ReportId == reportId)
+            .Select(l => (int?)l.LineOrder)
+            .MaxAsync(ct);
+
+        return maxOrder ?? 0;
+    }
+
+    public async Task<HashSet<Guid>> GetTransactionIdsOnReportsAsync(Guid userId, IEnumerable<Guid> transactionIds, CancellationToken ct = default)
+    {
+        var transactionIdList = transactionIds.ToList();
+        if (transactionIdList.Count == 0)
+            return new HashSet<Guid>();
+
+        // Single query to get all transaction IDs that are already on active reports
+        var usedIds = await _context.ExpenseLines
+            .Include(l => l.Report)
+            .Where(l => l.TransactionId != null && transactionIdList.Contains(l.TransactionId.Value))
+            .Where(l => l.Report.UserId == userId)
+            .Where(l => !l.Report.IsDeleted)
+            .Select(l => l.TransactionId!.Value)
+            .Distinct()
+            .ToListAsync(ct);
+
+        return usedIds.ToHashSet();
+    }
 }

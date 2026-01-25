@@ -119,4 +119,49 @@ public interface IReportService
     /// <param name="ct">Cancellation token</param>
     /// <returns>List of expense line DTOs that would be in the report</returns>
     Task<List<ExpenseLineDto>> GetPreviewAsync(Guid userId, string period, CancellationToken ct = default);
+
+    /// <summary>
+    /// Adds a transaction as a new expense line to a report.
+    /// Enforces transaction exclusivity - a transaction can only be on one report at a time.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="reportId">Report ID to add the line to</param>
+    /// <param name="request">Request containing transaction ID and optional categorization</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Created expense line DTO</returns>
+    /// <exception cref="InvalidOperationException">Thrown if report not found, not a draft, or transaction already on another report</exception>
+    Task<ExpenseLineDto> AddLineAsync(Guid userId, Guid reportId, AddLineRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Removes an expense line from a report.
+    /// If the line is a split parent, all child allocations are removed (cascade delete).
+    /// The underlying transaction is returned to the available pool.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="reportId">Report ID</param>
+    /// <param name="lineId">Line ID to remove</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>True if removed, false if not found</returns>
+    /// <exception cref="InvalidOperationException">Thrown if report not found or not a draft</exception>
+    Task<bool> RemoveLineAsync(Guid userId, Guid reportId, Guid lineId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets transactions available to add to a report.
+    /// Excludes transactions already on any active report for the user.
+    /// Includes IsOutsidePeriod flag for transactions outside the report period.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="reportId">Report ID (to determine period and exclude existing lines)</param>
+    /// <param name="search">Optional search term for filtering</param>
+    /// <param name="page">Page number (1-based)</param>
+    /// <param name="pageSize">Items per page</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Response with available transactions and metadata</returns>
+    Task<AvailableTransactionsResponse> GetAvailableTransactionsAsync(
+        Guid userId,
+        Guid reportId,
+        string? search,
+        int page,
+        int pageSize,
+        CancellationToken ct = default);
 }
