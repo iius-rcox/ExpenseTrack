@@ -229,4 +229,23 @@ public class ExpenseReportRepository : IExpenseReportRepository
 
         return usedIds.ToHashSet();
     }
+
+    public async Task<List<ExpenseLine>> GetChildAllocationsAsync(Guid parentLineId, CancellationToken ct = default)
+    {
+        return await _context.ExpenseLines
+            .Where(l => l.ParentLineId == parentLineId)
+            .OrderBy(l => l.AllocationOrder)
+            .ToListAsync(ct);
+    }
+
+    public async Task<bool> DeleteLineAsync(Guid lineId, CancellationToken ct = default)
+    {
+        var line = await _context.ExpenseLines.FindAsync(new object[] { lineId }, ct);
+        if (line == null)
+            return false;
+
+        _context.ExpenseLines.Remove(line);
+        await _context.SaveChangesAsync(ct);
+        return true;
+    }
 }

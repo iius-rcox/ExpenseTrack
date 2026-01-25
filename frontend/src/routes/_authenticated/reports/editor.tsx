@@ -438,9 +438,10 @@ function ReportEditorPage() {
 
         const dbLineId = getDbLineId(lineId)
         const splitAllocations = line.allocations.map((alloc) => ({
-          department: alloc.departmentCode,
+          glCode: alloc.glCode || line.glCode,
+          departmentCode: alloc.departmentCode,
           percentage: alloc.percentage,
-          // Note: GL code is at line level, not per-allocation in the API
+          amount: alloc.amount,
         }))
 
         updateLine(

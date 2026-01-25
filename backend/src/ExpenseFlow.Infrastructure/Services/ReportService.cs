@@ -367,6 +367,13 @@ public class ReportService : IReportService
             line.JustificationNote = request.JustificationNote;
         }
 
+        // Handle split allocations
+        if (request.SplitAllocations != null)
+        {
+            await UpdateSplitAllocationsAsync(report.Id, line, request.SplitAllocations, ct);
+            wasEdited = true;
+        }
+
         // Mark as user-edited if changes were made that differ from suggestions
         if (wasEdited)
         {
@@ -1179,6 +1186,91 @@ public class ReportService : IReportService
                 tier3++;
                 break;
         }
+    }
+
+    /// <summary>
+    /// Updates split allocations for an expense line.
+    /// Creates, updates, or removes child allocation lines as needed.
+    /// </summary>
+    private async Task UpdateSplitAllocationsAsync(
+        Guid reportId,
+        ExpenseLine parentLine,
+        List<SplitAllocationDto> allocations,
+        CancellationToken ct)
+    {
+        // Get existing child allocations
+        var existingChildren = await _reportRepository.GetChildAllocationsAsync(parentLine.Id, ct);
+
+        // Remove all existing children - we'll recreate from scratch
+        // This simplifies the logic and avoids complex diff calculations
+        foreach (var child in existingChildren)
+        {
+            await _reportRepository.DeleteLineAsync(child.Id, ct);
+        }
+
+        // If no allocations provided (or empty), remove split status from parent
+        if (allocations.Count == 0)
+        {
+            parentLine.IsSplitParent = false;
+            _logger.LogInformation(
+                "Removed split allocations from line {LineId}",
+                parentLine.Id);
+            return;
+        }
+
+        // Validate percentages sum to 100
+        var totalPercentage = allocations.Sum(a => a.Percentage);
+        if (Math.Abs(totalPercentage - 100) > 0.01m)
+        {
+            _logger.LogWarning(
+                "Split allocations for line {LineId} sum to {Total}% instead of 100%",
+                parentLine.Id, totalPercentage);
+        }
+
+        // Mark parent as split parent
+        parentLine.IsSplitParent = true;
+
+        // Create child allocation lines
+        var order = 1;
+        foreach (var alloc in allocations)
+        {
+            var childAmount = parentLine.Amount * (alloc.Percentage / 100m);
+
+            var childLine = new ExpenseLine
+            {
+                Id = Guid.NewGuid(),
+                ReportId = reportId,
+                ParentLineId = parentLine.Id,
+                IsSplitChild = true,
+                SplitPercentage = alloc.Percentage,
+                AllocationOrder = order++,
+
+                // Inherit from parent
+                ExpenseDate = parentLine.ExpenseDate,
+                OriginalDescription = parentLine.OriginalDescription,
+                NormalizedDescription = parentLine.NormalizedDescription,
+                VendorName = parentLine.VendorName,
+                TransactionId = parentLine.TransactionId,
+                ReceiptId = parentLine.ReceiptId,
+                HasReceipt = parentLine.HasReceipt,
+                LineOrder = parentLine.LineOrder,
+
+                // Allocation-specific values
+                Amount = Math.Round(childAmount, 2),
+                GLCode = alloc.GlCode ?? parentLine.GLCode,
+                DepartmentCode = alloc.DepartmentCode,
+
+                // Mark as user-edited since user created the split
+                IsUserEdited = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _reportRepository.AddLineAsync(childLine, ct);
+        }
+
+        _logger.LogInformation(
+            "Created {Count} split allocations for line {LineId} in report {ReportId}",
+            allocations.Count, parentLine.Id, reportId);
     }
 
     /// <summary>

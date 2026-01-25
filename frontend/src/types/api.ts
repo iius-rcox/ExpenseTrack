@@ -327,9 +327,10 @@ export interface UpdateLineRequest {
 }
 
 export interface SplitAllocationInput {
-  department: string
-  project?: string
+  glCode?: string
+  departmentCode?: string
   percentage: number
+  amount?: number
 }
 
 export interface GenerateDraftRequest {

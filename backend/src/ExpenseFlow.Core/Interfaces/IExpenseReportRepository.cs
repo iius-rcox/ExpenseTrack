@@ -139,4 +139,21 @@ public interface IExpenseReportRepository
     /// <param name="ct">Cancellation token</param>
     /// <returns>Maximum line order, or 0 if no lines exist</returns>
     Task<int> GetMaxLineOrderAsync(Guid reportId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets child allocation lines for a split parent line.
+    /// </summary>
+    /// <param name="parentLineId">Parent line ID</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>List of child allocation lines</returns>
+    Task<List<ExpenseLine>> GetChildAllocationsAsync(Guid parentLineId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Deletes a single expense line by ID.
+    /// Does not cascade to children - use for individual child allocation deletion.
+    /// </summary>
+    /// <param name="lineId">Line ID to delete</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>True if deleted, false if not found</returns>
+    Task<bool> DeleteLineAsync(Guid lineId, CancellationToken ct = default);
 }

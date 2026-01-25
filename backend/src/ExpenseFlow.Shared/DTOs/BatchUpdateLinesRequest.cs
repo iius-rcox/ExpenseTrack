@@ -58,6 +58,14 @@ public class BatchLineUpdate
     /// </summary>
     [StringLength(500, ErrorMessage = "Justification note cannot exceed 500 characters")]
     public string? JustificationNote { get; set; }
+
+    /// <summary>
+    /// Split allocations for this expense line.
+    /// When provided, the line becomes a split parent with child allocations.
+    /// Pass an empty array to remove existing splits.
+    /// </summary>
+    [MaxLength(10, ErrorMessage = "Cannot have more than 10 split allocations per line")]
+    public List<SplitAllocationDto>? SplitAllocations { get; set; }
 }
 
 /// <summary>
