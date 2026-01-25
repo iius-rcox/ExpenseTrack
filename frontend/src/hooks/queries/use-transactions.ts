@@ -65,9 +65,8 @@ function safeString(value: unknown, fallback = ''): string {
   if (typeof value === 'string') {
     return value || fallback;
   }
-  // Empty object {} - the main culprit of React Error #301
+  // Convert empty/non-array objects to fallback (defensive against malformed API responses)
   if (typeof value === 'object' && !Array.isArray(value)) {
-    console.warn('[use-transactions] Empty object detected in API response, using fallback');
     return fallback;
   }
   return String(value);

@@ -208,65 +208,16 @@ export function safeDisplayString(
 }
 
 /**
- * Detailed warning logger for safeDisplayString.
- * Provides comprehensive debugging information for React Error #301.
+ * Warning logger for safeDisplayString (disabled in production).
+ * Re-enable console statements for debugging React Error #301 issues.
  */
 function logSafeDisplayWarning(
-  type: 'null_undefined' | 'empty_object' | 'non_empty_object' | 'array' | 'function' | 'symbol',
-  value: unknown,
-  fallback: string,
-  context?: string
+  _type: 'null_undefined' | 'empty_object' | 'non_empty_object' | 'array' | 'function' | 'symbol',
+  _value: unknown,
+  _fallback: string,
+  _context?: string
 ): void {
-  // Skip logging for expected null/undefined without context (not unusual)
-  if (type === 'null_undefined' && !context) return
-
-  const contextLabel = context ? ` [${context}]` : ''
-  const timestamp = new Date().toISOString()
-
-  // Create detailed log message
-  const typeLabels: Record<typeof type, string> = {
-    null_undefined: '⚠️ Null/Undefined Value',
-    empty_object: '🔴 EMPTY OBJECT (React Error #301 source)',
-    non_empty_object: '🟠 Non-Empty Object (cannot render)',
-    array: '🟡 Array (cannot render as child)',
-    function: '🔵 Function (cannot render)',
-    symbol: '🟣 Symbol (cannot render)',
-  }
-
-  console.group(`${typeLabels[type]}${contextLabel}`)
-  console.warn(`Timestamp: ${timestamp}`)
-  console.warn(`Context: ${context || 'Not provided'}`)
-  console.warn(`Value Type: ${typeof value}`)
-  console.warn(`Fallback Used: "${fallback}"`)
-
-  // Log the actual value with safeguards
-  try {
-    if (type === 'empty_object' || type === 'non_empty_object') {
-      const serialized = JSON.stringify(value, null, 2)
-      const truncated = serialized.length > 500
-        ? serialized.slice(0, 500) + '... (truncated)'
-        : serialized
-      console.warn(`Value (JSON):`, truncated)
-      console.warn(`Object Keys:`, Object.keys(value as object))
-    } else if (type === 'array') {
-      console.warn(`Array Length:`, (value as unknown[]).length)
-      console.warn(`First 3 Items:`, (value as unknown[]).slice(0, 3))
-    } else if (type === 'function') {
-      console.warn(`Function Name:`, (value as () => void).name || '(anonymous)')
-    } else {
-      console.warn(`Raw Value:`, value)
-    }
-  } catch (e) {
-    console.warn(`Value: [Could not serialize - ${e}]`)
-  }
-
-  // Add stack trace for debugging (helps identify the source)
-  if (type === 'empty_object' || type === 'non_empty_object') {
-    console.warn(`Stack Trace (to find data source):`)
-    console.trace()
-  }
-
-  console.groupEnd()
+  // No-op in production - re-enable for debugging if needed
 }
 
 /**
@@ -342,39 +293,14 @@ export function safeDisplayNumber(
 }
 
 /**
- * Detailed warning logger for safeDisplayNumber.
- * Provides comprehensive debugging information for React Error #301.
+ * Warning logger for safeDisplayNumber (disabled in production).
+ * Re-enable console statements for debugging React Error #301 issues.
  */
 function logSafeNumberWarning(
-  type: 'null_undefined' | 'empty_object' | 'non_empty_object' | 'nan' | 'invalid_string' | 'unknown_type',
-  value: unknown,
-  fallback: number,
-  context?: string
+  _type: 'null_undefined' | 'empty_object' | 'non_empty_object' | 'nan' | 'invalid_string' | 'unknown_type',
+  _value: unknown,
+  _fallback: number,
+  _context?: string
 ): void {
-  // Skip logging for expected null/undefined without context (not unusual)
-  if (type === 'null_undefined' && !context) return
-
-  const contextLabel = context ? ` [${context}]` : ''
-
-  const typeLabels: Record<typeof type, string> = {
-    null_undefined: '⚠️ Null/Undefined Number',
-    empty_object: '🔴 EMPTY OBJECT AS NUMBER (React Error #301 source)',
-    non_empty_object: '🟠 Non-Empty Object as Number',
-    nan: '🟡 NaN Value',
-    invalid_string: '🔵 Invalid String Number',
-    unknown_type: '🟣 Unknown Type for Number',
-  }
-
-  console.group(`${typeLabels[type]}${contextLabel}`)
-  console.warn(`Context: ${context || 'Not provided'}`)
-  console.warn(`Value Type: ${typeof value}`)
-  console.warn(`Value:`, value)
-  console.warn(`Fallback Used: ${fallback}`)
-
-  if (type === 'empty_object' || type === 'non_empty_object') {
-    console.warn(`Stack Trace:`)
-    console.trace()
-  }
-
-  console.groupEnd()
+  // No-op in production - re-enable for debugging if needed
 }

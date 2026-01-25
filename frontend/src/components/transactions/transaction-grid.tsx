@@ -280,38 +280,12 @@ function MobileTransactionCard({
  * Defensive check verifies required group properties exist at runtime.
  */
 function isGroup(item: TransactionListItem): item is TransactionGroupView {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const itemAny = item as any; // Capture before type narrowing for diagnostics
-
-  const hasType = item.type === 'group';
-  const hasTransactionCount = 'transactionCount' in item;
-  const hasCombinedAmount = 'combinedAmount' in item;
-  const hasDisplayDate = 'displayDate' in item;
-
-  // DIAGNOSTIC: Log when an item has type='group' but fails other checks
-  if (hasType && (!hasTransactionCount || !hasCombinedAmount || !hasDisplayDate)) {
-    console.error('[TransactionGrid] ⚠️ MALFORMED GROUP DETECTED - item has type="group" but missing required properties:', {
-      id: itemAny.id,
-      type: itemAny.type,
-      hasTransactionCount,
-      hasCombinedAmount,
-      hasDisplayDate,
-      itemKeys: Object.keys(item),
-      item,
-    });
-  }
-
-  // DIAGNOSTIC: Log when item.type is an object (could be empty object)
-  if (typeof itemAny.type === 'object') {
-    console.error('[TransactionGrid] ⚠️ item.type IS AN OBJECT (not string):', {
-      id: itemAny.id,
-      typeValue: itemAny.type,
-      typeType: typeof itemAny.type,
-      isEmptyObject: typeof itemAny.type === 'object' && Object.keys(itemAny.type as object).length === 0,
-    });
-  }
-
-  return hasType && hasTransactionCount && hasCombinedAmount && hasDisplayDate;
+  return (
+    item.type === 'group' &&
+    'transactionCount' in item &&
+    'combinedAmount' in item &&
+    'displayDate' in item
+  );
 }
 
 /**
@@ -341,19 +315,7 @@ function formatShortDate(date: Date): string {
  * Supports rendering both transactions and transaction groups in a single list.
  * Groups are rendered as expandable accordion rows.
  */
-// DIAGNOSTIC: Render counter for TransactionGrid
-let gridRenderCount = 0;
-
 export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
-  gridRenderCount++;
-  const gridRender = gridRenderCount;
-  console.log(`[TransactionGrid] Starting render #${gridRender}`, {
-    hasItems: 'items' in props,
-    itemCount: ('items' in props ? props.items : props.transactions)?.length ?? 0,
-    isLoading: props.isLoading,
-    categoriesCount: props.categories?.length ?? 0,
-  });
-
   // Support legacy 'transactions' prop name for backwards compatibility
   const items: TransactionListItem[] = 'items' in props
     ? props.items
@@ -426,17 +388,6 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
     ? rawExpandedGroupIds
     : new Set<string>()
   , [rawExpandedGroupIds]);
-
-  // DIAGNOSTIC: Log if we had to fix any props
-  if (rawSelection?.selectedIds && !(rawSelection.selectedIds instanceof Set)) {
-    console.error(`[TransactionGrid] ⚠️ FIXED selection.selectedIds - was not a Set:`, rawSelection.selectedIds);
-  }
-  if (rawSort && (typeof rawSort.field !== 'string' || typeof rawSort.direction !== 'string')) {
-    console.error(`[TransactionGrid] ⚠️ FIXED sort config:`, rawSort);
-  }
-  if (rawCategories && rawCategories.length !== categories.length) {
-    console.error(`[TransactionGrid] ⚠️ Filtered ${rawCategories.length - categories.length} malformed categories`);
-  }
 
   const parentRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -892,30 +843,9 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
               {virtualRows.map((virtualRow) => {
                 const item = items[virtualRow.index];
 
-                // DIAGNOSTIC: Check for undefined or empty object items
-                if (!item) {
-                  console.error(`[TransactionGrid] ⚠️ UNDEFINED ITEM at index ${virtualRow.index}`, {
-                    itemsLength: items.length,
-                    virtualRowIndex: virtualRow.index,
-                  });
-                  return null; // Skip rendering to prevent crash
-                }
-                if (typeof item === 'object' && Object.keys(item).length === 0) {
-                  console.error(`[TransactionGrid] ⚠️ EMPTY OBJECT ITEM at index ${virtualRow.index}`, {
-                    itemsLength: items.length,
-                    virtualRowIndex: virtualRow.index,
-                    item,
-                  });
-                  return null; // Skip rendering to prevent crash
-                }
-                // Also check if item has no id (malformed data)
-                if (!item.id) {
-                  console.error(`[TransactionGrid] ⚠️ ITEM WITHOUT ID at index ${virtualRow.index}`, {
-                    item,
-                    itemType: typeof item,
-                    itemKeys: Object.keys(item),
-                  });
-                  return null; // Skip rendering to prevent crash
+                // Defensive guards: skip rendering malformed items to prevent crashes
+                if (!item || (typeof item === 'object' && Object.keys(item).length === 0) || !item.id) {
+                  return null;
                 }
 
                 // Render group row (Feature 028)
@@ -954,19 +884,6 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
 
                 // Render transaction row
                 const transaction = item as TransactionView;
-
-                // DIAGNOSTIC: Check transaction fields that could cause React Error #301
-                const txFields = ['id', 'description', 'merchant', 'category', 'notes'];
-                for (const field of txFields) {
-                  const value = (transaction as unknown as Record<string, unknown>)[field];
-                  if (typeof value === 'object' && value !== null && !(value instanceof Date) && Object.keys(value as object).length === 0) {
-                    console.error(`[TransactionGrid] ⚠️ EMPTY OBJECT in transaction.${field}`, {
-                      transactionId: transaction.id,
-                      field,
-                      value,
-                    });
-                  }
-                }
 
                 return (
                   <div

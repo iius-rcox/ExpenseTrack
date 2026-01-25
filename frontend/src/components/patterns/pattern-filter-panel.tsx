@@ -30,11 +30,6 @@ import type { PatternGridFilters, PatternStatusFilter } from '@/types/prediction
 function safeDisplayString(value: unknown, fallback = ''): string {
   if (value === null || value === undefined) return fallback;
   if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
-    const keys = Object.keys(value as object);
-    if (keys.length === 0) {
-      console.warn('[PatternFilterPanel] Empty object detected, using fallback');
-      return fallback;
-    }
     return fallback;
   }
   return String(value);

@@ -152,39 +152,6 @@ export const TransactionRow = memo(function TransactionRow({
   onMarkNotReimbursable,
   onClearReimbursabilityOverride,
 }: TransactionRowComponentProps) {
-  // DIAGNOSTIC: Deep scan for empty objects that could cause React Error #301
-  // This recursively checks ALL properties to identify malformed cached data
-  if (process.env.NODE_ENV !== 'production' || true) { // Always run in staging
-    const checkForEmptyObjects = (obj: unknown, path: string, depth = 0): void => {
-      if (depth > 5) return; // Prevent infinite recursion
-      if (obj === null || obj === undefined) return;
-      if (typeof obj === 'object' && !Array.isArray(obj) && !(obj instanceof Date)) {
-        const keys = Object.keys(obj as object);
-        if (keys.length === 0) {
-          console.error(`[TransactionRow] ⚠️ EMPTY OBJECT at ${path}`, {
-            transactionId: transaction.id,
-            path,
-            valueType: typeof obj,
-            isEmptyObject: true,
-          });
-        } else {
-          // Recursively check nested properties
-          keys.forEach(key => {
-            checkForEmptyObjects((obj as Record<string, unknown>)[key], `${path}.${key}`, depth + 1);
-          });
-        }
-      } else if (Array.isArray(obj)) {
-        obj.forEach((item, idx) => checkForEmptyObjects(item, `${path}[${idx}]`, depth + 1));
-      }
-    };
-
-    // Check the ENTIRE transaction object recursively
-    checkForEmptyObjects(transaction, 'transaction');
-
-    // Also check categories prop
-    categories.forEach((cat, idx) => checkForEmptyObjects(cat, `categories[${idx}]`));
-  }
-
   // Editing state
   const [editingField, setEditingField] = useState<'notes' | null>(null);
   const [editValue, setEditValue] = useState('');

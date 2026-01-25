@@ -104,33 +104,10 @@ export const Route = createFileRoute('/_authenticated/transactions/')({
   component: TransactionsPage,
 })
 
-// DIAGNOSTIC: Render counter outside component to track renders
-let renderCount = 0;
-
 function TransactionsPage() {
-  renderCount++;
-  const currentRender = renderCount;
-  // DIAGNOSTIC: Log at the very start of the component to track render progress
-  console.log(`[TransactionsPage] Starting render #${currentRender}...`);
-
   const search = Route.useSearch()
 
-  // DIAGNOSTIC: Deep inspection of search params to catch empty objects
-  console.log(`[TransactionsPage] Render #${currentRender} FULL search inspection:`, {
-    view: search.view,
-    viewType: typeof search.view,
-    viewIsEmpty: typeof search.view === 'object' && Object.keys(search.view as object).length === 0,
-    sortBy: search.sortBy,
-    sortByType: typeof search.sortBy,
-    sortByIsEmpty: typeof search.sortBy === 'object' && Object.keys(search.sortBy as object).length === 0,
-    sortOrder: search.sortOrder,
-    sortOrderType: typeof search.sortOrder,
-    sortOrderIsEmpty: typeof search.sortOrder === 'object' && Object.keys(search.sortOrder as object).length === 0,
-    page: search.page,
-    rawSearch: JSON.stringify(search),
-  });
-
-  // DEFENSIVE: Ensure search.view is a valid string, not an empty object
+  // Ensure search params are valid strings, not empty objects (defensive against malformed URL state)
   const safeView = (typeof search.view === 'string' && (search.view === 'transactions' || search.view === 'patterns'))
     ? search.view
     : 'transactions';
@@ -140,17 +117,6 @@ function TransactionsPage() {
   const safeSortOrder = (typeof search.sortOrder === 'string' && (search.sortOrder === 'asc' || search.sortOrder === 'desc'))
     ? search.sortOrder
     : 'desc';
-
-  // Log if we had to fix any values
-  if (safeView !== search.view) {
-    console.error(`[TransactionsPage] ⚠️ FIXED search.view from:`, search.view, 'to:', safeView);
-  }
-  if (safeSortBy !== search.sortBy) {
-    console.error(`[TransactionsPage] ⚠️ FIXED search.sortBy from:`, search.sortBy, 'to:', safeSortBy);
-  }
-  if (safeSortOrder !== search.sortOrder) {
-    console.error(`[TransactionsPage] ⚠️ FIXED search.sortOrder from:`, search.sortOrder, 'to:', safeSortOrder);
-  }
 
   const navigate = Route.useNavigate()
 
@@ -260,30 +226,6 @@ function TransactionsPage() {
   // Reference data
   const { data: categories = [] } = useTransactionCategories()
   const { data: tags = [] } = useTransactionTags()
-
-  // DIAGNOSTIC: Log after data hooks to check data structure
-  console.log(`[TransactionsPage] Render #${currentRender} After data hooks:`, {
-    mixedListDataExists: !!mixedListData,
-    itemCount: mixedListData?.items?.length ?? 0,
-    isLoading,
-    hasError: !!error,
-    categoriesCount: categories?.length ?? 0,
-    tagsCount: tags?.length ?? 0,
-  });
-
-  // DIAGNOSTIC: Check for empty objects in categories
-  if (categories.length > 0) {
-    console.log(`[TransactionsPage] Render #${currentRender} Categories sample:`, categories.slice(0, 3));
-    const badCategories = categories.filter((c: { id?: unknown; name?: unknown }) =>
-      typeof c !== 'object' || c === null ||
-      typeof c.id !== 'string' || typeof c.name !== 'string' ||
-      c.id === '' || c.name === '' ||
-      (typeof c.id === 'object') || (typeof c.name === 'object')
-    );
-    if (badCategories.length > 0) {
-      console.error(`[TransactionsPage] ⚠️ BAD CATEGORIES FOUND:`, badCategories);
-    }
-  }
 
   // Pattern data (only fetch when on patterns tab)
   const patternWorkspace = usePatternWorkspace({
@@ -815,18 +757,8 @@ function TransactionsPage() {
     [items, selection.selectedIds]
   )
 
-  // DIAGNOSTIC: Log right before render to confirm we reach this point
-  console.log(`[TransactionsPage] Render #${currentRender} About to render JSX, items count:`, items.length);
-
-  // DIAGNOSTIC: Create a render tracker to identify which section crashes
-  const renderSection = (name: string) => {
-    console.log(`[TransactionsPage] Rendering section: ${name}`);
-    return null;
-  };
-
   return (
     <div className="space-y-6">
-      {renderSection('root-div')}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -843,10 +775,8 @@ function TransactionsPage() {
         </Button>
       </div>
 
-      {renderSection('before-tabs')}
       {/* View Toggle Tabs */}
       <Tabs value={safeView} onValueChange={handleViewChange} className="space-y-6">
-        {renderSection('inside-tabs')}
         <TabsList>
           <TabsTrigger value="transactions" className="gap-2">
             <ListFilter className="h-4 w-4" />
@@ -860,9 +790,7 @@ function TransactionsPage() {
 
         {/* Transactions View */}
         <TabsContent value="transactions" className="space-y-6 mt-0">
-          {renderSection('transactions-tabcontent')}
           {/* Filter Panel */}
-          {renderSection('before-filter-panel')}
           <TransactionFilterPanel
             filters={filters}
             categories={categories}
@@ -882,7 +810,6 @@ function TransactionsPage() {
             </Card>
           )}
 
-          {renderSection('before-transaction-grid')}
           {/* Transaction Grid */}
           <TransactionGrid
             items={items}
