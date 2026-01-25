@@ -594,7 +594,8 @@ public class ReportService : IReportService
         {
             ReportId = report.Id,
             Status = ReportStatus.Submitted.ToString(),
-            GeneratedAt = report.GeneratedAt!.Value,
+            // GeneratedAt may be null if submitting directly from Draft status
+            GeneratedAt = report.GeneratedAt ?? report.SubmittedAt!.Value,
             SubmittedAt = report.SubmittedAt!.Value
         };
     }
@@ -1109,10 +1110,21 @@ public class ReportService : IReportService
 
     private static (DateOnly StartDate, DateOnly EndDate) ParsePeriod(string period)
     {
-        // Period format: YYYY-MM
+        // Validate period format: YYYY-MM
+        if (string.IsNullOrWhiteSpace(period) ||
+            !System.Text.RegularExpressions.Regex.IsMatch(period, @"^\d{4}-\d{2}$"))
+        {
+            throw new ArgumentException("Period must be in YYYY-MM format", nameof(period));
+        }
+
         var parts = period.Split('-');
-        var year = int.Parse(parts[0]);
-        var month = int.Parse(parts[1]);
+        if (!int.TryParse(parts[0], out var year) ||
+            !int.TryParse(parts[1], out var month) ||
+            month < 1 || month > 12 ||
+            year < 1900 || year > 2100)
+        {
+            throw new ArgumentException("Period contains invalid year or month values", nameof(period));
+        }
 
         var startDate = new DateOnly(year, month, 1);
         var endDate = startDate.AddMonths(1).AddDays(-1);

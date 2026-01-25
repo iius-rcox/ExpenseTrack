@@ -17,6 +17,8 @@ public class BatchUpdateLinesRequest
     /// <summary>
     /// List of line updates to apply.
     /// </summary>
+    [Required(ErrorMessage = "Lines collection is required")]
+    [MinLength(1, ErrorMessage = "At least one line must be provided")]
     [MaxLength(MaxBatchSize, ErrorMessage = "Cannot update more than 100 lines in a single request")]
     public List<BatchLineUpdate> Lines { get; set; } = new();
 }

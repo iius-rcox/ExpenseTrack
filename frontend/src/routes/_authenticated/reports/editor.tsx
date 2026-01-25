@@ -581,7 +581,9 @@ function ReportEditorPage() {
         <CardHeader>
           <CardTitle>Expense Lines</CardTitle>
           <CardDescription>
-            Click any cell to edit. Changes are not saved - download to export your edits.
+            {useDraft
+              ? 'Click any cell to edit. Changes auto-save to your draft.'
+              : 'Click any cell to edit. Save as draft or download to keep your edits.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
