@@ -1375,9 +1375,10 @@ public class ReportServiceTests
     }
 
     [Fact]
-    public async Task SubmitAsync_DraftReport_ThrowsException()
+    public async Task SubmitAsync_DraftReport_TransitionsToSubmitted()
     {
-        // Arrange
+        // Arrange - Draft reports can now be submitted directly
+        // This supports the simpler workflow: Draft → Save (stays editable) → Submit (locks)
         var reportId = Guid.NewGuid();
         var report = CreateTestReport(reportId, _testUserId);
         report.Status = ReportStatus.Draft;
@@ -1386,10 +1387,17 @@ public class ReportServiceTests
             .Setup(x => x.GetByIdAsync(reportId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(report);
 
-        // Act & Assert
-        var action = () => _service.SubmitAsync(_testUserId, reportId);
-        await action.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*must be in Generated status*");
+        _reportRepositoryMock
+            .Setup(x => x.UpdateAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _service.SubmitAsync(_testUserId, reportId);
+
+        // Assert
+        result.Status.Should().Be("Submitted");
+        report.Status.Should().Be(ReportStatus.Submitted);
+        report.SubmittedAt.Should().NotBeNull();
     }
 
     [Fact]

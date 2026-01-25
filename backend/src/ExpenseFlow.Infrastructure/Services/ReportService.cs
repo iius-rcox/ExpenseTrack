@@ -546,15 +546,18 @@ public class ReportService : IReportService
             throw new InvalidOperationException($"Report with ID {reportId} was not found");
         }
 
-        // Check current status
+        // Check current status - allow submitting from Draft or Generated status
+        // Once submitted, the report is locked and cannot be edited
         if (report.Status == ReportStatus.Submitted)
         {
             throw new InvalidOperationException("Report has already been submitted");
         }
 
-        if (report.Status != ReportStatus.Generated)
+        // Allow submission from both Draft and Generated status
+        // This supports the simpler workflow: Draft → Save (stays editable) → Submit (locks)
+        if (report.Status != ReportStatus.Draft && report.Status != ReportStatus.Generated)
         {
-            throw new InvalidOperationException("Report must be in Generated status before submitting");
+            throw new InvalidOperationException("Report must be in Draft or Generated status before submitting");
         }
 
         // Update status to Submitted

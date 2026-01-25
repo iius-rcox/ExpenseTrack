@@ -534,19 +534,30 @@ public class ReportsControllerTests
     }
 
     [Fact]
-    public async Task Submit_WithDraftReport_ReturnsBadRequest()
+    public async Task Submit_WithDraftReport_ReturnsOkWithSubmittedStatus()
     {
-        // Arrange
+        // Arrange - Draft reports can now be submitted directly
+        // This supports the simpler workflow: Draft → Save (stays editable) → Submit (locks)
         var reportId = Guid.NewGuid();
+        var response = new SubmitReportResponseDto
+        {
+            ReportId = reportId,
+            Status = "Submitted",
+            GeneratedAt = DateTimeOffset.UtcNow,
+            SubmittedAt = DateTimeOffset.UtcNow,
+        };
         _reportServiceMock
             .Setup(s => s.SubmitAsync(_testUser.Id, reportId, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Report must be in Generated status before submitting"));
+            .ReturnsAsync(response);
 
         // Act
         var result = await _controller.Submit(reportId, CancellationToken.None);
 
         // Assert
-        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        result.Result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Result as OkObjectResult;
+        var submitResponse = okResult!.Value as SubmitReportResponseDto;
+        submitResponse!.Status.Should().Be("Submitted");
     }
 
     [Fact]

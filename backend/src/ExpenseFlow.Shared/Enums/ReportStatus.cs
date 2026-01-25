@@ -2,17 +2,19 @@ namespace ExpenseFlow.Shared.Enums;
 
 /// <summary>
 /// Status of an expense report.
-/// State machine: Draft → Generated → Submitted
+/// Typical workflow: Draft → Submitted
+/// Alternative workflow: Draft → Generated → Submitted
+/// Once Submitted, the report is locked and cannot be edited.
 /// </summary>
 public enum ReportStatus : short
 {
-    /// <summary>Draft - being edited by user</summary>
+    /// <summary>Draft - being edited by user, can be saved and modified</summary>
     Draft = 0,
 
-    /// <summary>Generated - finalized and locked for editing</summary>
+    /// <summary>Generated - intermediate state, can still be submitted</summary>
     Generated = 1,
 
-    /// <summary>Submitted - marked as complete for audit trail</summary>
+    /// <summary>Submitted - locked, marked as complete for audit trail</summary>
     Submitted = 2
 
     // Future states:
