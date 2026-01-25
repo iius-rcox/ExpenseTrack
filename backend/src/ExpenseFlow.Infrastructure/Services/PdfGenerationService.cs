@@ -1426,9 +1426,10 @@ public class PdfGenerationService : IPdfGenerationService
         }
 
         /// <summary>
-        /// Creates an IImageSource from a byte array using ImageSharp 3.x APIs.
+        /// Creates an ImageSharp3ImageSource from a byte array using ImageSharp 3.x APIs.
+        /// Returns concrete type for proper IDisposable support.
         /// </summary>
-        public static IImageSource FromBytes(byte[] imageBytes, int quality = 75)
+        public static ImageSharp3ImageSource FromBytes(byte[] imageBytes, int quality = 75)
         {
             using var stream = new MemoryStream(imageBytes);
             var image = Image.Load<Rgba32>(stream);
