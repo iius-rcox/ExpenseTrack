@@ -8,17 +8,23 @@ import { Loader2 } from 'lucide-react'
 export const Route = createFileRoute('/')({
   beforeLoad: ({ context }) => {
     // IMPORTANT: Don't redirect if this is an MSAL OAuth callback
-    // Azure AD returns with a fragment containing 'code' and 'state' params
-    // We must let MSAL's handleRedirectPromise() process this first
+    // Azure AD returns with code/state in query string (auth code flow) or hash (implicit flow)
     const hash = typeof window !== 'undefined' ? window.location.hash : ''
-    if (hash && (hash.includes('code=') || hash.includes('error='))) {
+    const search = typeof window !== 'undefined' ? window.location.search : ''
+    if ((hash && (hash.includes('code=') || hash.includes('error='))) ||
+        (search && (search.includes('code=') || search.includes('error=')))) {
       // This is an OAuth callback - don't redirect, let MSAL handle it
       // The page will re-render after MSAL processes the response
       return
     }
 
+    // Check MSAL instance directly for current auth state
+    const account = context.msalInstance.getActiveAccount()
+    const accounts = context.msalInstance.getAllAccounts()
+    const isAuthenticated = !!account || accounts.length > 0
+
     // If authenticated, redirect to dashboard
-    if (context.isAuthenticated && context.account) {
+    if (isAuthenticated) {
       throw redirect({ to: '/dashboard' })
     }
     // Otherwise redirect to login

@@ -14,8 +14,14 @@ const loginSearchSchema = z.object({
 export const Route = createFileRoute('/login')({
   validateSearch: loginSearchSchema,
   beforeLoad: ({ context, search }) => {
+    // Check MSAL instance directly for current auth state
+    // The static context.isAuthenticated may be stale after redirect
+    const account = context.msalInstance.getActiveAccount()
+    const accounts = context.msalInstance.getAllAccounts()
+    const isAuthenticated = !!account || accounts.length > 0
+
     // If user is already authenticated, redirect to dashboard or requested page
-    if (context.isAuthenticated && context.account) {
+    if (isAuthenticated) {
       throw redirect({ to: search.redirect || '/dashboard' })
     }
   },
