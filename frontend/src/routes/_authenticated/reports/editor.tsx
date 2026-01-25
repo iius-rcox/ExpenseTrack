@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, memo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { useReportPreview, useCheckDraftExists, useGenerateReport, useReportDetail, useUpdateReportLine, useAddReportLine, useRemoveReportLine, useSaveReport } from '@/hooks/queries/use-reports'
@@ -21,7 +21,223 @@ import { RemoveLineDialog } from '@/components/reports/remove-line-dialog'
 import { toast } from 'sonner'
 import { FileSpreadsheet, FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Split, ChevronDown, ChevronRight as ChevronRightIcon, Plus, Trash2 } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
-import type { ExportPreviewRequest, ExportLineDto } from '@/types/report-editor'
+import { getDbLineId, calculateNextPeriod, formatPeriodDisplay } from '@/lib/report-editor-utils'
+import type { ExportPreviewRequest, ExportLineDto, EditableExpenseLine, SplitAllocation, ReportEditorAction } from '@/types/report-editor'
+
+/**
+ * Props for the memoized ExpenseRow component.
+ * Kept minimal to enable effective memoization.
+ */
+interface ExpenseRowProps {
+  line: EditableExpenseLine
+  dispatch: React.Dispatch<ReportEditorAction>
+  useDraft: boolean
+  reportId: string | null
+  onGLCodeChange: (lineId: string, newGLCode: string) => void
+  onFieldUpdate: (lineId: string, field: string, value: any) => void
+  onApplySplit: (lineId: string) => void
+  onRemoveLineClick: (line: { id: string; vendor: string; amount: number }) => void
+}
+
+/**
+ * Memoized table row component to prevent unnecessary re-renders.
+ * Only re-renders when its specific line data or handlers change.
+ */
+const ExpenseRow = memo(function ExpenseRow({
+  line,
+  dispatch,
+  useDraft,
+  reportId,
+  onGLCodeChange,
+  onFieldUpdate,
+  onApplySplit,
+  onRemoveLineClick,
+}: ExpenseRowProps) {
+  return (
+    <>
+      <TableRow className={cn(line.isDirty && 'border-l-2 border-l-blue-500')}>
+        {/* Expansion chevron */}
+        <TableCell>
+          {line.isSplit && line.appliedAllocations && line.appliedAllocations.length > 0 && (
+            <button
+              onClick={() => dispatch({ type: 'TOGGLE_EXPANSION', id: line.id })}
+              className="p-1 hover:bg-accent rounded"
+            >
+              {line.isExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+          )}
+        </TableCell>
+
+        <TableCell>
+          <EditableDateCell
+            value={line.expenseDate}
+            onChange={(value) =>
+              dispatch({
+                type: 'UPDATE_LINE',
+                id: line.id,
+                field: 'expenseDate',
+                value,
+              })
+            }
+            error={line.validationWarnings.find((w) => w.startsWith('expenseDate'))?.split(': ')[1]}
+          />
+        </TableCell>
+
+        <TableCell>
+          <EditableTextCell
+            value={line.vendor}
+            onChange={(value) =>
+              dispatch({
+                type: 'UPDATE_LINE',
+                id: line.id,
+                field: 'vendor',
+                value,
+              })
+            }
+            placeholder="Enter vendor..."
+            error={line.validationWarnings.find((w) => w.startsWith('vendor'))?.split(': ')[1]}
+          />
+        </TableCell>
+
+        <TableCell>
+          {line.isSplit && line.appliedAllocations ? (
+            <SplitIndicatorBadge
+              count={line.appliedAllocations.length}
+              isExpanded={line.isExpanded}
+              onClick={() => dispatch({ type: 'TOGGLE_EXPANSION', id: line.id })}
+            />
+          ) : (
+            <EditableTextCell
+              value={line.glCode}
+              onChange={(value) => onGLCodeChange(line.id, value)}
+              placeholder="GL code..."
+              error={line.validationWarnings.find((w) => w.startsWith('glCode'))?.split(': ')[1]}
+            />
+          )}
+        </TableCell>
+
+        {/* GL Name (Vista Description) - Read-only */}
+        <TableCell>
+          <span className="text-sm text-muted-foreground italic">{line.glName || '-'}</span>
+        </TableCell>
+
+        <TableCell>
+          {line.isSplit && line.appliedAllocations ? (
+            <span className="text-sm text-muted-foreground">-</span>
+          ) : (
+            <EditableTextCell
+              value={line.departmentCode}
+              onChange={(value) => onFieldUpdate(line.id, 'departmentCode', value)}
+              placeholder="Dept..."
+              error={line.validationWarnings.find((w) => w.startsWith('departmentCode'))?.split(': ')[1]}
+            />
+          )}
+        </TableCell>
+
+        <TableCell>
+          <EditableTextCell
+            value={line.description}
+            onChange={(value) => onFieldUpdate(line.id, 'description', value)}
+            placeholder="Description..."
+            error={line.validationWarnings.find((w) => w.startsWith('description'))?.split(': ')[1]}
+          />
+        </TableCell>
+
+        <TableCell className="text-center">
+          {line.hasReceipt ? (
+            <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+          ) : (
+            <XCircle className="h-4 w-4 text-muted-foreground mx-auto" />
+          )}
+        </TableCell>
+
+        <TableCell className="text-right font-mono text-sm">
+          {formatCurrency(line.originalAmount)}
+        </TableCell>
+
+        {/* Actions Column */}
+        <TableCell>
+          <div className="flex items-center gap-1">
+            {/* Remove Line Button - Only for draft reports */}
+            {useDraft && reportId && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() =>
+                  onRemoveLineClick({ id: line.id, vendor: line.vendor, amount: line.originalAmount })
+                }
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                data-testid={`remove-line-${getDbLineId(line.id)}`}
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="sr-only">Remove line</span>
+              </Button>
+            )}
+
+            {/* Split Actions */}
+            {line.isSplit && line.appliedAllocations ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => dispatch({ type: 'REMOVE_SPLIT', id: line.id })}
+              >
+                Remove Split
+              </Button>
+            ) : line.isExpanded ? null : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => dispatch({ type: 'START_SPLIT', id: line.id })}
+                className="gap-1"
+              >
+                <Split className="h-3 w-3" />
+                Split
+              </Button>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+
+      {/* Split Expansion Panel */}
+      {line.isExpanded && line.allocations.length > 0 && (
+        <TableRow>
+          <TableCell colSpan={10} className="p-0">
+            <SplitExpansionPanel
+              parentId={line.id}
+              parentAmount={line.originalAmount}
+              allocations={line.allocations}
+              onAddAllocation={() => dispatch({ type: 'ADD_ALLOCATION', parentId: line.id })}
+              onRemoveAllocation={(allocationId) =>
+                dispatch({ type: 'REMOVE_ALLOCATION', parentId: line.id, allocationId })
+              }
+              onUpdateAllocation={(allocationId, field, value) =>
+                dispatch({
+                  type: 'UPDATE_ALLOCATION',
+                  parentId: line.id,
+                  allocationId,
+                  field: field as keyof SplitAllocation,
+                  value,
+                })
+              }
+              onToggleEntryMode={(allocationId) =>
+                dispatch({ type: 'TOGGLE_ENTRY_MODE', parentId: line.id, allocationId })
+              }
+              onBulkPaste={(allocations) =>
+                dispatch({ type: 'BULK_PASTE_ALLOCATIONS', parentId: line.id, allocations })
+              }
+              onApply={() => onApplySplit(line.id)}
+              onCancel={() => dispatch({ type: 'CANCEL_SPLIT', id: line.id })}
+            />
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  )
+})
 
 const editorSearchSchema = z.object({
   period: z.string().optional().default(new Date().toISOString().slice(0, 7)),
@@ -80,15 +296,6 @@ function ReportEditorPage() {
   const [loadedPeriod, setLoadedPeriod] = useState<string | null>(null)
 
   const isLoading = checkingDraft || loadingDraft || loadingPreview || generatingDraft
-
-  // Helper: Strip index suffix from line ID for API calls
-  const getDbLineId = (lineId: string): string => {
-    // Frontend IDs have "-{index}" suffix added by the reducer (e.g., "abc-def-0")
-    // Remove just the last segment (the index) to get the original API ID
-    // Works for both GUIDs (5 segments) and simple IDs (like "line-001")
-    const parts = lineId.split('-')
-    return parts.slice(0, -1).join('-')
-  }
 
   // Handler: Add transaction to report
   const handleAddTransaction = (transactionId: string) => {
@@ -159,47 +366,19 @@ function ReportEditorPage() {
   }
 
   // Helper: Update GL Code and auto-lookup GL Name
-  const handleGLCodeChange = (lineId: string, newGLCode: string) => {
-    const glName = lookupGLName(newGLCode, glAccounts)
+  const handleGLCodeChange = useCallback(
+    (lineId: string, newGLCode: string) => {
+      const glName = lookupGLName(newGLCode, glAccounts)
 
-    // Update both GL Code and GL Name in UI
-    dispatch({ type: 'UPDATE_LINE', id: lineId, field: 'glCode', value: newGLCode })
-    dispatch({ type: 'UPDATE_LINE', id: lineId, field: 'glName', value: glName })
+      // Update both GL Code and GL Name in UI
+      dispatch({ type: 'UPDATE_LINE', id: lineId, field: 'glCode', value: newGLCode })
+      dispatch({ type: 'UPDATE_LINE', id: lineId, field: 'glName', value: glName })
 
-    // Save to database if using draft
-    if (useDraft && reportId) {
-      const dbLineId = getDbLineId(lineId)
-      updateLine(
-        { reportId, lineId: dbLineId, data: { glCode: newGLCode } },
-        {
-          onSuccess: () => {
-            setLastSaved(new Date())
-          },
-          onError: (error) => {
-            toast.error(`Failed to save: ${error.message}`)
-          },
-        }
-      )
-    }
-  }
-
-  // Helper: Update any field with auto-save
-  const handleFieldUpdate = (lineId: string, field: string, value: any) => {
-    // Update UI immediately (optimistic)
-    dispatch({ type: 'UPDATE_LINE', id: lineId, field: field as any, value })
-
-    // Save to database if using draft
-    if (useDraft && reportId) {
-      const updateData: any = {}
-      // Map frontend field names to API field names
-      if (field === 'departmentCode') updateData.departmentCode = value
-      if (field === 'description') updateData.notes = value // API uses 'notes'
-      // GL Code handled by handleGLCodeChange which also updates glName
-
-      if (Object.keys(updateData).length > 0) {
+      // Save to database if using draft
+      if (useDraft && reportId) {
         const dbLineId = getDbLineId(lineId)
         updateLine(
-          { reportId, lineId: dbLineId, data: updateData },
+          { reportId, lineId: dbLineId, data: { glCode: newGLCode } },
           {
             onSuccess: () => {
               setLastSaved(new Date())
@@ -210,39 +389,85 @@ function ReportEditorPage() {
           }
         )
       }
-    }
-  }
+    },
+    [glAccounts, dispatch, useDraft, reportId, updateLine]
+  )
+
+  // Helper: Update any field with auto-save
+  const handleFieldUpdate = useCallback(
+    (lineId: string, field: string, value: any) => {
+      // Update UI immediately (optimistic)
+      dispatch({ type: 'UPDATE_LINE', id: lineId, field: field as any, value })
+
+      // Save to database if using draft
+      if (useDraft && reportId) {
+        const updateData: any = {}
+        // Map frontend field names to API field names
+        if (field === 'departmentCode') updateData.departmentCode = value
+        if (field === 'description') updateData.notes = value // API uses 'notes'
+        // GL Code handled by handleGLCodeChange which also updates glName
+
+        if (Object.keys(updateData).length > 0) {
+          const dbLineId = getDbLineId(lineId)
+          updateLine(
+            { reportId, lineId: dbLineId, data: updateData },
+            {
+              onSuccess: () => {
+                setLastSaved(new Date())
+              },
+              onError: (error) => {
+                toast.error(`Failed to save: ${error.message}`)
+              },
+            }
+          )
+        }
+      }
+    },
+    [dispatch, useDraft, reportId, updateLine]
+  )
 
   // Helper: Save split allocations to database
-  const handleApplySplit = (lineId: string) => {
-    dispatch({ type: 'APPLY_SPLIT', parentId: lineId })
+  const handleApplySplit = useCallback(
+    (lineId: string) => {
+      dispatch({ type: 'APPLY_SPLIT', parentId: lineId })
 
-    // Save split allocations to database if using draft
-    if (useDraft && reportId) {
-      const line = state.lines.find(l => l.id === lineId)
-      if (!line) return
+      // Save split allocations to database if using draft
+      if (useDraft && reportId) {
+        const line = state.lines.find((l) => l.id === lineId)
+        if (!line) return
 
-      const dbLineId = getDbLineId(lineId)
-      const splitAllocations = line.allocations.map(alloc => ({
-        department: alloc.departmentCode,
-        percentage: alloc.percentage,
-        // Note: GL code is at line level, not per-allocation in the API
-      }))
+        const dbLineId = getDbLineId(lineId)
+        const splitAllocations = line.allocations.map((alloc) => ({
+          department: alloc.departmentCode,
+          percentage: alloc.percentage,
+          // Note: GL code is at line level, not per-allocation in the API
+        }))
 
-      updateLine(
-        { reportId, lineId: dbLineId, data: { splitAllocations } },
-        {
-          onSuccess: () => {
-            setLastSaved(new Date())
-            toast.success('Split allocations saved')
-          },
-          onError: (error) => {
-            toast.error(`Failed to save split: ${error.message}`)
-          },
-        }
-      )
-    }
-  }
+        updateLine(
+          { reportId, lineId: dbLineId, data: { splitAllocations } },
+          {
+            onSuccess: () => {
+              setLastSaved(new Date())
+              toast.success('Split allocations saved')
+            },
+            onError: (error) => {
+              toast.error(`Failed to save split: ${error.message}`)
+            },
+          }
+        )
+      }
+    },
+    [dispatch, useDraft, reportId, state.lines, updateLine]
+  )
+
+  // Handler: Trigger remove line dialog
+  const handleRemoveLineClick = useCallback(
+    (line: { id: string; vendor: string; amount: number }) => {
+      setLineToRemove(line)
+      setRemoveDialogOpen(true)
+    },
+    []
+  )
 
   // Load data into editor (draft or preview) - ONLY ONCE per period
   // This prevents refetches from overwriting user edits
@@ -294,12 +519,58 @@ function ReportEditorPage() {
     }
   }, [metrics.dirtyCount])
 
-  const handleExport = (format: 'excel' | 'pdf') => {
-    // For PDF exports when we have a saved draft, use the complete endpoint
-    // which includes receipt images and proper split rendering
-    if (format === 'pdf' && useDraft && reportId) {
-      exportComplete(
-        { reportId, period },
+  const handleExport = useCallback(
+    (format: 'excel' | 'pdf') => {
+      // For PDF exports when we have a saved draft, use the complete endpoint
+      // which includes receipt images and proper split rendering
+      if (format === 'pdf' && useDraft && reportId) {
+        exportComplete(
+          { reportId, period },
+          {
+            onSuccess: ({ filename }) => {
+              toast.success(`Downloaded ${filename}`)
+            },
+            onError: (err) => {
+              toast.error(`Export failed: ${err.message}`)
+            },
+          }
+        )
+        return
+      }
+
+      // For Excel or PDF without a saved draft, use the preview endpoint
+      const request: ExportPreviewRequest = {
+        period,
+        lines: state.lines.map((line) => {
+          const exportLine: ExportLineDto = {
+            expenseDate: line.expenseDate,
+            vendorName: line.vendor,
+            glCode: line.glCode,
+            departmentCode: line.departmentCode,
+            description: line.description,
+            hasReceipt: line.hasReceipt,
+            amount: line.originalAmount,
+          }
+
+          // If line has split allocations, include as child allocations
+          if (line.isSplit && line.appliedAllocations && line.appliedAllocations.length > 0) {
+            exportLine.childAllocations = line.appliedAllocations.map((alloc) => ({
+              expenseDate: line.expenseDate,
+              vendorName: line.vendor,
+              glCode: alloc.glCode,
+              departmentCode: alloc.departmentCode,
+              description: line.description,
+              hasReceipt: line.hasReceipt,
+              amount: alloc.amount,
+            }))
+          }
+
+          return exportLine
+        }),
+      }
+
+      exportPreview(
+        { request, format },
         {
           onSuccess: ({ filename }) => {
             toast.success(`Downloaded ${filename}`)
@@ -309,62 +580,19 @@ function ReportEditorPage() {
           },
         }
       )
-      return
-    }
+    },
+    [useDraft, reportId, period, state.lines, exportComplete, exportPreview]
+  )
 
-    // For Excel or PDF without a saved draft, use the preview endpoint
-    const request: ExportPreviewRequest = {
-      period,
-      lines: state.lines.map((line) => {
-        const exportLine: ExportLineDto = {
-          expenseDate: line.expenseDate,
-          vendorName: line.vendor,
-          glCode: line.glCode,
-          departmentCode: line.departmentCode,
-          description: line.description,
-          hasReceipt: line.hasReceipt,
-          amount: line.originalAmount,
-        }
-
-        // If line has split allocations, include as child allocations
-        if (line.isSplit && line.appliedAllocations && line.appliedAllocations.length > 0) {
-          exportLine.childAllocations = line.appliedAllocations.map((alloc) => ({
-            expenseDate: line.expenseDate,
-            vendorName: line.vendor,
-            glCode: alloc.glCode,
-            departmentCode: alloc.departmentCode,
-            description: line.description,
-            hasReceipt: line.hasReceipt,
-            amount: alloc.amount,
-          }))
-        }
-
-        return exportLine
-      }),
-    }
-
-    exportPreview(
-      { request, format },
-      {
-        onSuccess: ({ filename }) => {
-          toast.success(`Downloaded ${filename}`)
-        },
-        onError: (err) => {
-          toast.error(`Export failed: ${err.message}`)
-        },
-      }
-    )
-  }
-
-  const handlePeriodChange = (direction: 'prev' | 'next') => {
-    const [year, month] = period.split('-').map(Number)
-    const date = new Date(year, month - 1, 1)
-    date.setMonth(date.getMonth() + (direction === 'next' ? 1 : -1))
-    const newPeriod = date.toISOString().slice(0, 7)
-    // Reset loaded state so new period data will be loaded
-    setLoadedPeriod(null)
-    navigate({ search: { period: newPeriod } } as any)
-  }
+  const handlePeriodChange = useCallback(
+    (direction: 'prev' | 'next') => {
+      const newPeriod = calculateNextPeriod(period, direction)
+      // Reset loaded state so new period data will be loaded
+      setLoadedPeriod(null)
+      navigate({ search: { period: newPeriod } } as any)
+    },
+    [period, navigate]
+  )
 
   if (isLoading) {
     return (
@@ -492,14 +720,7 @@ function ReportEditorPage() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="text-sm font-medium min-w-[100px] text-center">
-              {(() => {
-                const [year, month] = period.split('-').map(Number)
-                const date = new Date(year, month - 1, 1) // month is 0-indexed in Date constructor
-                return date.toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                })
-              })()}
+              {formatPeriodDisplay(period)}
             </div>
             <Button
               variant="outline"
@@ -612,188 +833,17 @@ function ReportEditorPage() {
                 </TableHeader>
                 <TableBody>
                   {state.lines.map((line) => (
-                    <>
-                      <TableRow
-                        key={line.id}
-                        className={cn(line.isDirty && 'border-l-2 border-l-blue-500')}
-                      >
-                        {/* Expansion chevron */}
-                        <TableCell>
-                          {line.isSplit && line.appliedAllocations && line.appliedAllocations.length > 0 && (
-                            <button
-                              onClick={() => dispatch({ type: 'TOGGLE_EXPANSION', id: line.id })}
-                              className="p-1 hover:bg-accent rounded"
-                            >
-                              {line.isExpanded ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRightIcon className="h-4 w-4" />
-                              )}
-                            </button>
-                          )}
-                        </TableCell>
-
-                        <TableCell>
-                        <EditableDateCell
-                          value={line.expenseDate}
-                          onChange={(value) =>
-                            dispatch({
-                              type: 'UPDATE_LINE',
-                              id: line.id,
-                              field: 'expenseDate',
-                              value,
-                            })
-                          }
-                          error={line.validationWarnings.find((w) => w.startsWith('expenseDate'))?.split(': ')[1]}
-                        />
-                      </TableCell>
-
-                      <TableCell>
-                        <EditableTextCell
-                          value={line.vendor}
-                          onChange={(value) =>
-                            dispatch({
-                              type: 'UPDATE_LINE',
-                              id: line.id,
-                              field: 'vendor',
-                              value,
-                            })
-                          }
-                          placeholder="Enter vendor..."
-                          error={line.validationWarnings.find((w) => w.startsWith('vendor'))?.split(': ')[1]}
-                        />
-                      </TableCell>
-
-                      <TableCell>
-                        {line.isSplit && line.appliedAllocations ? (
-                          <SplitIndicatorBadge
-                            count={line.appliedAllocations.length}
-                            isExpanded={line.isExpanded}
-                            onClick={() => dispatch({ type: 'TOGGLE_EXPANSION', id: line.id })}
-                          />
-                        ) : (
-                          <EditableTextCell
-                            value={line.glCode}
-                            onChange={(value) => handleGLCodeChange(line.id, value)}
-                            placeholder="GL code..."
-                            error={line.validationWarnings.find((w) => w.startsWith('glCode'))?.split(': ')[1]}
-                          />
-                        )}
-                      </TableCell>
-
-                      {/* GL Name (Vista Description) - Read-only */}
-                      <TableCell>
-                        <span className="text-sm text-muted-foreground italic">
-                          {line.glName || '-'}
-                        </span>
-                      </TableCell>
-
-                      <TableCell>
-                        {line.isSplit && line.appliedAllocations ? (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        ) : (
-                          <EditableTextCell
-                            value={line.departmentCode}
-                            onChange={(value) => handleFieldUpdate(line.id, 'departmentCode', value)}
-                            placeholder="Dept..."
-                            error={line.validationWarnings.find((w) => w.startsWith('departmentCode'))?.split(': ')[1]}
-                          />
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        <EditableTextCell
-                          value={line.description}
-                          onChange={(value) => handleFieldUpdate(line.id, 'description', value)}
-                          placeholder="Description..."
-                          error={line.validationWarnings.find((w) => w.startsWith('description'))?.split(': ')[1]}
-                        />
-                      </TableCell>
-
-                      <TableCell className="text-center">
-                        {line.hasReceipt ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-muted-foreground mx-auto" />
-                        )}
-                      </TableCell>
-
-                      <TableCell className="text-right font-mono text-sm">
-                        {formatCurrency(line.originalAmount)}
-                      </TableCell>
-
-                      {/* Actions Column */}
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {/* Remove Line Button - Only for draft reports */}
-                          {useDraft && reportId && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setLineToRemove({ id: line.id, vendor: line.vendor, amount: line.originalAmount })
-                                setRemoveDialogOpen(true)
-                              }}
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              data-testid={`remove-line-${getDbLineId(line.id)}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Remove line</span>
-                            </Button>
-                          )}
-
-                          {/* Split Actions */}
-                          {line.isSplit && line.appliedAllocations ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => dispatch({ type: 'REMOVE_SPLIT', id: line.id })}
-                            >
-                              Remove Split
-                            </Button>
-                          ) : line.isExpanded ? null : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => dispatch({ type: 'START_SPLIT', id: line.id })}
-                              className="gap-1"
-                            >
-                              <Split className="h-3 w-3" />
-                              Split
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-
-                    {/* Split Expansion Panel */}
-                    {line.isExpanded && line.allocations.length > 0 && (
-                      <TableRow>
-                        <TableCell colSpan={9} className="p-0">
-                          <SplitExpansionPanel
-                            parentId={line.id}
-                            parentAmount={line.originalAmount}
-                            allocations={line.allocations}
-                            onAddAllocation={() => dispatch({ type: 'ADD_ALLOCATION', parentId: line.id })}
-                            onRemoveAllocation={(allocationId) =>
-                              dispatch({ type: 'REMOVE_ALLOCATION', parentId: line.id, allocationId })
-                            }
-                            onUpdateAllocation={(allocationId, field, value) =>
-                              dispatch({ type: 'UPDATE_ALLOCATION', parentId: line.id, allocationId, field, value })
-                            }
-                            onToggleEntryMode={(allocationId) =>
-                              dispatch({ type: 'TOGGLE_ENTRY_MODE', parentId: line.id, allocationId })
-                            }
-                            onBulkPaste={(allocations) =>
-                              dispatch({ type: 'BULK_PASTE_ALLOCATIONS', parentId: line.id, allocations })
-                            }
-                            onApply={() => handleApplySplit(line.id)}
-                            onCancel={() => dispatch({ type: 'CANCEL_SPLIT', id: line.id })}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    </>
+                    <ExpenseRow
+                      key={line.id}
+                      line={line}
+                      dispatch={dispatch}
+                      useDraft={useDraft}
+                      reportId={reportId}
+                      onGLCodeChange={handleGLCodeChange}
+                      onFieldUpdate={handleFieldUpdate}
+                      onApplySplit={handleApplySplit}
+                      onRemoveLineClick={handleRemoveLineClick}
+                    />
                   ))}
                 </TableBody>
               </Table>
