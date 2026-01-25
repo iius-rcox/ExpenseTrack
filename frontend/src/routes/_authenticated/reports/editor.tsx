@@ -650,6 +650,7 @@ function ReportEditorPage() {
         lineId: getDbLineId(line.id),
         glCode: line.glCode || undefined,
         departmentCode: line.departmentCode || undefined,
+        notes: line.description || undefined, // API uses 'notes' for description
         // Note: Other fields like missingReceiptJustification could be added here
       }))
 

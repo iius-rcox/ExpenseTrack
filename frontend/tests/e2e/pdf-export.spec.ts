@@ -15,7 +15,7 @@
  */
 
 import { test, expect, Page } from '@playwright/test'
-import { setupApiMocks, mockExpenseReport } from './fixtures/api-mocks'
+import { setupApiMocks } from './fixtures/api-mocks'
 import { navigateAuthenticated } from './fixtures/auth-helpers'
 import { ReportEditorPage } from './pages/report-editor-page'
 
@@ -96,7 +96,7 @@ test.describe('PDF Export with Receipt Images', () => {
       // Set up API capture
       await page.route('**/api/reports/*/export/complete', async (route) => {
         const response = await route.fetch()
-        responseHeaders = Object.fromEntries(response.headers().entries())
+        responseHeaders = response.headers()
         await route.fulfill({ response })
       })
 

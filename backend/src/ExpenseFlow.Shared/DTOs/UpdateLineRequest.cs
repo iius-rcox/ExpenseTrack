@@ -20,6 +20,13 @@ public class UpdateLineRequest
     public string? DepartmentCode { get; set; }
 
     /// <summary>
+    /// Updated description/notes for the expense line (user override).
+    /// This is the user-friendly "Description" field shown in the UI.
+    /// </summary>
+    [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters")]
+    public string? Notes { get; set; }
+
+    /// <summary>
     /// Justification for missing receipt (when HasReceipt is false).
     /// </summary>
     public MissingReceiptJustification? MissingReceiptJustification { get; set; }
