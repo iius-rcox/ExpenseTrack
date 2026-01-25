@@ -225,8 +225,8 @@ function reportEditorReducer(
                   },
                   {
                     id: crypto.randomUUID(),
-                    glCode: '',
-                    departmentCode: '',
+                    glCode: line.glCode, // Inherit parent's GL code
+                    departmentCode: '', // Department can differ per allocation
                     percentage: 50,
                     amount: line.originalAmount * 0.5,
                     entryMode: 'amount' as const,
@@ -257,7 +257,7 @@ function reportEditorReducer(
 
           const newAllocation = {
             id: crypto.randomUUID(),
-            glCode: '',
+            glCode: line.glCode, // Inherit parent's GL code for new allocations
             departmentCode: '',
             percentage: 0,
             amount: 0,
