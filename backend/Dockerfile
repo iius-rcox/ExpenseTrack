@@ -62,8 +62,16 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     # Fix ImageMagick security policy to allow PDF processing
     # Default Debian policy blocks PDF for security, but we need it for receipt thumbnails
-    && sed -i 's/<policy domain="coder" rights="none" pattern="PDF" \/>/<policy domain="coder" rights="read|write" pattern="PDF" \/>/g' /etc/ImageMagick-6/policy.xml 2>/dev/null || true \
-    && sed -i 's/<policy domain="coder" rights="none" pattern="PDF"/<policy domain="coder" rights="read|write" pattern="PDF"/g' /etc/ImageMagick-6/policy.xml 2>/dev/null || true
+    # Remove the restrictive PDF policy entirely (multiple possible formats)
+    && (sed -i '/pattern="PDF"/d' /etc/ImageMagick-6/policy.xml 2>/dev/null || true) \
+    && (sed -i '/pattern="PDF"/d' /etc/ImageMagick-7/policy.xml 2>/dev/null || true) \
+    # Also remove PS, EPS, XPS restrictions that might affect Ghostscript
+    && (sed -i '/pattern="PS"/d' /etc/ImageMagick-6/policy.xml 2>/dev/null || true) \
+    && (sed -i '/pattern="EPS"/d' /etc/ImageMagick-6/policy.xml 2>/dev/null || true) \
+    && (sed -i '/pattern="XPS"/d' /etc/ImageMagick-6/policy.xml 2>/dev/null || true) \
+    && (sed -i '/pattern="PS"/d' /etc/ImageMagick-7/policy.xml 2>/dev/null || true) \
+    && (sed -i '/pattern="EPS"/d' /etc/ImageMagick-7/policy.xml 2>/dev/null || true) \
+    && (sed -i '/pattern="XPS"/d' /etc/ImageMagick-7/policy.xml 2>/dev/null || true)
 
 # Set Chromium path for PuppeteerSharp
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
