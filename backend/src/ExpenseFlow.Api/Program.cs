@@ -261,6 +261,16 @@ if (!app.Environment.IsEnvironment("Testing"))
     // Trigger reference data sync on startup to ensure data is populated
     RecurringJob.TriggerJob("sync-reference-data");
     Log.Information("Triggered initial reference data sync job");
+
+    // Trigger thumbnail backfill on startup if configured (for regenerating missing thumbnails)
+    if (builder.Configuration.GetValue<bool>("ReceiptProcessing:TriggerThumbnailBackfillOnStartup", false))
+    {
+        using var scope = app.Services.CreateScope();
+        var backfillService = scope.ServiceProvider.GetRequiredService<ExpenseFlow.Core.Interfaces.IThumbnailBackfillService>();
+        var backfillResult = backfillService.StartBackfillAsync(new ExpenseFlow.Shared.DTOs.ThumbnailBackfillRequest()).GetAwaiter().GetResult();
+        Log.Information("Triggered thumbnail backfill on startup: JobId={JobId}, EstimatedCount={Count}",
+            backfillResult.JobId, backfillResult.EstimatedCount);
+    }
 }
 
 app.MapControllers();

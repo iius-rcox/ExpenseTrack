@@ -23,7 +23,7 @@ spec:
       serviceAccountName: expenseflow-api
       containers:
         - name: api
-          image: iiusacr.azurecr.io/expenseflow-api:v2026.01.26-191bf64
+          image: iiusacr.azurecr.io/expenseflow-api:v1.0.1-backfill
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -112,6 +112,9 @@ spec:
                 secretKeyRef:
                   key: blob-storage-connection-string
                   name: expenseflow-secrets
+            # Trigger thumbnail backfill on startup (one-time fix for missing thumbnails)
+            - name: ReceiptProcessing__TriggerThumbnailBackfillOnStartup
+              value: "true"
           volumeMounts:
             - name: secrets-store
               mountPath: "/mnt/secrets-store"
