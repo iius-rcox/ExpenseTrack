@@ -85,8 +85,24 @@ public class ThumbnailService : IThumbnailService
             // Get page dimensions at 150 DPI (native is 72 DPI)
             // Scale factor: 150/72 ≈ 2.08
             var scaleFactor = 150.0 / 72.0;
-            var pageWidth = (int)(pageReader.GetPageWidth() * scaleFactor);
-            var pageHeight = (int)(pageReader.GetPageHeight() * scaleFactor);
+            var nativeWidth = pageReader.GetPageWidth();
+            var nativeHeight = pageReader.GetPageHeight();
+
+            _logger.LogDebug("PDF native page dimensions: {Width}x{Height}", nativeWidth, nativeHeight);
+
+            // Handle PDFs with zero or invalid dimensions (common in some Foxit-generated or malformed PDFs)
+            // Use Letter size (8.5x11 inches at 72 DPI) as fallback
+            if (nativeWidth <= 0 || nativeHeight <= 0)
+            {
+                _logger.LogWarning(
+                    "PDF has invalid page dimensions ({Width}x{Height}), using Letter size fallback",
+                    nativeWidth, nativeHeight);
+                nativeWidth = 612;  // 8.5 inches * 72 DPI
+                nativeHeight = 792; // 11 inches * 72 DPI
+            }
+
+            var pageWidth = Math.Max(1, (int)(nativeWidth * scaleFactor));
+            var pageHeight = Math.Max(1, (int)(nativeHeight * scaleFactor));
 
             _logger.LogDebug("PDF page dimensions at 150 DPI: {Width}x{Height}", pageWidth, pageHeight);
 
@@ -103,6 +119,21 @@ public class ThumbnailService : IThumbnailService
 
             _logger.LogDebug("Rendered PDF page: {Width}x{Height}, {Bytes} bytes raw",
                 renderWidth, renderHeight, rawBytes.Length);
+
+            // Validate rendered dimensions
+            if (renderWidth <= 0 || renderHeight <= 0)
+            {
+                throw new InvalidOperationException(
+                    $"PDF rendered with invalid dimensions: {renderWidth}x{renderHeight}. The PDF may be corrupted or password-protected.");
+            }
+
+            // Validate we have enough pixel data (BGRA = 4 bytes per pixel)
+            var expectedBytes = renderWidth * renderHeight * 4;
+            if (rawBytes == null || rawBytes.Length < expectedBytes)
+            {
+                throw new InvalidOperationException(
+                    $"PDF rendering produced insufficient data. Expected {expectedBytes} bytes, got {rawBytes?.Length ?? 0}. The PDF may be corrupted.");
+            }
 
             // Convert BGRA to RGBA for ImageSharp
             // PDFium returns BGRA, ImageSharp expects RGBA
