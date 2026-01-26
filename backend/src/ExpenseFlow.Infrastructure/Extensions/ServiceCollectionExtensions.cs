@@ -48,6 +48,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IHeicConversionService, HeicConversionService>();
         services.AddScoped<IDocumentIntelligenceService, DocumentIntelligenceService>();
         services.AddScoped<IThumbnailService, ThumbnailService>();
+        services.AddScoped<IThumbnailBackfillService, ThumbnailBackfillJob>();
         services.AddScoped<IReceiptProcessingJob, ProcessReceiptJob>();
 
         // Sprint 4: Statement Import & Fingerprinting
