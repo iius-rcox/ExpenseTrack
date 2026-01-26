@@ -189,6 +189,7 @@ public class ThumbnailBackfillJob : JobBase, IThumbnailBackfillService
         LogJobStart(forceRegenerate ? "ThumbnailRegenerationJob" : "ThumbnailBackfillJob");
 
         int offset = 0; // Used for pagination when regenerating all
+        HashSet<Guid> processedReceiptIds = new(); // Track unique receipts to detect infinite loops
 
         try
         {
@@ -208,10 +209,38 @@ public class ThumbnailBackfillJob : JobBase, IThumbnailBackfillService
                     break;
                 }
 
+                // Defensive check: Detect infinite loop by checking if we're getting the same receipts
+                var newReceiptIds = receipts.Select(r => r.Id).ToList();
+                var duplicateCount = newReceiptIds.Count(id => processedReceiptIds.Contains(id));
+
+                if (duplicateCount == receipts.Count && receipts.Count > 0)
+                {
+                    _logger.LogWarning(
+                        "Infinite loop detected: All {Count} receipts in batch were already processed. " +
+                        "Stopping job. Total unique receipts processed: {UniqueCount}",
+                        receipts.Count, processedReceiptIds.Count);
+                    break;
+                }
+
+                // Track all receipt IDs we've seen
+                foreach (var id in newReceiptIds)
+                {
+                    processedReceiptIds.Add(id);
+                }
+
                 // For regeneration mode, increment offset for next batch
                 if (forceRegenerate)
                 {
                     offset += receipts.Count;
+
+                    // Additional safety: Stop if we've processed more than we should
+                    if (offset > _totalCount * 2 && _totalCount > 0)
+                    {
+                        _logger.LogWarning(
+                            "Safety limit reached: offset {Offset} exceeds 2x total count {TotalCount}. Stopping.",
+                            offset, _totalCount);
+                        break;
+                    }
                 }
 
                 lock (_statusLock)
@@ -220,8 +249,8 @@ public class ThumbnailBackfillJob : JobBase, IThumbnailBackfillService
                 }
 
                 _logger.LogInformation(
-                    "Processing batch {BatchNumber}: {Count} receipts",
-                    _currentBatch, receipts.Count);
+                    "Processing batch {BatchNumber}: {Count} receipts (offset={Offset}, uniqueProcessed={UniqueCount})",
+                    _currentBatch, receipts.Count, offset - receipts.Count, processedReceiptIds.Count);
 
                 foreach (var receipt in receipts)
                 {
