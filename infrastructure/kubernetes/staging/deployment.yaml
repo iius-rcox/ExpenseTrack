@@ -23,7 +23,7 @@ spec:
       serviceAccountName: expenseflow-api
       containers:
         - name: api
-          image: iiusacr.azurecr.io/expenseflow-api:v1.0.3-hangfire-fix
+          image: iiusacr.azurecr.io/expenseflow-api:v1.0.4-hangfire-anon
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
