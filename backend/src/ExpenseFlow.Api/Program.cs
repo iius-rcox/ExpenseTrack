@@ -6,6 +6,7 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
 using Hangfire.PostgreSql;
+using ImageMagick;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
@@ -14,6 +15,14 @@ using Npgsql;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Magick.NET to find Ghostscript for PDF rendering
+// On Linux, Ghostscript is typically at /usr/bin/gs
+var gsPath = Environment.GetEnvironmentVariable("GHOSTSCRIPT_PATH") ?? "/usr/bin";
+if (Directory.Exists(gsPath))
+{
+    MagickNET.SetGhostscriptDirectory(gsPath);
+}
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
