@@ -76,6 +76,13 @@ RUN apt-get update && apt-get install -y \
 # Set Chromium path for PuppeteerSharp
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
+# Set Ghostscript paths for Magick.NET PDF rendering
+# MAGICK_HOME tells Magick.NET where to find delegates
+ENV GHOSTSCRIPT_PATH=/usr/bin
+ENV GS_LIB=/usr/share/ghostscript
+ENV MAGICK_TMPDIR=/tmp
+ENV MAGICK_HOME=/usr
+
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser
 
