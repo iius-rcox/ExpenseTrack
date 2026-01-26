@@ -34,9 +34,11 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim AS runtime
 WORKDIR /app
 
 # Install Chromium and dependencies for PuppeteerSharp (HTML-to-image rendering)
+# Plus Ghostscript for Magick.NET PDF rendering (receipt thumbnails)
 # Plus wget for health checks
 RUN apt-get update && apt-get install -y \
     chromium \
+    ghostscript \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
