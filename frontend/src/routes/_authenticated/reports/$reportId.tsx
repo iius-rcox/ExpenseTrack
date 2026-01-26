@@ -62,6 +62,7 @@ import {
   Loader2,
   X,
   LockOpen,
+  Pencil,
 } from 'lucide-react'
 import { AutoSuggestedBadge, AutoSuggestedSummary } from '@/components/predictions'
 import {
@@ -190,6 +191,12 @@ function ReportDetailPage() {
         <div className="flex items-center gap-2">
           {report.status === 'Draft' && (
             <>
+              <Button variant="outline" asChild>
+                <Link to="/reports/editor" search={{ period: report.period }}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Report
+                </Link>
+              </Button>
               <Button onClick={handleSubmit} disabled={isSubmitting}>
                 {isSubmitting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
