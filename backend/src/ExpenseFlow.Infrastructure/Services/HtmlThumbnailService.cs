@@ -44,8 +44,8 @@ public class HtmlThumbnailService : IHtmlThumbnailService, IAsyncDisposable, IDi
     /// <inheritdoc />
     public async Task<Stream> GenerateThumbnailAsync(
         string htmlContent,
-        int width = 200,
-        int height = 200,
+        int width = 800,
+        int height = 800,
         CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

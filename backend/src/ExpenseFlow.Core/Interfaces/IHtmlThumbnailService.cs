@@ -12,14 +12,14 @@ public interface IHtmlThumbnailService
     /// Renders the HTML in a headless browser and captures a screenshot.
     /// </summary>
     /// <param name="htmlContent">HTML content to render</param>
-    /// <param name="width">Target thumbnail width in pixels (default: 200)</param>
-    /// <param name="height">Target thumbnail height in pixels (default: 200)</param>
+    /// <param name="width">Target thumbnail width in pixels (default: 800 for crisp PDF display)</param>
+    /// <param name="height">Target thumbnail height in pixels (default: 800 for crisp PDF display)</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Stream containing the thumbnail image (JPEG format)</returns>
     Task<Stream> GenerateThumbnailAsync(
         string htmlContent,
-        int width = 200,
-        int height = 200,
+        int width = 800,
+        int height = 800,
         CancellationToken ct = default);
 
     /// <summary>

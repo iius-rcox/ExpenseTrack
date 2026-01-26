@@ -40,8 +40,8 @@ public class ThumbnailService : IThumbnailService
     public async Task<Stream> GenerateThumbnailAsync(
         Stream imageStream,
         string contentType,
-        int width = 200,
-        int height = 200)
+        int width = 800,
+        int height = 800)
     {
         _logger.LogDebug("Generating {Width}x{Height} thumbnail for content type {ContentType}",
             width, height, contentType);
