@@ -16,6 +16,13 @@ public record ThumbnailBackfillRequest
     /// </summary>
     /// <example>["application/pdf", "text/html"]</example>
     public List<string>? ContentTypes { get; init; }
+
+    /// <summary>
+    /// If true, regenerate ALL thumbnails (even existing ones) at current resolution settings.
+    /// Use this after changing thumbnail size defaults to upgrade existing thumbnails.
+    /// Default: false (only process receipts without thumbnails).
+    /// </summary>
+    public bool ForceRegenerate { get; init; } = false;
 }
 
 /// <summary>

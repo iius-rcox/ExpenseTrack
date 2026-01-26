@@ -92,4 +92,20 @@ public interface IReceiptRepository
     /// <param name="contentTypes">Optional list of content types to filter</param>
     /// <returns>List of receipts needing thumbnail generation</returns>
     Task<List<Receipt>> GetReceiptsWithoutThumbnailsAsync(int batchSize, List<string>? contentTypes = null);
+
+    /// <summary>
+    /// Gets count of all receipts with blob URLs (for regeneration).
+    /// </summary>
+    /// <param name="contentTypes">Optional list of content types to filter</param>
+    /// <returns>Count of all receipts with blobs</returns>
+    Task<int> GetAllReceiptsWithBlobsCountAsync(List<string>? contentTypes = null);
+
+    /// <summary>
+    /// Gets a batch of all receipts with blob URLs for thumbnail regeneration.
+    /// </summary>
+    /// <param name="batchSize">Maximum number of receipts to return</param>
+    /// <param name="contentTypes">Optional list of content types to filter</param>
+    /// <param name="offset">Number of receipts to skip (for pagination)</param>
+    /// <returns>List of receipts for thumbnail regeneration</returns>
+    Task<List<Receipt>> GetReceiptsForThumbnailRegenerationAsync(int batchSize, List<string>? contentTypes = null, int offset = 0);
 }

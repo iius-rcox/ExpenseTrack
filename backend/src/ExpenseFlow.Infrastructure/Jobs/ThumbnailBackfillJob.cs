@@ -74,7 +74,11 @@ public class ThumbnailBackfillJob : JobBase, IThumbnailBackfillService
         }
 
         var batchSize = Math.Clamp(request.BatchSize, 1, 500);
-        var estimatedCount = await _receiptRepository.GetReceiptsWithoutThumbnailsCountAsync(request.ContentTypes);
+
+        // Get count based on whether we're regenerating all or just missing
+        var estimatedCount = request.ForceRegenerate
+            ? await _receiptRepository.GetAllReceiptsWithBlobsCountAsync(request.ContentTypes)
+            : await _receiptRepository.GetReceiptsWithoutThumbnailsCountAsync(request.ContentTypes);
 
         if (estimatedCount == 0)
         {
@@ -82,7 +86,9 @@ public class ThumbnailBackfillJob : JobBase, IThumbnailBackfillService
             {
                 JobId = string.Empty,
                 EstimatedCount = 0,
-                Message = "No receipts require thumbnail generation."
+                Message = request.ForceRegenerate
+                    ? "No receipts found for thumbnail regeneration."
+                    : "No receipts require thumbnail generation."
             };
         }
 
@@ -101,7 +107,7 @@ public class ThumbnailBackfillJob : JobBase, IThumbnailBackfillService
 
         // Enqueue the background job
         var jobId = _backgroundJobClient.Enqueue<ThumbnailBackfillJob>(
-            job => job.ProcessBackfillAsync(batchSize, request.ContentTypes, CancellationToken.None));
+            job => job.ProcessBackfillAsync(batchSize, request.ContentTypes, request.ForceRegenerate, CancellationToken.None));
 
         lock (_statusLock)
         {
@@ -109,14 +115,16 @@ public class ThumbnailBackfillJob : JobBase, IThumbnailBackfillService
         }
 
         _logger.LogInformation(
-            "Started thumbnail backfill job {JobId}: {EstimatedCount} receipts, batch size {BatchSize}",
-            jobId, estimatedCount, batchSize);
+            "Started thumbnail backfill job {JobId}: {EstimatedCount} receipts, batch size {BatchSize}, forceRegenerate={ForceRegenerate}",
+            jobId, estimatedCount, batchSize, request.ForceRegenerate);
 
         return new ThumbnailBackfillResponse
         {
             JobId = jobId,
             EstimatedCount = estimatedCount,
-            Message = "Backfill job started successfully."
+            Message = request.ForceRegenerate
+                ? "Thumbnail regeneration job started. All thumbnails will be regenerated at current resolution."
+                : "Backfill job started successfully."
         };
     }
 
@@ -170,24 +178,40 @@ public class ThumbnailBackfillJob : JobBase, IThumbnailBackfillService
     /// <summary>
     /// Processes the backfill job in batches.
     /// </summary>
+    /// <param name="batchSize">Number of receipts per batch</param>
+    /// <param name="contentTypes">Optional content type filter</param>
+    /// <param name="forceRegenerate">If true, regenerate all thumbnails (even existing ones)</param>
+    /// <param name="ct">Cancellation token</param>
     [AutomaticRetry(Attempts = 3, DelaysInSeconds = new[] { 60, 300, 1800 })] // 1min, 5min, 30min
-    public async Task ProcessBackfillAsync(int batchSize, List<string>? contentTypes, CancellationToken ct)
+    public async Task ProcessBackfillAsync(int batchSize, List<string>? contentTypes, bool forceRegenerate, CancellationToken ct)
     {
         var startTime = DateTime.UtcNow;
-        LogJobStart("ThumbnailBackfillJob");
+        LogJobStart(forceRegenerate ? "ThumbnailRegenerationJob" : "ThumbnailBackfillJob");
+
+        int offset = 0; // Used for pagination when regenerating all
 
         try
         {
             while (!ct.IsCancellationRequested)
             {
-                // Get next batch of receipts without thumbnails
-                var receipts = await _receiptRepository.GetReceiptsWithoutThumbnailsAsync(
-                    batchSize, contentTypes);
+                // Get next batch of receipts - either missing thumbnails only, or all receipts
+                var receipts = forceRegenerate
+                    ? await _receiptRepository.GetReceiptsForThumbnailRegenerationAsync(batchSize, contentTypes, offset)
+                    : await _receiptRepository.GetReceiptsWithoutThumbnailsAsync(batchSize, contentTypes);
 
                 if (receipts.Count == 0)
                 {
-                    _logger.LogInformation("Thumbnail backfill complete. No more receipts to process.");
+                    _logger.LogInformation(
+                        forceRegenerate
+                            ? "Thumbnail regeneration complete. All receipts processed."
+                            : "Thumbnail backfill complete. No more receipts to process.");
                     break;
+                }
+
+                // For regeneration mode, increment offset for next batch
+                if (forceRegenerate)
+                {
+                    offset += receipts.Count;
                 }
 
                 lock (_statusLock)

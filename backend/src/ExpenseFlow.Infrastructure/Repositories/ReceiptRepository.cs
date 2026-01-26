@@ -200,4 +200,34 @@ public class ReceiptRepository : IReceiptRepository
             .Take(batchSize)
             .ToListAsync();
     }
+
+    public async Task<int> GetAllReceiptsWithBlobsCountAsync(List<string>? contentTypes = null)
+    {
+        var query = _context.Receipts
+            .Where(r => r.BlobUrl != null);
+
+        if (contentTypes != null && contentTypes.Count > 0)
+        {
+            query = query.Where(r => contentTypes.Contains(r.ContentType));
+        }
+
+        return await query.CountAsync();
+    }
+
+    public async Task<List<Receipt>> GetReceiptsForThumbnailRegenerationAsync(int batchSize, List<string>? contentTypes = null, int offset = 0)
+    {
+        var query = _context.Receipts
+            .Where(r => r.BlobUrl != null);
+
+        if (contentTypes != null && contentTypes.Count > 0)
+        {
+            query = query.Where(r => contentTypes.Contains(r.ContentType));
+        }
+
+        return await query
+            .OrderBy(r => r.CreatedAt)
+            .Skip(offset)
+            .Take(batchSize)
+            .ToListAsync();
+    }
 }
