@@ -45,6 +45,13 @@ spec:
                 name: expenseflow-api
                 port:
                   number: 80
+          - path: /hangfire
+            pathType: Prefix
+            backend:
+              service:
+                name: expenseflow-api
+                port:
+                  number: 80
           # Frontend - catch all
           - path: /
             pathType: Prefix
