@@ -11,9 +11,11 @@ public class HangfireAuthorizationFilter : IDashboardAuthorizationFilter
     public bool Authorize(DashboardContext context)
     {
         var httpContext = context.GetHttpContext();
+        var env = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
 
-        // In development, allow anonymous access for testing
-        if (httpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment())
+        // In development or staging, allow anonymous access for testing/debugging
+        // Production requires Admin role
+        if (env.IsDevelopment() || env.IsEnvironment("Staging"))
         {
             return true;
         }

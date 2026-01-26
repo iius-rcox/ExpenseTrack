@@ -7,9 +7,10 @@ namespace ExpenseFlow.Api.Controllers;
 
 /// <summary>
 /// Administrative endpoints for thumbnail management including backfill operations.
+/// In production, requires Admin role. In staging, allows any authenticated user.
 /// </summary>
 [Route("api/admin/thumbnails")]
-[Authorize(Roles = "Admin")]
+[Authorize] // Role check is done in methods for environment-specific behavior
 public class ThumbnailsController : ApiControllerBase
 {
     private readonly IThumbnailBackfillService _backfillService;
