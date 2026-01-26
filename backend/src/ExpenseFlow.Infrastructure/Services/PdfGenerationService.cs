@@ -183,6 +183,35 @@ public class PdfGenerationService : IPdfGenerationService
                 }
             }
 
+            // Handle PDF source files - use thumbnail if available, otherwise show placeholder
+            // IMPORTANT: Check BEFORE downloading the blob to avoid loading the PDF unnecessarily
+            if (string.Equals(line.Receipt.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogDebug(
+                    "Receipt {ReceiptId} is PDF content type, checking for thumbnail",
+                    line.Receipt.Id);
+
+                if (!string.IsNullOrWhiteSpace(line.Receipt.ThumbnailUrl))
+                {
+                    // Use the thumbnail image (first page preview) instead of the PDF
+                    _logger.LogDebug(
+                        "Using thumbnail for PDF receipt {ReceiptId}: {ThumbnailUrl}",
+                        line.Receipt.Id, line.Receipt.ThumbnailUrl);
+
+                    return await AddThumbnailPageAsync(document, line, lineRef, ct);
+                }
+                else
+                {
+                    // No thumbnail available - create placeholder for PDF receipt
+                    _logger.LogDebug(
+                        "No thumbnail available for PDF receipt {ReceiptId}, adding placeholder",
+                        line.Receipt.Id);
+
+                    AddPdfReceiptPlaceholderWithRef(document, line, lineRef);
+                    return 1;
+                }
+            }
+
             _logger.LogDebug(
                 "Downloading receipt image for line {LineId}, ReceiptId: {ReceiptId}, BlobUrl: {BlobUrl}",
                 line.Id, line.Receipt.Id, line.Receipt.BlobUrl);
@@ -211,34 +240,6 @@ public class PdfGenerationService : IPdfGenerationService
                 if (!ValidateImageDimensions(imageBytes, out validationError))
                 {
                     AddReceiptErrorPageWithRef(document, line, validationError!, lineRef);
-                    return 1;
-                }
-            }
-
-            // Handle PDF source files - use thumbnail if available, otherwise show placeholder
-            if (string.Equals(line.Receipt.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
-            {
-                _logger.LogDebug(
-                    "Receipt {ReceiptId} is PDF content type, checking for thumbnail",
-                    line.Receipt.Id);
-
-                if (!string.IsNullOrWhiteSpace(line.Receipt.ThumbnailUrl))
-                {
-                    // Use the thumbnail image (first page preview) instead of the PDF
-                    _logger.LogDebug(
-                        "Using thumbnail for PDF receipt {ReceiptId}: {ThumbnailUrl}",
-                        line.Receipt.Id, line.Receipt.ThumbnailUrl);
-
-                    return await AddThumbnailPageAsync(document, line, lineRef, ct);
-                }
-                else
-                {
-                    // No thumbnail available - create placeholder for PDF receipt
-                    _logger.LogDebug(
-                        "No thumbnail available for PDF receipt {ReceiptId}, adding placeholder",
-                        line.Receipt.Id);
-
-                    AddPdfReceiptPlaceholderWithRef(document, line, lineRef);
                     return 1;
                 }
             }
