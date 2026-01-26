@@ -31,6 +31,14 @@ public class PdfGenerationService : IPdfGenerationService
     private const double PageHeight = 792;
     private const double Margin = 36; // 0.5 inch margin
 
+    // Grid layout for receipts (6 per page in 2 columns × 3 rows)
+    private const int ReceiptsPerPage = 6;
+    private const int GridColumns = 2;
+    private const int GridRows = 3;
+    private const double GridGapX = 12; // Horizontal gap between cells
+    private const double GridGapY = 10; // Vertical gap between cells
+    private const double GridHeaderHeight = 40; // Space for page header
+
     // Font family name - use a cross-platform compatible font
     // Helvetica is a built-in PDF base font that doesn't require installation
     private const string FontFamily = "Helvetica";
@@ -1117,9 +1125,12 @@ public class PdfGenerationService : IPdfGenerationService
         // Section 1: Generate itemized expense list pages
         var summaryPageCount = AddItemizedSummarySection(document, report, orderedLines);
 
-        // Section 2: Generate receipt pages with line references
+        // Section 2: Generate receipt pages with line references (6 per page grid layout)
         int receiptPageCount = 0;
         int placeholderCount = 0;
+
+        // Collect receipt data for grid rendering
+        var receiptItems = new List<ReceiptGridItem>();
         int lineRef = 0;
 
         foreach (var line in orderedLines)
@@ -1127,18 +1138,36 @@ public class PdfGenerationService : IPdfGenerationService
             ct.ThrowIfCancellationRequested();
             lineRef++;
 
+            var item = new ReceiptGridItem
+            {
+                Line = line,
+                LineRef = lineRef,
+                Report = report
+            };
+
+            // Pre-load image data for receipts
             if (line.HasReceipt && line.Receipt != null)
             {
-                var pagesAdded = await AddReceiptPageWithRefAsync(document, line, lineRef, ct);
-                receiptPageCount += pagesAdded;
+                item.ImageData = await LoadReceiptImageDataAsync(line, ct);
+                if (item.ImageData == null)
+                {
+                    // Track placeholders for receipts that couldn't be loaded
+                    item.IsPlaceholder = true;
+                    item.PlaceholderReason = GetPlaceholderReason(line);
+                }
             }
             else
             {
-                AddPlaceholderPageWithRef(document, line, report, lineRef);
-                receiptPageCount++;
+                item.IsPlaceholder = true;
+                item.PlaceholderReason = "Missing";
                 placeholderCount++;
             }
+
+            receiptItems.Add(item);
         }
+
+        // Render receipts in grid pages (6 per page)
+        receiptPageCount = AddReceiptGridPages(document, receiptItems, report);
 
         // If no receipts at all, add informational page
         if (receiptPageCount == 0)
@@ -1441,6 +1470,297 @@ public class PdfGenerationService : IPdfGenerationService
             XBrushes.Gray,
             new XRect(0, y, PageWidth, 18),
             XStringFormats.TopCenter);
+    }
+
+    /// <summary>
+    /// Data container for receipt grid rendering.
+    /// Holds pre-loaded image data and metadata for each receipt cell.
+    /// </summary>
+    private sealed class ReceiptGridItem
+    {
+        public required ExpenseLine Line { get; init; }
+        public required int LineRef { get; init; }
+        public required ExpenseReport Report { get; init; }
+        public byte[]? ImageData { get; set; }
+        public bool IsPlaceholder { get; set; }
+        public string? PlaceholderReason { get; set; }
+    }
+
+    /// <summary>
+    /// Pre-loads receipt image data for grid rendering.
+    /// Returns null if image cannot be loaded (will show placeholder).
+    /// </summary>
+    private async Task<byte[]?> LoadReceiptImageDataAsync(ExpenseLine line, CancellationToken ct)
+    {
+        if (line.Receipt == null)
+            return null;
+
+        try
+        {
+            // For HTML/PDF receipts, use thumbnail if available
+            if (IsHtmlContentType(line.Receipt.ContentType) ||
+                string.Equals(line.Receipt.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(line.Receipt.ThumbnailUrl))
+                {
+                    using var thumbnailStream = await _blobService.DownloadAsync(line.Receipt.ThumbnailUrl);
+                    using var thumbnailBuffer = new MemoryStream();
+                    await thumbnailStream.CopyToAsync(thumbnailBuffer, ct);
+                    return thumbnailBuffer.ToArray();
+                }
+                return null; // No thumbnail available
+            }
+
+            // For regular images, download from blob storage
+            if (string.IsNullOrWhiteSpace(line.Receipt.BlobUrl))
+                return null;
+
+            using var imageStream = await _blobService.DownloadAsync(line.Receipt.BlobUrl);
+            using var imageBuffer = new MemoryStream();
+            await imageStream.CopyToAsync(imageBuffer, ct);
+            var imageBytes = imageBuffer.ToArray();
+
+            // Validate and convert if needed
+            if (!ValidateImageDimensions(imageBytes, out _))
+                return null;
+
+            // Handle HEIC/HEIF format
+            if (IsHeicFormat(line.Receipt.ContentType, line.Receipt.OriginalFilename))
+            {
+                imageBytes = await ConvertHeicToJpegAsync(imageBytes, ct);
+            }
+
+            return imageBytes;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load receipt image for line {LineId}", line.Id);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets placeholder reason text based on receipt type.
+    /// </summary>
+    private static string GetPlaceholderReason(ExpenseLine line)
+    {
+        if (line.Receipt == null)
+            return "Missing";
+
+        if (IsHtmlContentType(line.Receipt.ContentType))
+            return "Email Receipt";
+
+        if (string.Equals(line.Receipt.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
+            return "PDF Receipt";
+
+        return "Unavailable";
+    }
+
+    /// <summary>
+    /// Renders receipts in a grid layout (6 per page, 2 columns × 3 rows).
+    /// </summary>
+    private int AddReceiptGridPages(PdfDocument document, List<ReceiptGridItem> items, ExpenseReport report)
+    {
+        if (items.Count == 0)
+            return 0;
+
+        // Calculate cell dimensions
+        var availableWidth = PageWidth - (2 * Margin);
+        var availableHeight = PageHeight - (2 * Margin) - GridHeaderHeight;
+
+        var cellWidth = (availableWidth - (GridGapX * (GridColumns - 1))) / GridColumns;
+        var cellHeight = (availableHeight - (GridGapY * (GridRows - 1))) / GridRows;
+
+        // Image area within each cell (leave room for header text)
+        var cellHeaderHeight = 36.0;
+        var imageWidth = cellWidth - 8; // 4pt padding each side
+        var imageHeight = cellHeight - cellHeaderHeight - 8;
+
+        int pageCount = 0;
+        var totalPages = (int)Math.Ceiling((double)items.Count / ReceiptsPerPage);
+
+        for (int pageNum = 0; pageNum < totalPages; pageNum++)
+        {
+            var page = document.AddPage();
+            page.Width = PageWidth;
+            page.Height = PageHeight;
+            pageCount++;
+
+            using var gfx = XGraphics.FromPdfPage(page);
+
+            // Draw page header
+            var fontHeader = new XFont(FontFamily, 11, XFontStyle.Bold);
+            var fontSmall = new XFont(FontFamily, 8, XFontStyle.Regular);
+
+            gfx.DrawString(
+                $"Receipt Images - {report.Period}",
+                fontHeader,
+                XBrushes.Black,
+                new XRect(Margin, Margin, availableWidth, 20),
+                XStringFormats.TopLeft);
+
+            gfx.DrawString(
+                $"Page {pageNum + 1} of {totalPages}",
+                fontSmall,
+                XBrushes.Gray,
+                new XRect(Margin, Margin, availableWidth, 20),
+                XStringFormats.TopRight);
+
+            // Get items for this page
+            var pageItems = items.Skip(pageNum * ReceiptsPerPage).Take(ReceiptsPerPage).ToList();
+
+            for (int i = 0; i < pageItems.Count; i++)
+            {
+                var item = pageItems[i];
+                var col = i % GridColumns;
+                var row = i / GridColumns;
+
+                var cellX = Margin + (col * (cellWidth + GridGapX));
+                var cellY = Margin + GridHeaderHeight + (row * (cellHeight + GridGapY));
+
+                DrawReceiptCell(gfx, item, cellX, cellY, cellWidth, cellHeight, cellHeaderHeight, imageWidth, imageHeight);
+            }
+
+            // Draw page footer
+            gfx.DrawString(
+                "(Numbers correspond to expense line items in the itemized list)",
+                fontSmall,
+                XBrushes.Gray,
+                new XRect(0, PageHeight - Margin + 5, PageWidth, 14),
+                XStringFormats.TopCenter);
+        }
+
+        return pageCount;
+    }
+
+    /// <summary>
+    /// Draws a single receipt cell in the grid layout.
+    /// </summary>
+    private void DrawReceiptCell(
+        XGraphics gfx,
+        ReceiptGridItem item,
+        double cellX,
+        double cellY,
+        double cellWidth,
+        double cellHeight,
+        double headerHeight,
+        double imageWidth,
+        double imageHeight)
+    {
+        var fontRef = new XFont(FontFamily, 11, XFontStyle.Bold);
+        var fontInfo = new XFont(FontFamily, 7, XFontStyle.Regular);
+        var fontPlaceholder = new XFont(FontFamily, 9, XFontStyle.Italic);
+
+        // Draw cell border
+        gfx.DrawRectangle(new XPen(XColors.LightGray, 0.5), cellX, cellY, cellWidth, cellHeight);
+
+        // Draw header with line reference
+        var headerY = cellY + 4;
+
+        // Line reference badge
+        gfx.DrawString(
+            $"#{item.LineRef}",
+            fontRef,
+            item.IsPlaceholder ? XBrushes.DarkOrange : XBrushes.DarkGreen,
+            new XRect(cellX + 4, headerY, 30, 14),
+            XStringFormats.TopLeft);
+
+        // Date and amount on the same line
+        var infoText = $"{item.Line.ExpenseDate:MM/dd/yy} • {item.Line.Amount.ToString("C", UsCulture)}";
+        gfx.DrawString(
+            infoText,
+            fontInfo,
+            XBrushes.DarkGray,
+            new XRect(cellX + 36, headerY + 2, cellWidth - 44, 12),
+            XStringFormats.TopLeft);
+
+        // Vendor name on second line
+        var vendorName = SanitizeForPdf(item.Line.VendorName, 30);
+        if (!string.IsNullOrEmpty(vendorName))
+        {
+            gfx.DrawString(
+                vendorName,
+                fontInfo,
+                XBrushes.Black,
+                new XRect(cellX + 4, headerY + 14, cellWidth - 8, 12),
+                XStringFormats.TopLeft);
+        }
+
+        // Image area starts below header
+        var imageAreaX = cellX + 4;
+        var imageAreaY = cellY + headerHeight;
+
+        if (item.IsPlaceholder || item.ImageData == null)
+        {
+            // Draw placeholder
+            DrawPlaceholderCell(gfx, item, imageAreaX, imageAreaY, imageWidth, imageHeight, fontPlaceholder);
+        }
+        else
+        {
+            // Draw the actual receipt image
+            try
+            {
+                using var imageSource = ImageSharp3ImageSource.FromBytes(item.ImageData);
+                var xImage = XImage.FromImageSource(imageSource);
+
+                // Calculate scaling to fit within cell while maintaining aspect ratio
+                var scale = Math.Min(imageWidth / xImage.PixelWidth, imageHeight / xImage.PixelHeight);
+                var scaledWidth = xImage.PixelWidth * scale;
+                var scaledHeight = xImage.PixelHeight * scale;
+
+                // Center the image in the cell
+                var imgX = imageAreaX + (imageWidth - scaledWidth) / 2;
+                var imgY = imageAreaY + (imageHeight - scaledHeight) / 2;
+
+                gfx.DrawImage(xImage, imgX, imgY, scaledWidth, scaledHeight);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to render receipt image for line {LineRef}", item.LineRef);
+                DrawPlaceholderCell(gfx, item, imageAreaX, imageAreaY, imageWidth, imageHeight, fontPlaceholder);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Draws a placeholder rectangle when receipt image is unavailable.
+    /// </summary>
+    private static void DrawPlaceholderCell(
+        XGraphics gfx,
+        ReceiptGridItem item,
+        double x,
+        double y,
+        double width,
+        double height,
+        XFont font)
+    {
+        // Draw dashed border for placeholder
+        var pen = new XPen(XColors.LightGray, 1) { DashStyle = XDashStyle.Dash };
+        gfx.DrawRectangle(pen, x, y, width, height);
+
+        // Draw placeholder text
+        var placeholderText = item.PlaceholderReason ?? "Unavailable";
+        var brush = item.PlaceholderReason == "Missing" ? XBrushes.DarkOrange : XBrushes.Gray;
+
+        gfx.DrawString(
+            placeholderText,
+            font,
+            brush,
+            new XRect(x, y + (height / 2) - 8, width, 16),
+            XStringFormats.TopCenter);
+
+        // If missing, show justification if available
+        if (item.PlaceholderReason == "Missing" && item.Line.MissingReceiptJustification.HasValue)
+        {
+            var justificationText = GetJustificationText(item.Line.MissingReceiptJustification);
+            var smallFont = new XFont(FontFamily, 6, XFontStyle.Regular);
+            gfx.DrawString(
+                justificationText,
+                smallFont,
+                XBrushes.Gray,
+                new XRect(x, y + (height / 2) + 6, width, 12),
+                XStringFormats.TopCenter);
+        }
     }
 
     /// <summary>
