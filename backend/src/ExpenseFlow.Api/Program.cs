@@ -222,23 +222,13 @@ app.UseAuthorization();
 // Hangfire Dashboard and recurring jobs (skip for test environments)
 if (!app.Environment.IsEnvironment("Testing"))
 {
-    // Use endpoint routing for Hangfire dashboard with AllowAnonymous in non-production
-    // This allows the dashboard to be accessed without JWT authentication in dev/staging
-    var dashboardPath = builder.Configuration.GetValue("Hangfire:DashboardPath", "/hangfire");
-    var dashboardOptions = new DashboardOptions
-    {
-        Authorization = new[] { new ExpenseFlow.Api.Filters.HangfireAuthorizationFilter() },
-        DashboardTitle = "ExpenseFlow Jobs"
-    };
-
-    if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
-    {
-        app.MapHangfireDashboard(dashboardPath, dashboardOptions).AllowAnonymous();
-    }
-    else
-    {
-        app.UseHangfireDashboard(dashboardPath, dashboardOptions);
-    }
+    app.UseHangfireDashboard(
+        builder.Configuration.GetValue("Hangfire:DashboardPath", "/hangfire"),
+        new DashboardOptions
+        {
+            Authorization = new[] { new ExpenseFlow.Api.Filters.HangfireAuthorizationFilter() },
+            DashboardTitle = "ExpenseFlow Jobs"
+        });
 
     // Configure recurring jobs
     RecurringJob.AddOrUpdate<ExpenseFlow.Infrastructure.Jobs.ReferenceDataSyncJob>(

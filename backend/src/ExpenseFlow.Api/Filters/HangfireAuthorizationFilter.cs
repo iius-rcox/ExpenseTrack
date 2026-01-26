@@ -13,20 +13,19 @@ public class HangfireAuthorizationFilter : IDashboardAuthorizationFilter
         var httpContext = context.GetHttpContext();
         var env = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
 
-        // In development or staging, allow anonymous access for testing/debugging
-        // Production requires Admin role
-        if (env.IsDevelopment() || env.IsEnvironment("Staging"))
+        // TEMPORARY: Always allow in non-production for debugging thumbnail backfill
+        // TODO: Restore proper authorization after debugging
+        if (!env.IsProduction())
         {
             return true;
         }
 
-        // Require authentication
+        // Production requires authentication and Admin role
         if (!httpContext.User.Identity?.IsAuthenticated ?? true)
         {
             return false;
         }
 
-        // Check for Admin role
         return httpContext.User.HasClaim("roles", "Admin")
             || httpContext.User.HasClaim("roles", "ExpenseFlow.Admin")
             || httpContext.User.IsInRole("Admin");
