@@ -15,7 +15,7 @@ spec:
   template:
     metadata:
       annotations:
-        kubectl.kubernetes.io/restartedAt: "2026-01-04T04:30:00Z"
+        kubectl.kubernetes.io/restartedAt: "2026-01-26T15:35:00Z"
       labels:
         app: expenseflow-api
         environment: staging
