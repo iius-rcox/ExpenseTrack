@@ -297,7 +297,8 @@ public class ThumbnailBackfillJob : JobBase, IThumbnailBackfillService
 
         try
         {
-            if (receipt.ContentType.Equals("text/html", StringComparison.OrdinalIgnoreCase))
+            if (receipt.ContentType.Equals("text/html", StringComparison.OrdinalIgnoreCase) ||
+                receipt.ContentType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase))
             {
                 // HTML thumbnail generation
                 if (!await _htmlThumbnailService.IsAvailableAsync())

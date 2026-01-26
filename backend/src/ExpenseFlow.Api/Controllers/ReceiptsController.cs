@@ -355,7 +355,8 @@ public class ReceiptsController : ApiControllerBase
         }
 
         // Verify this is an HTML receipt
-        if (!receipt.ContentType.Equals("text/html", StringComparison.OrdinalIgnoreCase))
+        if (!receipt.ContentType.Equals("text/html", StringComparison.OrdinalIgnoreCase) &&
+            !receipt.ContentType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase))
         {
             return BadRequest(new ProblemDetailsResponse
             {
