@@ -22,7 +22,7 @@ namespace ExpenseFlow.Infrastructure.Services;
 /// In containerized environments, the Chromium executable path must be set via
 /// the PUPPETEER_EXECUTABLE_PATH environment variable (configured in Dockerfile).
 /// </remarks>
-public class HtmlThumbnailService : IHtmlThumbnailService, IAsyncDisposable
+public class HtmlThumbnailService : IHtmlThumbnailService, IAsyncDisposable, IDisposable
 {
     private readonly ILogger<HtmlThumbnailService> _logger;
     private readonly int _viewportWidth;
@@ -260,5 +260,14 @@ public class HtmlThumbnailService : IHtmlThumbnailService, IAsyncDisposable
         _browserLock.Dispose();
 
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Synchronous dispose for compatibility with DI container scope disposal.
+    /// Blocks on async disposal to ensure browser is properly cleaned up.
+    /// </summary>
+    public void Dispose()
+    {
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 }
