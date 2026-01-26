@@ -100,7 +100,8 @@ public class ProcessReceiptJob : IReceiptProcessingJob
             // Branch processing based on content type
             ReceiptExtractionResult extractionResult;
 
-            if (receipt.ContentType.Equals("text/html", StringComparison.OrdinalIgnoreCase))
+            if (receipt.ContentType.Equals("text/html", StringComparison.OrdinalIgnoreCase) ||
+                receipt.ContentType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase))
             {
                 // HTML receipt processing via AI extraction
                 extractionResult = await ProcessHtmlReceiptAsync(receipt);
@@ -422,7 +423,8 @@ public class ProcessReceiptJob : IReceiptProcessingJob
         {
             Stream? thumbnailStream = null;
 
-            if (receipt.ContentType.Equals("text/html", StringComparison.OrdinalIgnoreCase))
+            if (receipt.ContentType.Equals("text/html", StringComparison.OrdinalIgnoreCase) ||
+                receipt.ContentType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase))
             {
                 // HTML thumbnail generation via headless browser
                 if (await _htmlThumbnailService.IsAvailableAsync())
