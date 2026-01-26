@@ -76,4 +76,55 @@ public class ThumbnailsController : ApiControllerBase
         var status = await _backfillService.GetStatusAsync();
         return Ok(status);
     }
+
+    /// <summary>
+    /// Internal endpoint to trigger thumbnail regeneration (staging only, no auth required).
+    /// Access via: POST /api/admin/thumbnails/internal/regenerate
+    /// </summary>
+    [HttpPost("internal/regenerate")]
+    [AllowAnonymous]
+    [ApiExplorerSettings(IgnoreApi = true)] // Hide from Swagger
+    public async Task<IActionResult> InternalRegenerate([FromBody] ThumbnailBackfillRequest? request)
+    {
+        // Only allow in non-production environments
+        var env = HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>();
+        if (env.IsProduction())
+        {
+            return NotFound(); // Pretend endpoint doesn't exist in production
+        }
+
+        _logger.LogWarning("Internal regenerate endpoint called - bypassing auth for staging");
+
+        var req = request ?? new ThumbnailBackfillRequest();
+        // Force regeneration when using internal endpoint
+        req = req with { ForceRegenerate = true };
+
+        try
+        {
+            var response = await _backfillService.StartBackfillAsync(req);
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already running"))
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Internal endpoint to check backfill status (staging only, no auth required).
+    /// </summary>
+    [HttpGet("internal/status")]
+    [AllowAnonymous]
+    [ApiExplorerSettings(IgnoreApi = true)]
+    public async Task<IActionResult> InternalStatus()
+    {
+        var env = HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>();
+        if (env.IsProduction())
+        {
+            return NotFound();
+        }
+
+        var status = await _backfillService.GetStatusAsync();
+        return Ok(status);
+    }
 }
