@@ -215,13 +215,32 @@ public class PdfGenerationService : IPdfGenerationService
                 }
             }
 
-            // For PDF source files, we'd need special handling - for now, treat as image
-            if (line.Receipt.ContentType == "application/pdf")
+            // Handle PDF source files - use thumbnail if available, otherwise show placeholder
+            if (string.Equals(line.Receipt.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
             {
-                // PDF embedding would require different handling
-                // For MVP, create a placeholder noting it's a PDF receipt
-                AddPdfReceiptPlaceholderWithRef(document, line, lineRef);
-                return 1;
+                _logger.LogDebug(
+                    "Receipt {ReceiptId} is PDF content type, checking for thumbnail",
+                    line.Receipt.Id);
+
+                if (!string.IsNullOrWhiteSpace(line.Receipt.ThumbnailUrl))
+                {
+                    // Use the thumbnail image (first page preview) instead of the PDF
+                    _logger.LogDebug(
+                        "Using thumbnail for PDF receipt {ReceiptId}: {ThumbnailUrl}",
+                        line.Receipt.Id, line.Receipt.ThumbnailUrl);
+
+                    return await AddThumbnailPageAsync(document, line, lineRef, ct);
+                }
+                else
+                {
+                    // No thumbnail available - create placeholder for PDF receipt
+                    _logger.LogDebug(
+                        "No thumbnail available for PDF receipt {ReceiptId}, adding placeholder",
+                        line.Receipt.Id);
+
+                    AddPdfReceiptPlaceholderWithRef(document, line, lineRef);
+                    return 1;
+                }
             }
 
             // Add image to PDF
@@ -270,11 +289,6 @@ public class PdfGenerationService : IPdfGenerationService
             AddReceiptErrorPageWithRef(document, line, safeMessage, lineRef);
             return 1;
         }
-    }
-
-    private void DrawReceiptHeader(XGraphics gfx, ExpenseLine line)
-    {
-        DrawReceiptHeaderWithRef(gfx, line, null);
     }
 
     /// <summary>
@@ -468,11 +482,6 @@ public class PdfGenerationService : IPdfGenerationService
             XStringFormats.TopLeft);
     }
 
-    private void AddPdfReceiptPlaceholder(PdfDocument document, ExpenseLine line)
-    {
-        AddPdfReceiptPlaceholderWithRef(document, line, null);
-    }
-
     private void AddPdfReceiptPlaceholderWithRef(PdfDocument document, ExpenseLine line, int? lineRef)
     {
         var page = document.AddPage();
@@ -546,7 +555,7 @@ public class PdfGenerationService : IPdfGenerationService
     }
 
     /// <summary>
-    /// Adds a page using the receipt's thumbnail image (for HTML receipts with thumbnails).
+    /// Adds a page using the receipt's thumbnail image (for HTML and PDF receipts with thumbnails).
     /// </summary>
     private async Task<int> AddThumbnailPageAsync(
         PdfDocument document,
@@ -601,10 +610,11 @@ public class PdfGenerationService : IPdfGenerationService
             // Draw thumbnail image
             gfx.DrawImage(xImage, x, y, scaledWidth, scaledHeight);
 
-            // Add note that this is a thumbnail
+            // Add note based on content type
             var fontSmall = new XFont(FontFamily, 8, XFontStyle.Italic);
+            var footnote = GetThumbnailFootnote(line.Receipt.ContentType);
             gfx.DrawString(
-                "(Email receipt - thumbnail preview)",
+                footnote,
                 fontSmall,
                 XBrushes.Gray,
                 new XRect(0, PageHeight - Margin - 10, PageWidth, 12),
@@ -615,12 +625,42 @@ public class PdfGenerationService : IPdfGenerationService
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
-                "Failed to load thumbnail for HTML receipt {ReceiptId}, adding placeholder",
-                line.Receipt?.Id);
+                "Failed to load thumbnail for receipt {ReceiptId} (type: {ContentType}), adding placeholder",
+                line.Receipt?.Id, line.Receipt?.ContentType);
 
-            AddHtmlReceiptPlaceholderWithRef(document, line, lineRef);
+            // Fall back to appropriate placeholder based on content type
+            if (IsHtmlContentType(line.Receipt?.ContentType))
+            {
+                AddHtmlReceiptPlaceholderWithRef(document, line, lineRef);
+            }
+            else if (string.Equals(line.Receipt?.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                AddPdfReceiptPlaceholderWithRef(document, line, lineRef);
+            }
+            else
+            {
+                AddReceiptErrorPageWithRef(document, line, "Thumbnail could not be loaded.", lineRef);
+            }
             return 1;
         }
+    }
+
+    /// <summary>
+    /// Gets the appropriate footnote text for a thumbnail based on the original receipt content type.
+    /// </summary>
+    private static string GetThumbnailFootnote(string? contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+            return "(Thumbnail preview)";
+
+        if (contentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase))
+            return "(PDF receipt - first page preview)";
+
+        if (contentType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase) ||
+            contentType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase))
+            return "(Email receipt - thumbnail preview)";
+
+        return "(Thumbnail preview)";
     }
 
     /// <summary>
