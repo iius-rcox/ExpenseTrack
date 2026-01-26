@@ -35,10 +35,12 @@ WORKDIR /app
 
 # Install Chromium and dependencies for PuppeteerSharp (HTML-to-image rendering)
 # Plus Ghostscript for Magick.NET PDF rendering (receipt thumbnails)
+# Plus ImageMagick for thumbnail generation
 # Plus wget for health checks
 RUN apt-get update && apt-get install -y \
     chromium \
     ghostscript \
+    imagemagick \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -57,7 +59,11 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     wget \
     --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    # Fix ImageMagick security policy to allow PDF processing
+    # Default Debian policy blocks PDF for security, but we need it for receipt thumbnails
+    && sed -i 's/<policy domain="coder" rights="none" pattern="PDF" \/>/<policy domain="coder" rights="read|write" pattern="PDF" \/>/g' /etc/ImageMagick-6/policy.xml 2>/dev/null || true \
+    && sed -i 's/<policy domain="coder" rights="none" pattern="PDF"/<policy domain="coder" rights="read|write" pattern="PDF"/g' /etc/ImageMagick-6/policy.xml 2>/dev/null || true
 
 # Set Chromium path for PuppeteerSharp
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
