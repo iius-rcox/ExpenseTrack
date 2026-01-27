@@ -435,16 +435,29 @@ public class PredictionsController : ApiControllerBase
     /// <returns>Number of patterns rebuilt.</returns>
     [HttpPost("rebuild")]
     [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<int>> RebuildPatterns()
     {
-        var user = await _userService.GetOrCreateUserAsync(User);
-        var patternsCount = await _predictionService.RebuildPatternsAsync(user.Id);
+        try
+        {
+            var user = await _userService.GetOrCreateUserAsync(User);
+            var patternsCount = await _predictionService.RebuildPatternsAsync(user.Id);
 
-        _logger.LogInformation(
-            "Rebuilt {Count} patterns for user {UserId}",
-            patternsCount, user.Id);
+            _logger.LogInformation(
+                "Rebuilt {Count} patterns for user {UserId}",
+                patternsCount, user.Id);
 
-        return Ok(patternsCount);
+            return Ok(patternsCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to rebuild patterns");
+            return StatusCode(500, new ProblemDetailsResponse
+            {
+                Title = "Failed to rebuild patterns",
+                Detail = ex.Message
+            });
+        }
     }
 
     /// <summary>

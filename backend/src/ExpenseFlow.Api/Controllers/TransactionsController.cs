@@ -162,6 +162,22 @@ public class TransactionsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Gets available tags for transaction filtering.
+    /// Currently returns an empty array as tags are not implemented on transactions.
+    /// TODO: Add Tags field to Transaction entity and implement tag management.
+    /// </summary>
+    /// <returns>List of tags (currently empty).</returns>
+    [HttpGet("tags")]
+    [ProducesResponseType(typeof(TransactionTagsResponse), StatusCodes.Status200OK)]
+    public ActionResult<TransactionTagsResponse> GetTags()
+    {
+        // Tags are not currently implemented on transactions.
+        // Frontend expects this endpoint to exist for filter dropdowns.
+        // Return empty array to prevent 404 errors.
+        return Ok(new TransactionTagsResponse { Tags = new List<string>() });
+    }
+
+    /// <summary>
     /// Gets smart filter suggestions based on the user's transaction data.
     /// Analyzes transaction patterns to suggest relevant filters like
     /// top merchants, date ranges, and amount brackets.

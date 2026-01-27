@@ -207,6 +207,17 @@ public class TransactionCategoriesResponse
 }
 
 /// <summary>
+/// Response containing available tags for transaction filtering.
+/// </summary>
+public class TransactionTagsResponse
+{
+    /// <summary>
+    /// List of available tags (currently not implemented).
+    /// </summary>
+    public List<string> Tags { get; set; } = new();
+}
+
+/// <summary>
 /// A suggested filter based on transaction data analysis.
 /// </summary>
 public class FilterSuggestionDto
