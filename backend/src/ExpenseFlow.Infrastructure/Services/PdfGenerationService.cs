@@ -1790,25 +1790,54 @@ public class PdfGenerationService : IPdfGenerationService
         /// Creates an ImageSharp3ImageSource from a byte array using ImageSharp 3.x APIs.
         /// Returns concrete type for proper IDisposable support.
         /// Quality of 95 ensures crisp display at 600px+ resolution in PDF viewers.
+        /// Images with transparency are composited onto a white background since PDFs
+        /// often render transparent areas as black.
         /// </summary>
         public static ImageSharp3ImageSource FromBytes(byte[] imageBytes, int quality = 95)
         {
             using var stream = new MemoryStream(imageBytes);
             var image = Image.Load<Rgba32>(stream);
 
-            // Detect if image has transparency (PNG with alpha channel)
+            // Check if image has any transparent pixels
             var hasTransparency = false;
             if (image.PixelType.AlphaRepresentation != null)
             {
-                // Check a sample of pixels for actual transparency
                 hasTransparency = HasActualTransparency(image);
+            }
+
+            // If image has transparency, composite onto white background
+            // This prevents black backgrounds in PDF viewers which don't handle transparency well
+            if (hasTransparency)
+            {
+                // Alpha-blend each pixel onto white background
+                image.ProcessPixelRows(accessor =>
+                {
+                    for (int y = 0; y < accessor.Height; y++)
+                    {
+                        var row = accessor.GetRowSpan(y);
+                        for (int x = 0; x < row.Length; x++)
+                        {
+                            ref var pixel = ref row[x];
+                            if (pixel.A < 255)
+                            {
+                                // Blend with white: result = fg * alpha + white * (1 - alpha)
+                                float alpha = pixel.A / 255f;
+                                float invAlpha = 1f - alpha;
+                                pixel.R = (byte)(pixel.R * alpha + 255 * invAlpha);
+                                pixel.G = (byte)(pixel.G * alpha + 255 * invAlpha);
+                                pixel.B = (byte)(pixel.B * alpha + 255 * invAlpha);
+                                pixel.A = 255; // Fully opaque
+                            }
+                        }
+                    }
+                });
             }
 
             return new ImageSharp3ImageSource(
                 Guid.NewGuid().ToString(),
                 image,
                 quality,
-                hasTransparency);
+                false); // No longer transparent after compositing
         }
 
         private static bool HasActualTransparency(Image<Rgba32> image)
