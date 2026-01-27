@@ -23,7 +23,7 @@ spec:
       serviceAccountName: expenseflow-api
       containers:
         - name: api
-          image: iiusacr.azurecr.io/expenseflow-api:v2026.01.27-ee1e361
+          image: iiusacr.azurecr.io/expenseflow-api:v2026.01.27-6b0539a
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
