@@ -138,6 +138,10 @@ public class ExpensePredictionService : IExpensePredictionService
 
         foreach (var reportId in reportIds)
         {
+            // Clear change tracker between reports to prevent stale entity tracking
+            // This fixes DbUpdateConcurrencyException when the same vendor appears in multiple reports
+            _dbContext.ChangeTracker.Clear();
+
             totalPatterns += await LearnFromReportAsync(userId, reportId);
         }
 
