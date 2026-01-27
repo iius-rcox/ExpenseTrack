@@ -1584,14 +1584,52 @@ public class PdfGenerationService : IPdfGenerationService
         gfx.DrawLine(thinBorderPen, divider2X, topBoxY, divider2X, topBoxY + topBoxHeight);
 
         // --- LOGO SECTION (Left) ---
-        // Draw stylized "I&I" logo text
-        var logoBrush = new XSolidBrush(logoBlue);
-        gfx.DrawString(
-            _options.CompanyName,
-            fontLogo,
-            logoBrush,
-            new XRect(Margin + 8, topBoxY + 8, 60, 40),
-            XStringFormats.TopLeft);
+        // Draw company logo image from base64
+        if (!string.IsNullOrEmpty(_options.LogoBase64))
+        {
+            try
+            {
+                var logoBytes = Convert.FromBase64String(_options.LogoBase64);
+                var logoImage = XImage.FromStream(() => new MemoryStream(logoBytes));
+
+                // Scale logo to fit within the logo section while maintaining aspect ratio
+                double maxWidth = 55;
+                double maxHeight = 35;
+                double logoWidth = logoImage.PixelWidth;
+                double logoHeight = logoImage.PixelHeight;
+                double scale = Math.Min(maxWidth / logoWidth, maxHeight / logoHeight);
+                double drawWidth = logoWidth * scale;
+                double drawHeight = logoHeight * scale;
+
+                // Center the logo in the logo area
+                double logoX = Margin + 8 + (maxWidth - drawWidth) / 2;
+                double logoY = topBoxY + 8 + (maxHeight - drawHeight) / 2;
+
+                gfx.DrawImage(logoImage, logoX, logoY, drawWidth, drawHeight);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to draw logo image, falling back to text");
+                var logoBrush = new XSolidBrush(logoBlue);
+                gfx.DrawString(
+                    _options.CompanyName,
+                    fontLogo,
+                    logoBrush,
+                    new XRect(Margin + 8, topBoxY + 8, 60, 40),
+                    XStringFormats.TopLeft);
+            }
+        }
+        else
+        {
+            // Fallback to text if no logo configured
+            var logoBrush = new XSolidBrush(logoBlue);
+            gfx.DrawString(
+                _options.CompanyName,
+                fontLogo,
+                logoBrush,
+                new XRect(Margin + 8, topBoxY + 8, 60, 40),
+                XStringFormats.TopLeft);
+        }
 
         // Form label and title
         gfx.DrawString(
