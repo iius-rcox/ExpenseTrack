@@ -115,9 +115,12 @@ public class ExpensePredictionService : IExpensePredictionService
             else
             {
                 // Update existing pattern with exponential decay weighting
+                // Note: We don't call UpdateAsync here because:
+                // 1. EF Core automatically tracks property changes on loaded entities
+                // 2. The pattern might be in Added state (from localPatternCache) - calling Update() would break it
+                // 3. UpdatePatternWithNewOccurrence modifies properties directly, EF detects this
                 var decayWeight = CalculateDecayWeight(report.CreatedAt);
                 UpdatePatternWithNewOccurrence(pattern, line, decayWeight);
-                await _patternRepository.UpdateAsync(pattern);
                 localPatternCache[normalized] = pattern; // Update cache
                 _logger.LogDebug("Updated pattern for vendor {Vendor}, weight {Weight:F3}", normalized, decayWeight);
             }
