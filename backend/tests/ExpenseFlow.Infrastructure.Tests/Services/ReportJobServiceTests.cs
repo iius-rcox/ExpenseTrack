@@ -5,6 +5,7 @@ using ExpenseFlow.Infrastructure.Repositories;
 using ExpenseFlow.Infrastructure.Services;
 using FluentAssertions;
 using Hangfire;
+using Hangfire.States;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;

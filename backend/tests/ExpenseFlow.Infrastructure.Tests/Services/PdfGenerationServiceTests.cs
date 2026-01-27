@@ -19,6 +19,7 @@ public class PdfGenerationServiceTests
 {
     private readonly Mock<IExpenseReportRepository> _reportRepositoryMock;
     private readonly Mock<IBlobStorageService> _blobServiceMock;
+    private readonly Mock<IUserPreferencesService> _preferencesServiceMock;
     private readonly Mock<ILogger<PdfGenerationService>> _loggerMock;
     private readonly IOptions<ExportOptions> _options;
     private readonly PdfGenerationService _service;
@@ -30,6 +31,7 @@ public class PdfGenerationServiceTests
     {
         _reportRepositoryMock = new Mock<IExpenseReportRepository>();
         _blobServiceMock = new Mock<IBlobStorageService>();
+        _preferencesServiceMock = new Mock<IUserPreferencesService>();
         _loggerMock = new Mock<ILogger<PdfGenerationService>>();
 
         _options = Options.Create(new ExportOptions
@@ -40,6 +42,7 @@ public class PdfGenerationServiceTests
         _service = new PdfGenerationService(
             _reportRepositoryMock.Object,
             _blobServiceMock.Object,
+            _preferencesServiceMock.Object,
             _options,
             _loggerMock.Object);
     }

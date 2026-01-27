@@ -1,6 +1,5 @@
 using ExpenseFlow.Infrastructure.Services;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -14,25 +13,13 @@ namespace ExpenseFlow.Infrastructure.Tests.Services;
 public class ThumbnailServiceTests
 {
     private readonly Mock<ILogger<ThumbnailService>> _loggerMock;
-    private readonly IConfiguration _configuration;
     private readonly ThumbnailService _service;
 
     public ThumbnailServiceTests()
     {
         _loggerMock = new Mock<ILogger<ThumbnailService>>();
 
-        var inMemorySettings = new Dictionary<string, string?>
-        {
-            { "ReceiptProcessing:Thumbnail:Width", "150" },
-            { "ReceiptProcessing:Thumbnail:Height", "150" },
-            { "ReceiptProcessing:Thumbnail:Quality", "80" }
-        };
-
-        _configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(inMemorySettings)
-            .Build();
-
-        _service = new ThumbnailService(_configuration, _loggerMock.Object);
+        _service = new ThumbnailService(_loggerMock.Object);
     }
 
     [Theory]

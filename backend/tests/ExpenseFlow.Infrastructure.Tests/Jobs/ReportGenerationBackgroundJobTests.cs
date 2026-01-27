@@ -3,6 +3,7 @@ using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Infrastructure.Data;
 using ExpenseFlow.Infrastructure.Jobs;
 using ExpenseFlow.Infrastructure.Repositories;
+using ExpenseFlow.Shared.DTOs;
 using ExpenseFlow.Shared.Enums;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -55,7 +56,15 @@ public class ReportGenerationBackgroundJobTests : IDisposable
 
         _normalizationServiceMock
             .Setup(s => s.NormalizeAsync(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string desc, Guid _, CancellationToken _) => desc);
+            .ReturnsAsync((string desc, Guid _, CancellationToken _) => new NormalizationResultDto
+            {
+                RawDescription = desc,
+                NormalizedDescription = desc,
+                ExtractedVendor = "Test Vendor",
+                Tier = 1,
+                CacheHit = true,
+                Confidence = 1.0m
+            });
 
         _job = new ReportGenerationBackgroundJob(
             _dbContext,
@@ -142,7 +151,7 @@ public class ReportGenerationBackgroundJobTests : IDisposable
 
         _reportRepositoryMock
             .Setup(r => r.AddAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((ExpenseReport report, CancellationToken _) => report);
 
         // Act
         await _job.ExecuteAsync(reportJob.Id, CancellationToken.None);
@@ -169,8 +178,11 @@ public class ReportGenerationBackgroundJobTests : IDisposable
         ExpenseReport? createdReport = null;
         _reportRepositoryMock
             .Setup(r => r.AddAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()))
-            .Callback<ExpenseReport, CancellationToken>((report, _) => createdReport = report)
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((ExpenseReport report, CancellationToken _) =>
+            {
+                createdReport = report;
+                return report;
+            });
 
         // Act
         await _job.ExecuteAsync(reportJob.Id, CancellationToken.None);
@@ -196,7 +208,7 @@ public class ReportGenerationBackgroundJobTests : IDisposable
 
         _reportRepositoryMock
             .Setup(r => r.AddAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((ExpenseReport report, CancellationToken _) => report);
 
         // Act
         await _job.ExecuteAsync(reportJob.Id, CancellationToken.None);
@@ -236,7 +248,15 @@ public class ReportGenerationBackgroundJobTests : IDisposable
                     job!.Status = ReportJobStatus.CancellationRequested;
                     await _repository.UpdateAsync(job, ct);
                 }
-                return desc;
+                return new NormalizationResultDto
+                {
+                    RawDescription = desc,
+                    NormalizedDescription = desc,
+                    ExtractedVendor = "Test Vendor",
+                    Tier = 1,
+                    CacheHit = true,
+                    Confidence = 1.0m
+                };
             });
 
         // Act
@@ -298,7 +318,7 @@ public class ReportGenerationBackgroundJobTests : IDisposable
 
         _reportRepositoryMock
             .Setup(r => r.AddAsync(It.IsAny<ExpenseReport>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((ExpenseReport report, CancellationToken _) => report);
 
         // Act
         await _job.ExecuteAsync(reportJob.Id, CancellationToken.None);

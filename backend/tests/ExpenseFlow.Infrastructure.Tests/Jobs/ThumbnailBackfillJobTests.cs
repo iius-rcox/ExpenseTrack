@@ -5,6 +5,7 @@ using ExpenseFlow.Shared.DTOs;
 using ExpenseFlow.Shared.Enums;
 using FluentAssertions;
 using Hangfire;
+using Hangfire.States;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
