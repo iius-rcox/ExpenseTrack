@@ -32,7 +32,8 @@ public interface IExpensePredictionService
     Task<int> LearnFromReportsAsync(Guid userId, IEnumerable<Guid> reportIds);
 
     /// <summary>
-    /// Rebuilds all patterns for a user from their historical approved reports.
+    /// Rebuilds all patterns for a user from their historical reports.
+    /// Includes Draft, Generated, and Submitted reports.
     /// Useful for recalculating patterns after configuration changes.
     /// </summary>
     /// <param name="userId">User ID.</param>

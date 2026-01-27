@@ -139,12 +139,14 @@ public class ExpensePredictionService : IExpensePredictionService
     {
         _logger.LogInformation("Rebuilding all patterns for user {UserId}", userId);
 
-        // Get all submitted reports for the user
-        var approvedReportIds = await _dbContext.ExpenseReports
-            .Where(r => r.UserId == userId && r.Status == ReportStatus.Submitted)
+        // Get all reports for the user (Draft, Generated, and Submitted)
+        var allReportIds = await _dbContext.ExpenseReports
+            .Where(r => r.UserId == userId)
             .OrderBy(r => r.CreatedAt)
             .Select(r => r.Id)
             .ToListAsync();
+
+        _logger.LogInformation("Found {Count} reports to learn from for user {UserId}", allReportIds.Count, userId);
 
         // Clear existing patterns
         var existingPatterns = await _patternRepository.GetActiveAsync(userId);
@@ -154,8 +156,8 @@ public class ExpensePredictionService : IExpensePredictionService
         }
         await _patternRepository.SaveChangesAsync();
 
-        // Rebuild from historical reports
-        return await LearnFromReportsAsync(userId, approvedReportIds);
+        // Rebuild from all reports
+        return await LearnFromReportsAsync(userId, allReportIds);
     }
 
     /// <inheritdoc />

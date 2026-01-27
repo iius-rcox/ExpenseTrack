@@ -429,7 +429,8 @@ public class PredictionsController : ApiControllerBase
     }
 
     /// <summary>
-    /// Rebuilds all patterns from historical approved reports.
+    /// Rebuilds all patterns from historical reports (Draft, Generated, and Submitted).
+    /// WARNING: This clears all existing patterns before rebuilding.
     /// </summary>
     /// <returns>Number of patterns rebuilt.</returns>
     [HttpPost("rebuild")]
