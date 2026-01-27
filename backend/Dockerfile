@@ -74,7 +74,10 @@ RUN apt-get update && apt-get install -y \
     && (sed -i '/pattern="XPS"/d' /etc/ImageMagick-7/policy.xml 2>/dev/null || true)
 
 # Set Chromium path for PuppeteerSharp
+# Debian bookworm uses /usr/bin/chromium
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+# Also set HOME for chromium user data directory (needed when running as non-root)
+ENV HOME=/tmp
 
 # Set Ghostscript paths for Magick.NET PDF rendering
 # MAGICK_HOME tells Magick.NET where to find delegates
@@ -85,6 +88,12 @@ ENV MAGICK_HOME=/usr
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser
+
+# Create cache and temp directories for Chromium with proper permissions
+RUN mkdir -p /tmp/.cache /tmp/.config && chmod 777 /tmp/.cache /tmp/.config
+
+# Verify Chromium is installed and accessible
+RUN test -x /usr/bin/chromium && echo "Chromium verified at /usr/bin/chromium"
 
 # Copy published app
 COPY --from=build /app/publish .

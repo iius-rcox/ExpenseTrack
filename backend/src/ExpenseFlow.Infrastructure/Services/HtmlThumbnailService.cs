@@ -164,6 +164,7 @@ public class HtmlThumbnailService : IHtmlThumbnailService, IAsyncDisposable, IDi
         }
 
         await _browserLock.WaitAsync();
+        string? chromiumPath = null;
         try
         {
             // Double-check after acquiring lock
@@ -180,7 +181,7 @@ public class HtmlThumbnailService : IHtmlThumbnailService, IAsyncDisposable, IDi
             _logger.LogInformation("Initializing headless Chromium browser for HTML thumbnails");
 
             // Check for custom executable path (set in Docker environment)
-            var executablePath = Environment.GetEnvironmentVariable("PUPPETEER_EXECUTABLE_PATH");
+            chromiumPath = Environment.GetEnvironmentVariable("PUPPETEER_EXECUTABLE_PATH");
 
             var launchOptions = new LaunchOptions
             {
@@ -196,17 +197,17 @@ public class HtmlThumbnailService : IHtmlThumbnailService, IAsyncDisposable, IDi
                 }
             };
 
-            if (!string.IsNullOrEmpty(executablePath))
+            if (!string.IsNullOrEmpty(chromiumPath))
             {
-                _logger.LogInformation("Using Chromium at custom path: {Path}", executablePath);
-                launchOptions.ExecutablePath = executablePath;
+                _logger.LogInformation("Using Chromium at custom path: {Path}", chromiumPath);
+                launchOptions.ExecutablePath = chromiumPath;
 
                 // Verify the executable exists
-                if (!File.Exists(executablePath))
+                if (!File.Exists(chromiumPath))
                 {
                     _logger.LogError(
                         "Chromium executable not found at {Path}. HTML thumbnails will be unavailable.",
-                        executablePath);
+                        chromiumPath);
                     _browserInitFailed = true;
                     return null;
                 }
@@ -244,7 +245,12 @@ public class HtmlThumbnailService : IHtmlThumbnailService, IAsyncDisposable, IDi
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to initialize Chromium browser. HTML thumbnails will be unavailable.");
+            _logger.LogError(ex,
+                "Failed to initialize Chromium browser at {Path}. Error: {Message}. " +
+                "InnerException: {InnerMessage}. HTML thumbnails will be unavailable.",
+                chromiumPath ?? "bundled",
+                ex.Message,
+                ex.InnerException?.Message ?? "none");
             _browserInitFailed = true;
             return null;
         }
