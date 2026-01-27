@@ -135,12 +135,33 @@ public class ThumbnailService : IThumbnailService
                     $"PDF rendering produced insufficient data. Expected {expectedBytes} bytes, got {rawBytes?.Length ?? 0}. The PDF may be corrupted.");
             }
 
-            // Convert BGRA to RGBA for ImageSharp
-            // PDFium returns BGRA, ImageSharp expects RGBA
+            // Convert BGRA to RGBA and composite onto white background
+            // PDFium returns BGRA with transparent background - we need to blend with white
+            // since JPEG doesn't support transparency (transparent areas would appear black)
             for (int i = 0; i < rawBytes.Length; i += 4)
             {
-                // Swap B and R channels
-                (rawBytes[i], rawBytes[i + 2]) = (rawBytes[i + 2], rawBytes[i]);
+                byte b = rawBytes[i];
+                byte g = rawBytes[i + 1];
+                byte r = rawBytes[i + 2];
+                byte a = rawBytes[i + 3];
+
+                // Alpha blend with white background (255, 255, 255)
+                // Formula: result = foreground * alpha + background * (1 - alpha)
+                // Simplified for white background: result = foreground * alpha/255 + 255 * (1 - alpha/255)
+                if (a < 255)
+                {
+                    float alpha = a / 255f;
+                    float invAlpha = 1f - alpha;
+                    r = (byte)(r * alpha + 255 * invAlpha);
+                    g = (byte)(g * alpha + 255 * invAlpha);
+                    b = (byte)(b * alpha + 255 * invAlpha);
+                }
+
+                // Store as RGBA (swap B and R, set alpha to fully opaque)
+                rawBytes[i] = r;
+                rawBytes[i + 1] = g;
+                rawBytes[i + 2] = b;
+                rawBytes[i + 3] = 255; // Fully opaque after blending
             }
 
             // Create ImageSharp image from raw pixel data
