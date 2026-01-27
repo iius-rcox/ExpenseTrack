@@ -169,6 +169,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IHtmlReceiptExtractionService, HtmlReceiptExtractionService>();
         services.AddScoped<IHtmlThumbnailService, HtmlThumbnailService>();
 
+        // Feature 032: Recurring Allowances
+        services.AddScoped<IAllowanceService, AllowanceService>();
+
         return services;
     }
 }

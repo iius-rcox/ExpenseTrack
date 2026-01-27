@@ -19,6 +19,7 @@ public class ReportService : IReportService
     private readonly IVendorAliasService _vendorAliasService;
     private readonly IDescriptionCacheService _descriptionCacheService;
     private readonly IExpensePredictionService? _predictionService;
+    private readonly IAllowanceService? _allowanceService;
     private readonly ILogger<ReportService> _logger;
 
     public ReportService(
@@ -30,7 +31,8 @@ public class ReportService : IReportService
         IVendorAliasService vendorAliasService,
         IDescriptionCacheService descriptionCacheService,
         ILogger<ReportService> logger,
-        IExpensePredictionService? predictionService = null)
+        IExpensePredictionService? predictionService = null,
+        IAllowanceService? allowanceService = null)
     {
         _reportRepository = reportRepository;
         _matchRepository = matchRepository;
@@ -40,6 +42,7 @@ public class ReportService : IReportService
         _vendorAliasService = vendorAliasService;
         _descriptionCacheService = descriptionCacheService;
         _predictionService = predictionService;
+        _allowanceService = allowanceService;
         _logger = logger;
     }
 
@@ -255,6 +258,52 @@ public class ReportService : IReportService
 
             missingReceiptCount++;
             lines.Add(line);
+        }
+
+        // Feature 032: Process recurring allowances
+        if (_allowanceService != null)
+        {
+            try
+            {
+                var allowances = await _allowanceService.GetActiveAllowancesForPeriodAsync(userId, startDate, endDate, ct);
+                _logger.LogInformation(
+                    "Found {AllowanceCount} allowance occurrences for period {Period}",
+                    allowances.Count, period);
+
+                foreach (var allowance in allowances)
+                {
+                    var allowanceLine = new ExpenseLine
+                    {
+                        // ReportId will be set automatically by EF Core via navigation property
+                        ReceiptId = null,
+                        TransactionId = null,
+                        AllowanceId = allowance.Id,
+                        LineOrder = lineOrder++,
+                        ExpenseDate = startDate, // Use period start date for allowances
+                        Amount = allowance.Amount,
+                        OriginalDescription = allowance.Description ?? $"{allowance.VendorName} Allowance",
+                        NormalizedDescription = allowance.Description ?? $"{allowance.VendorName} Allowance",
+                        VendorName = allowance.VendorName,
+                        GLCode = allowance.GLCode,
+                        GLCodeSuggested = allowance.GLCode,
+                        GLCodeSource = "RecurringAllowance",
+                        DepartmentCode = allowance.DepartmentCode,
+                        DepartmentSuggested = allowance.DepartmentCode,
+                        DepartmentSource = "RecurringAllowance",
+                        HasReceipt = false, // Allowances never have receipts
+                        MissingReceiptJustification = MissingReceiptJustification.DigitalSubscription,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    // Allowances don't count as missing receipts (they're expected to not have receipts)
+                    lines.Add(allowanceLine);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-blocking: allowances are enhancement, not critical
+                _logger.LogWarning(ex, "Failed to get allowances for draft report, continuing without allowances");
+            }
         }
 
         // Set report summary values
@@ -1430,6 +1479,7 @@ public class ReportService : IReportService
             ReportId = line.ReportId,
             ReceiptId = line.ReceiptId,
             TransactionId = line.TransactionId,
+            AllowanceId = line.AllowanceId,
             LineOrder = line.LineOrder,
             ExpenseDate = line.ExpenseDate,
             Amount = line.Amount,

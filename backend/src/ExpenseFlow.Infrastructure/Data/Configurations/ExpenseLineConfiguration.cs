@@ -31,6 +31,10 @@ public class ExpenseLineConfiguration : IEntityTypeConfiguration<ExpenseLine>
             .HasColumnName("transaction_id")
             .IsRequired(false);
 
+        builder.Property(e => e.AllowanceId)
+            .HasColumnName("allowance_id")
+            .IsRequired(false);
+
         builder.Property(e => e.LineOrder)
             .HasColumnName("line_order")
             .IsRequired();
@@ -176,6 +180,11 @@ public class ExpenseLineConfiguration : IEntityTypeConfiguration<ExpenseLine>
             .HasForeignKey(e => e.TransactionId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasOne(e => e.Allowance)
+            .WithMany()
+            .HasForeignKey(e => e.AllowanceId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Self-referencing relationship for split allocations
         builder.HasOne(e => e.ParentLine)
             .WithMany(e => e.ChildAllocations)
@@ -202,10 +211,15 @@ public class ExpenseLineConfiguration : IEntityTypeConfiguration<ExpenseLine>
             .HasDatabaseName("ix_expense_lines_parent")
             .HasFilter("parent_line_id IS NOT NULL");
 
-        // Check constraint: at least one of ReceiptId or TransactionId must be set
+        // Index on AllowanceId for efficient queries on allowance-sourced lines
+        builder.HasIndex(e => e.AllowanceId)
+            .HasDatabaseName("ix_expense_lines_allowance")
+            .HasFilter("allowance_id IS NOT NULL");
+
+        // Check constraint: at least one of ReceiptId, TransactionId, or AllowanceId must be set
         builder.ToTable(t => t.HasCheckConstraint(
             "chk_expense_line_has_source",
-            "receipt_id IS NOT NULL OR transaction_id IS NOT NULL"));
+            "receipt_id IS NOT NULL OR transaction_id IS NOT NULL OR allowance_id IS NOT NULL"));
 
         // Check constraint: tier values must be 1, 2, or 3 if set
         builder.ToTable(t => t.HasCheckConstraint(

@@ -69,6 +69,9 @@ public class ExpenseFlowDbContext : DbContext
     // Feature 028: Transaction Grouping
     public DbSet<TransactionGroup> TransactionGroups => Set<TransactionGroup>();
 
+    // Feature 032: Recurring Allowances
+    public DbSet<RecurringAllowance> RecurringAllowances => Set<RecurringAllowance>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

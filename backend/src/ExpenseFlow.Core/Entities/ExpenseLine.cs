@@ -16,6 +16,9 @@ public class ExpenseLine : BaseEntity
     /// <summary>FK to Transactions</summary>
     public Guid? TransactionId { get; set; }
 
+    /// <summary>FK to RecurringAllowances (if this line is from an allowance)</summary>
+    public Guid? AllowanceId { get; set; }
+
     /// <summary>Display order in report (1-based)</summary>
     public int LineOrder { get; set; }
 
@@ -120,6 +123,7 @@ public class ExpenseLine : BaseEntity
     public ExpenseReport Report { get; set; } = null!;
     public Receipt? Receipt { get; set; }
     public Transaction? Transaction { get; set; }
+    public RecurringAllowance? Allowance { get; set; }
 
     /// <summary>Parent line if this is a split allocation</summary>
     public ExpenseLine? ParentLine { get; set; }

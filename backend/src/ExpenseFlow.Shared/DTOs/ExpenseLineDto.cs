@@ -11,6 +11,7 @@ public class ExpenseLineDto
     public Guid ReportId { get; set; }
     public Guid? ReceiptId { get; set; }
     public Guid? TransactionId { get; set; }
+    public Guid? AllowanceId { get; set; }
     public int LineOrder { get; set; }
     public DateOnly ExpenseDate { get; set; }
     public decimal Amount { get; set; }
@@ -52,6 +53,13 @@ public class ExpenseLineDto
     /// The prediction ID that suggested this line (nullable).
     /// </summary>
     public Guid? PredictionId { get; set; }
+
+    // Allowance tracking (Feature 032 - Recurring Allowances)
+    /// <summary>
+    /// True if this line is from a recurring allowance (e.g., phone, internet).
+    /// Computed from AllowanceId.
+    /// </summary>
+    public bool IsAllowance => AllowanceId.HasValue;
 
     // Split allocation support
     /// <summary>
