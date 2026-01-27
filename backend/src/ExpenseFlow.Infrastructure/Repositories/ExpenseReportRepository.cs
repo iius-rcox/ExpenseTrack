@@ -31,6 +31,7 @@ public class ExpenseReportRepository : IExpenseReportRepository
     {
         return await _context.ExpenseReports
             .AsNoTracking()
+            .Include(r => r.User)
             .Include(r => r.Lines.OrderBy(l => l.LineOrder))
                 .ThenInclude(l => l.Receipt)
             .Include(r => r.Lines)
