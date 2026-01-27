@@ -149,7 +149,7 @@ export function PatternStats({
                     variant="outline"
                     size="sm"
                     onClick={onRebuild}
-                    disabled={isRebuilding || totalCount === 0}
+                    disabled={isRebuilding}
                     className="gap-2"
                   >
                     <RefreshCw
