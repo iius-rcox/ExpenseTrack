@@ -69,12 +69,20 @@ public class ExpensePredictionService : IExpensePredictionService
         }
 
         var patternsUpdated = 0;
+        // Track patterns created during this report to handle duplicate vendors within same report
+        var localPatternCache = new Dictionary<string, ExpensePattern>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var line in report.Lines)
         {
             var vendorName = line.VendorName ?? line.OriginalDescription;
             var normalized = await NormalizeVendorAsync(vendorName);
-            var pattern = await _patternRepository.GetByNormalizedVendorAsync(userId, normalized);
+
+            // Check local cache first (for patterns created in this report iteration)
+            if (!localPatternCache.TryGetValue(normalized, out var pattern))
+            {
+                // Not in local cache, check database
+                pattern = await _patternRepository.GetByNormalizedVendorAsync(userId, normalized);
+            }
 
             if (pattern == null)
             {
@@ -101,6 +109,7 @@ public class ExpensePredictionService : IExpensePredictionService
                 };
 
                 await _patternRepository.AddAsync(pattern);
+                localPatternCache[normalized] = pattern; // Cache for subsequent lines
                 _logger.LogDebug("Created new pattern for vendor {Vendor}", normalized);
             }
             else
@@ -109,6 +118,7 @@ public class ExpensePredictionService : IExpensePredictionService
                 var decayWeight = CalculateDecayWeight(report.CreatedAt);
                 UpdatePatternWithNewOccurrence(pattern, line, decayWeight);
                 await _patternRepository.UpdateAsync(pattern);
+                localPatternCache[normalized] = pattern; // Update cache
                 _logger.LogDebug("Updated pattern for vendor {Vendor}, weight {Weight:F3}", normalized, decayWeight);
             }
 
