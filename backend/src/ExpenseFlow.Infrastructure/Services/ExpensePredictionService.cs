@@ -60,11 +60,11 @@ public class ExpensePredictionService : IExpensePredictionService
 
         var report = await _dbContext.ExpenseReports
             .Include(r => r.Lines)
-            .FirstOrDefaultAsync(r => r.Id == reportId && r.UserId == userId);
+            .FirstOrDefaultAsync(r => r.Id == reportId && r.UserId == userId && !r.IsDeleted);
 
         if (report == null)
         {
-            _logger.LogWarning("Report {ReportId} not found for user {UserId}", reportId, userId);
+            _logger.LogWarning("Report {ReportId} not found or is deleted for user {UserId}", reportId, userId);
             return 0;
         }
 
@@ -156,9 +156,10 @@ public class ExpensePredictionService : IExpensePredictionService
     {
         _logger.LogInformation("Rebuilding all patterns for user {UserId}", userId);
 
-        // Get all reports for the user (Draft, Generated, and Submitted)
+        // Get all non-deleted reports for the user (Draft, Generated, and Submitted)
+        // Excludes soft-deleted reports to prevent learning from removed/discarded expense data
         var allReportIds = await _dbContext.ExpenseReports
-            .Where(r => r.UserId == userId)
+            .Where(r => r.UserId == userId && !r.IsDeleted)
             .OrderBy(r => r.CreatedAt)
             .Select(r => r.Id)
             .ToListAsync();
