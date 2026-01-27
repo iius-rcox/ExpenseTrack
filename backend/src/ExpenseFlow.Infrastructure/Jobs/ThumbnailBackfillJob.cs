@@ -356,11 +356,13 @@ public class ThumbnailBackfillJob : JobBase, IThumbnailBackfillService
                 // HTML thumbnail generation
                 if (!await _htmlThumbnailService.IsAvailableAsync())
                 {
-                    _logger.LogWarning(
-                        "HTML thumbnail service unavailable, skipping receipt {ReceiptId}",
-                        receipt.Id);
-                    return;
+                    // Throw error instead of silently skipping - this is a configuration issue that needs fixing
+                    throw new InvalidOperationException(
+                        $"HTML thumbnail service unavailable for receipt {receipt.Id}. " +
+                        "Check PUPPETEER_EXECUTABLE_PATH environment variable and Chromium installation.");
                 }
+
+                _logger.LogDebug("Generating HTML thumbnail for receipt {ReceiptId}", receipt.Id);
 
                 using var htmlStream = await _blobStorageService.DownloadAsync(receipt.BlobUrl);
                 using var reader = new StreamReader(htmlStream);
@@ -368,6 +370,8 @@ public class ThumbnailBackfillJob : JobBase, IThumbnailBackfillService
 
                 var sanitizedHtml = _htmlSanitizationService.Sanitize(htmlContent);
                 thumbnailStream = await _htmlThumbnailService.GenerateThumbnailAsync(sanitizedHtml, ct: ct);
+
+                _logger.LogDebug("HTML thumbnail generated successfully for receipt {ReceiptId}", receipt.Id);
             }
             else if (_thumbnailService.CanGenerateThumbnail(receipt.ContentType))
             {

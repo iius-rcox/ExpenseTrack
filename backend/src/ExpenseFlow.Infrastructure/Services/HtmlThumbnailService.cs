@@ -198,8 +198,18 @@ public class HtmlThumbnailService : IHtmlThumbnailService, IAsyncDisposable, IDi
 
             if (!string.IsNullOrEmpty(executablePath))
             {
-                _logger.LogDebug("Using Chromium at custom path: {Path}", executablePath);
+                _logger.LogInformation("Using Chromium at custom path: {Path}", executablePath);
                 launchOptions.ExecutablePath = executablePath;
+
+                // Verify the executable exists
+                if (!File.Exists(executablePath))
+                {
+                    _logger.LogError(
+                        "Chromium executable not found at {Path}. HTML thumbnails will be unavailable.",
+                        executablePath);
+                    _browserInitFailed = true;
+                    return null;
+                }
             }
             else
             {
@@ -221,8 +231,14 @@ public class HtmlThumbnailService : IHtmlThumbnailService, IAsyncDisposable, IDi
                 launchOptions.ExecutablePath = installedBrowser.GetExecutablePath();
             }
 
+            _logger.LogInformation(
+                "Launching Chromium browser with executable: {Path}, Args: {Args}",
+                launchOptions.ExecutablePath,
+                string.Join(" ", launchOptions.Args ?? Array.Empty<string>()));
+
             _browser = await Puppeteer.LaunchAsync(launchOptions);
-            _logger.LogInformation("Headless Chromium browser initialized successfully");
+            _logger.LogInformation("Headless Chromium browser initialized successfully at PID: {Pid}",
+                _browser.Process?.Id ?? -1);
 
             return _browser;
         }
