@@ -202,33 +202,46 @@ sed -i '/- name: init-db/a\          resources:\n            requests:\n        
 
 <!-- MANUAL ADDITIONS START -->
 
-## Docker Build Requirements
+## CI/CD Deployment (GitOps)
 
-**CRITICAL**: When building Docker images for AKS deployment, ALWAYS use `--platform linux/amd64`:
+**Deployments are automated via GitHub Actions.** Do NOT build Docker images locally.
 
-```bash
-# ✅ CORRECT - Always use this for AKS deployments
-docker buildx build --platform linux/amd64 -t iiusacr.azurecr.io/IMAGE_NAME:TAG --push .
+### How It Works
 
-# ❌ WRONG - Will fail on AKS (builds for local architecture, e.g., ARM64 on Apple Silicon)
-docker build -t iiusacr.azurecr.io/IMAGE_NAME:TAG .
+```
+Push to main → GitHub Actions builds image → Pushes to ACR → Updates manifest → ArgoCD syncs
 ```
 
-**Why**: The development machine (Apple Silicon Mac) uses ARM64 architecture, but AKS nodes run on AMD64 (x86_64). Without `--platform linux/amd64`, the image manifest won't match and Kubernetes will fail to pull with "no match for platform in manifest".
+| Workflow | Trigger | What It Does |
+|----------|---------|--------------|
+| `cd-deploy.yml` | Push to `main` with `backend/**` or `frontend/**` changes | Builds, pushes, updates manifests |
+| Manual dispatch | GitHub Actions UI | Deploy specific component to specific environment |
 
-### Frontend Deployment Workflow
+### Deploying Changes
 
 ```bash
-# 1. Build AMD64 image and push to ACR
-cd frontend
-docker buildx build --platform linux/amd64 -t iiusacr.azurecr.io/expenseflow-frontend:vX.Y.Z-COMMIT --push .
-
-# 2. Update staging manifest
-# Edit infrastructure/kubernetes/staging/frontend-deployment.yaml with new image tag
-
-# 3. Commit and push (ArgoCD auto-syncs from main branch)
-git add . && git commit -m "chore(deploy): Update staging frontend to vX.Y.Z" && git push origin main
+# Just commit and push - CI/CD handles the rest
+git add .
+git commit -m "fix(api): Your change description"
+git push origin main
 ```
+
+**Monitor deployment:** https://github.com/iius-rcox/ExpenseTrack/actions
+
+### Manual Deployment (Emergency Only)
+
+If CI/CD is broken and you need to deploy manually:
+
+```bash
+# 1. Build with correct platform (AKS requires linux/amd64)
+docker buildx build --platform linux/amd64 -t iiusacr.azurecr.io/expenseflow-api:vX.Y.Z --push .
+
+# 2. Update manifest and push
+# Edit infrastructure/kubernetes/staging/deployment.yaml
+git add . && git commit -m "chore(deploy): Manual deploy vX.Y.Z" && git push origin main
+```
+
+**Note:** Manual builds require Docker Desktop. The CI/CD pipeline builds on GitHub's ubuntu runners, eliminating this dependency.
 
 ## Database Migrations (EF Core)
 
