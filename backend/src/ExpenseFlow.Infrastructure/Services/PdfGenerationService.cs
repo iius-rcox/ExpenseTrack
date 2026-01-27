@@ -1122,26 +1122,67 @@ public class PdfGenerationService : IPdfGenerationService
             .Take(_options.MaxReceiptsPerPdf)
             .ToList();
 
+        // Build mapping of shared receipts (combined transactions)
+        // Key: ReceiptId, Value: list of (lineIndex, LineId) tuples
+        var sharedReceiptMap = new Dictionary<Guid, List<(int lineIndex, Guid lineId)>>();
+        for (int i = 0; i < orderedLines.Count; i++)
+        {
+            var line = orderedLines[i];
+            if (line.HasReceipt && line.ReceiptId.HasValue)
+            {
+                if (!sharedReceiptMap.ContainsKey(line.ReceiptId.Value))
+                    sharedReceiptMap[line.ReceiptId.Value] = new List<(int, Guid)>();
+                sharedReceiptMap[line.ReceiptId.Value].Add((i + 1, line.Id)); // 1-based index
+            }
+        }
+
+        // Identify which receipt groups are combined (more than 1 line)
+        var combinedReceiptIds = sharedReceiptMap
+            .Where(kvp => kvp.Value.Count > 1)
+            .Select(kvp => kvp.Key)
+            .ToHashSet();
+
         // Section 1: Generate itemized expense list pages
-        var summaryPageCount = AddItemizedSummarySection(document, report, orderedLines);
+        var summaryPageCount = AddItemizedSummarySection(document, report, orderedLines, sharedReceiptMap, combinedReceiptIds);
 
         // Section 2: Generate receipt pages with line references (6 per page grid layout)
         int receiptPageCount = 0;
         int placeholderCount = 0;
 
-        // Collect receipt data for grid rendering
+        // Collect receipt data for grid rendering, deduplicating by ReceiptId
+        // Combined transactions (multiple lines sharing one receipt) show as single cell
         var receiptItems = new List<ReceiptGridItem>();
+        var receiptIdToItem = new Dictionary<Guid, ReceiptGridItem>();
         int lineRef = 0;
 
+        // Build mapping of line references and track which receipts are shared
+        var lineRefMap = new Dictionary<Guid, int>(); // LineId -> lineRef
+        foreach (var line in orderedLines)
+        {
+            lineRef++;
+            lineRefMap[line.Id] = lineRef;
+        }
+
+        lineRef = 0;
         foreach (var line in orderedLines)
         {
             ct.ThrowIfCancellationRequested();
             lineRef++;
 
+            // Check if this receipt was already processed (combined transaction)
+            if (line.HasReceipt && line.ReceiptId.HasValue && receiptIdToItem.TryGetValue(line.ReceiptId.Value, out var existingItem))
+            {
+                // Add this line's reference to existing item
+                existingItem.LineRefs.Add(lineRef);
+                existingItem.CombinedAmount += line.Amount;
+                continue; // Skip creating new item - receipt already in grid
+            }
+
             var item = new ReceiptGridItem
             {
                 Line = line,
-                LineRef = lineRef,
+                LineRefs = new List<int> { lineRef },
+                CombinedAmount = line.Amount,
                 Report = report
             };
 
@@ -1154,6 +1195,12 @@ public class PdfGenerationService : IPdfGenerationService
                     // Track placeholders for receipts that couldn't be loaded
                     item.IsPlaceholder = true;
                     item.PlaceholderReason = GetPlaceholderReason(line);
+                }
+
+                // Track by ReceiptId for deduplication
+                if (line.ReceiptId.HasValue)
+                {
+                    receiptIdToItem[line.ReceiptId.Value] = item;
                 }
             }
             else
@@ -1195,7 +1242,12 @@ public class PdfGenerationService : IPdfGenerationService
         };
     }
 
-    private int AddItemizedSummarySection(PdfDocument document, ExpenseReport report, List<ExpenseLine> lines)
+    private int AddItemizedSummarySection(
+        PdfDocument document,
+        ExpenseReport report,
+        List<ExpenseLine> lines,
+        Dictionary<Guid, List<(int lineIndex, Guid lineId)>> sharedReceiptMap,
+        HashSet<Guid> combinedReceiptIds)
     {
         int pageCount = 0;
         var linesPerPage = 30;
@@ -1329,8 +1381,29 @@ public class PdfGenerationService : IPdfGenerationService
                 colX += colWidths[5];
 
                 // Receipt indicator with line reference
-                var receiptIndicator = line.HasReceipt ? $"#{lineIndex}" : "—";
-                var receiptBrush = line.HasReceipt ? XBrushes.DarkGreen : XBrushes.DarkOrange;
+                // For combined receipts, show shared reference (e.g., "★#1" to indicate it's grouped)
+                string receiptIndicator;
+                XBrush receiptBrush;
+
+                if (!line.HasReceipt)
+                {
+                    receiptIndicator = "—";
+                    receiptBrush = XBrushes.DarkOrange;
+                }
+                else if (line.ReceiptId.HasValue && combinedReceiptIds.Contains(line.ReceiptId.Value))
+                {
+                    // Combined receipt - find the first line index in the group (the "primary" reference)
+                    var group = sharedReceiptMap[line.ReceiptId.Value];
+                    var primaryRef = group.OrderBy(g => g.lineIndex).First().lineIndex;
+                    receiptIndicator = lineIndex == primaryRef ? $"★#{primaryRef}" : $"→#{primaryRef}";
+                    receiptBrush = XBrushes.DodgerBlue;
+                }
+                else
+                {
+                    receiptIndicator = $"#{lineIndex}";
+                    receiptBrush = XBrushes.DarkGreen;
+                }
+
                 gfx.DrawString(receiptIndicator, fontSmall, receiptBrush,
                     new XRect(colX, y, colWidths[6], 12), XStringFormats.TopCenter);
 
@@ -1475,15 +1548,57 @@ public class PdfGenerationService : IPdfGenerationService
     /// <summary>
     /// Data container for receipt grid rendering.
     /// Holds pre-loaded image data and metadata for each receipt cell.
+    /// Supports combined transactions where multiple lines share the same receipt.
     /// </summary>
     private sealed class ReceiptGridItem
     {
         public required ExpenseLine Line { get; init; }
-        public required int LineRef { get; init; }
         public required ExpenseReport Report { get; init; }
         public byte[]? ImageData { get; set; }
         public bool IsPlaceholder { get; set; }
         public string? PlaceholderReason { get; set; }
+
+        /// <summary>
+        /// Line reference numbers this receipt covers.
+        /// For combined transactions, contains multiple values (e.g., [1, 2, 3]).
+        /// </summary>
+        public List<int> LineRefs { get; init; } = new();
+
+        /// <summary>
+        /// Combined amount when receipt covers multiple transactions.
+        /// </summary>
+        public decimal CombinedAmount { get; set; }
+
+        /// <summary>
+        /// True if this receipt covers multiple transactions (combined).
+        /// </summary>
+        public bool IsCombined => LineRefs.Count > 1;
+
+        /// <summary>
+        /// Formats line references for display (e.g., "#1, #2, #3" or "#1-3" for consecutive).
+        /// </summary>
+        public string FormatLineRefs()
+        {
+            if (LineRefs.Count == 0) return "";
+            if (LineRefs.Count == 1) return $"#{LineRefs[0]}";
+
+            // Check if consecutive - if so, show as range
+            var sorted = LineRefs.OrderBy(x => x).ToList();
+            bool isConsecutive = true;
+            for (int i = 1; i < sorted.Count; i++)
+            {
+                if (sorted[i] != sorted[i - 1] + 1)
+                {
+                    isConsecutive = false;
+                    break;
+                }
+            }
+
+            if (isConsecutive)
+                return $"#{sorted.First()}-{sorted.Last()}";
+
+            return string.Join(", ", sorted.Select(r => $"#{r}"));
+        }
     }
 
     /// <summary>
@@ -1635,6 +1750,7 @@ public class PdfGenerationService : IPdfGenerationService
 
     /// <summary>
     /// Draws a single receipt cell in the grid layout.
+    /// Supports combined transactions showing multiple line references.
     /// </summary>
     private void DrawReceiptCell(
         XGraphics gfx,
@@ -1647,43 +1763,85 @@ public class PdfGenerationService : IPdfGenerationService
         double imageWidth,
         double imageHeight)
     {
-        var fontRef = new XFont(FontFamily, 11, XFontStyle.Bold);
+        var fontRef = new XFont(FontFamily, item.IsCombined ? 9 : 11, XFontStyle.Bold);
         var fontInfo = new XFont(FontFamily, 7, XFontStyle.Regular);
+        var fontCombined = new XFont(FontFamily, 7, XFontStyle.BoldItalic);
         var fontPlaceholder = new XFont(FontFamily, 9, XFontStyle.Italic);
 
-        // Draw cell border
-        gfx.DrawRectangle(new XPen(XColors.LightGray, 0.5), cellX, cellY, cellWidth, cellHeight);
+        // Draw cell border - use different color for combined transactions
+        var borderPen = item.IsCombined
+            ? new XPen(XColors.DodgerBlue, 1.5)
+            : new XPen(XColors.LightGray, 0.5);
+        gfx.DrawRectangle(borderPen, cellX, cellY, cellWidth, cellHeight);
 
-        // Draw header with line reference
+        // Draw header with line reference(s)
         var headerY = cellY + 4;
 
-        // Line reference badge
+        // Line reference badge(s) - shows "#1-3" or "#1, #2, #3" for combined
+        var lineRefText = item.FormatLineRefs();
+        var lineRefWidth = item.IsCombined ? 60.0 : 30.0;
         gfx.DrawString(
-            $"#{item.LineRef}",
+            lineRefText,
             fontRef,
             item.IsPlaceholder ? XBrushes.DarkOrange : XBrushes.DarkGreen,
-            new XRect(cellX + 4, headerY, 30, 14),
+            new XRect(cellX + 4, headerY, lineRefWidth, 14),
             XStringFormats.TopLeft);
 
-        // Date and amount on the same line
-        var infoText = $"{item.Line.ExpenseDate:MM/dd/yy} • {item.Line.Amount.ToString("C", UsCulture)}";
-        gfx.DrawString(
-            infoText,
-            fontInfo,
-            XBrushes.DarkGray,
-            new XRect(cellX + 36, headerY + 2, cellWidth - 44, 12),
-            XStringFormats.TopLeft);
-
-        // Vendor name on second line
-        var vendorName = SanitizeForPdf(item.Line.VendorName, 30);
-        if (!string.IsNullOrEmpty(vendorName))
+        // For combined transactions, show combined indicator and total amount
+        if (item.IsCombined)
         {
+            // Show "COMBINED" badge
             gfx.DrawString(
-                vendorName,
-                fontInfo,
-                XBrushes.Black,
-                new XRect(cellX + 4, headerY + 14, cellWidth - 8, 12),
+                $"({item.LineRefs.Count} items)",
+                fontCombined,
+                XBrushes.DodgerBlue,
+                new XRect(cellX + lineRefWidth + 4, headerY + 1, 50, 12),
                 XStringFormats.TopLeft);
+
+            // Show combined amount (total of all transactions)
+            var combinedInfo = $"Total: {item.CombinedAmount.ToString("C", UsCulture)}";
+            gfx.DrawString(
+                combinedInfo,
+                fontInfo,
+                XBrushes.DarkGray,
+                new XRect(cellX + 4, headerY + 12, cellWidth - 8, 12),
+                XStringFormats.TopLeft);
+
+            // Vendor name on third line for combined
+            var vendorName = SanitizeForPdf(item.Line.VendorName, 30);
+            if (!string.IsNullOrEmpty(vendorName))
+            {
+                gfx.DrawString(
+                    vendorName,
+                    fontInfo,
+                    XBrushes.Black,
+                    new XRect(cellX + 4, headerY + 22, cellWidth - 8, 12),
+                    XStringFormats.TopLeft);
+            }
+        }
+        else
+        {
+            // Standard single transaction display
+            // Date and amount on the same line
+            var infoText = $"{item.Line.ExpenseDate:MM/dd/yy} • {item.Line.Amount.ToString("C", UsCulture)}";
+            gfx.DrawString(
+                infoText,
+                fontInfo,
+                XBrushes.DarkGray,
+                new XRect(cellX + 36, headerY + 2, cellWidth - 44, 12),
+                XStringFormats.TopLeft);
+
+            // Vendor name on second line
+            var vendorName = SanitizeForPdf(item.Line.VendorName, 30);
+            if (!string.IsNullOrEmpty(vendorName))
+            {
+                gfx.DrawString(
+                    vendorName,
+                    fontInfo,
+                    XBrushes.Black,
+                    new XRect(cellX + 4, headerY + 14, cellWidth - 8, 12),
+                    XStringFormats.TopLeft);
+            }
         }
 
         // Image area starts below header
@@ -1716,7 +1874,7 @@ public class PdfGenerationService : IPdfGenerationService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to render receipt image for line {LineRef}", item.LineRef);
+                _logger.LogWarning(ex, "Failed to render receipt image for lines {LineRefs}", item.FormatLineRefs());
                 DrawPlaceholderCell(gfx, item, imageAreaX, imageAreaY, imageWidth, imageHeight, fontPlaceholder);
             }
         }
