@@ -1269,36 +1269,11 @@ public class PdfGenerationService : IPdfGenerationService
 
             double y = Margin;
 
-            // Title - only on first page
+            // Header - only on first page
             if (pageNum == 0)
             {
-                gfx.DrawString(
-                    $"EXPENSE REPORT - {report.Period}",
-                    fontTitle,
-                    XBrushes.Black,
-                    new XRect(Margin, y, PageWidth - (2 * Margin), 24),
-                    XStringFormats.TopCenter);
-
-                y += 35;
-
-                gfx.DrawString(
-                    $"Employee: {report.User?.DisplayName ?? "Unknown"}",
-                    fontRegular,
-                    XBrushes.Black,
-                    new XRect(Margin, y, PageWidth - (2 * Margin), 16),
-                    XStringFormats.TopLeft);
-
-                y += 20;
-
                 var totalAmount = lines.Sum(l => l.Amount);
-                gfx.DrawString(
-                    $"Total Expenses: {lines.Count} items | Total Amount: {totalAmount.ToString("C", UsCulture)}",
-                    fontRegular,
-                    XBrushes.Black,
-                    new XRect(Margin, y, PageWidth - (2 * Margin), 16),
-                    XStringFormats.TopLeft);
-
-                y += 30;
+                y = DrawFormHeader(gfx, report, totalAmount, lines);
             }
             else
             {
@@ -1543,6 +1518,210 @@ public class PdfGenerationService : IPdfGenerationService
             XBrushes.Gray,
             new XRect(0, y, PageWidth, 18),
             XStringFormats.TopCenter);
+    }
+
+    /// <summary>
+    /// Draws the company form header with logo area, form info, and employee details.
+    /// Matches the I&amp;I Expense &amp; Mileage Reimbursement form design.
+    /// </summary>
+    /// <returns>The Y position after the header for content to continue.</returns>
+    private double DrawFormHeader(
+        XGraphics gfx,
+        ExpenseReport report,
+        decimal totalAmount,
+        List<ExpenseLine> lines)
+    {
+        // Colors
+        var logoBlue = XColor.FromArgb(0, 51, 102); // Dark navy blue for logo
+        var borderPen = new XPen(XColors.Black, 1);
+        var thinBorderPen = new XPen(XColors.Black, 0.5);
+
+        // Fonts
+        var fontLogo = new XFont(FontFamily, 28, XFontStyle.Bold);
+        var fontFormLabel = new XFont(FontFamily, 9, XFontStyle.Regular);
+        var fontFormTitle = new XFont(FontFamily, 12, XFontStyle.Bold);
+        var fontRevision = new XFont(FontFamily, 9, XFontStyle.Regular);
+        var fontRevisionValue = new XFont(FontFamily, 14, XFontStyle.Bold);
+        var fontDateLabel = new XFont(FontFamily, 8, XFontStyle.Regular);
+        var fontDateValue = new XFont(FontFamily, 9, XFontStyle.Bold);
+        var fontInfoLabel = new XFont(FontFamily, 9, XFontStyle.Regular);
+        var fontInfoValue = new XFont(FontFamily, 10, XFontStyle.Regular);
+
+        double y = Margin;
+        double contentWidth = PageWidth - (2 * Margin);
+
+        // ============================================
+        // TOP SECTION: Logo + Form Title + Revision + Dates
+        // ============================================
+        double topBoxHeight = 50;
+        double topBoxY = y;
+
+        // Draw outer border for top box
+        gfx.DrawRectangle(borderPen, Margin, topBoxY, contentWidth, topBoxHeight);
+
+        // Section widths
+        double logoSectionWidth = 280;  // Logo + Form title
+        double revisionSectionWidth = 80;
+        double dateSectionWidth = contentWidth - logoSectionWidth - revisionSectionWidth;
+
+        // Vertical dividers
+        double divider1X = Margin + logoSectionWidth;
+        double divider2X = divider1X + revisionSectionWidth;
+        gfx.DrawLine(thinBorderPen, divider1X, topBoxY, divider1X, topBoxY + topBoxHeight);
+        gfx.DrawLine(thinBorderPen, divider2X, topBoxY, divider2X, topBoxY + topBoxHeight);
+
+        // --- LOGO SECTION (Left) ---
+        // Draw stylized "I&I" logo text
+        var logoBrush = new XSolidBrush(logoBlue);
+        gfx.DrawString(
+            _options.CompanyName,
+            fontLogo,
+            logoBrush,
+            new XRect(Margin + 8, topBoxY + 8, 60, 40),
+            XStringFormats.TopLeft);
+
+        // Form label and title
+        gfx.DrawString(
+            $"{_options.CompanyName} Form:",
+            fontFormLabel,
+            XBrushes.Black,
+            new XRect(Margin + 70, topBoxY + 10, 200, 12),
+            XStringFormats.TopLeft);
+
+        gfx.DrawString(
+            _options.FormName,
+            fontFormTitle,
+            XBrushes.Black,
+            new XRect(Margin + 70, topBoxY + 24, 200, 20),
+            XStringFormats.TopLeft);
+
+        // --- REVISION SECTION (Center) ---
+        gfx.DrawString(
+            "Revision",
+            fontRevision,
+            XBrushes.Black,
+            new XRect(divider1X + 5, topBoxY + 10, revisionSectionWidth - 10, 12),
+            XStringFormats.TopCenter);
+
+        gfx.DrawString(
+            _options.FormRevision,
+            fontRevisionValue,
+            XBrushes.Black,
+            new XRect(divider1X + 5, topBoxY + 24, revisionSectionWidth - 10, 20),
+            XStringFormats.TopCenter);
+
+        // --- DATE SECTION (Right) ---
+        // Horizontal divider in date section
+        double dateMidY = topBoxY + (topBoxHeight / 2);
+        gfx.DrawLine(thinBorderPen, divider2X, dateMidY, Margin + contentWidth, dateMidY);
+
+        // Date Reviewed (top)
+        var generatedDate = report.GeneratedAt?.ToString("M/d/yyyy") ?? DateTime.UtcNow.ToString("M/d/yyyy");
+        gfx.DrawString(
+            "Date Reviewed",
+            fontDateLabel,
+            XBrushes.Black,
+            new XRect(divider2X + 5, topBoxY + 5, 70, 12),
+            XStringFormats.TopLeft);
+        gfx.DrawString(
+            generatedDate,
+            fontDateValue,
+            XBrushes.Black,
+            new XRect(divider2X + 75, topBoxY + 5, dateSectionWidth - 80, 12),
+            XStringFormats.TopRight);
+
+        // Date Issued (bottom)
+        var submittedDate = report.SubmittedAt?.ToString("M/d/yyyy") ?? generatedDate;
+        gfx.DrawString(
+            "Date Issued",
+            fontDateLabel,
+            XBrushes.Black,
+            new XRect(divider2X + 5, dateMidY + 5, 70, 12),
+            XStringFormats.TopLeft);
+        gfx.DrawString(
+            submittedDate,
+            fontDateValue,
+            XBrushes.Black,
+            new XRect(divider2X + 75, dateMidY + 5, dateSectionWidth - 80, 12),
+            XStringFormats.TopRight);
+
+        y = topBoxY + topBoxHeight + 8;
+
+        // ============================================
+        // EMPLOYEE INFO ROW
+        // ============================================
+        double infoRowHeight = 20;
+
+        // Get employee data with fallbacks
+        var employeeId = report.User?.Id.ToString().Substring(0, 8).ToUpper() ?? "N/A";
+        var employeeName = report.User?.DisplayName ?? "Unknown";
+        var reportDate = report.Period; // Use period as the report date
+
+        // Draw employee info row
+        double col1Width = 180;
+        double col2Width = 250;
+        double col3Width = contentWidth - col1Width - col2Width;
+
+        // Employee ID
+        gfx.DrawString("Employee ID:", fontInfoLabel, XBrushes.Black,
+            new XRect(Margin, y, 70, infoRowHeight), XStringFormats.CenterLeft);
+        gfx.DrawString(employeeId, fontInfoValue, XBrushes.Black,
+            new XRect(Margin + 70, y, col1Width - 75, infoRowHeight), XStringFormats.CenterLeft);
+        // Underline
+        gfx.DrawLine(thinBorderPen, Margin + 70, y + infoRowHeight - 2, Margin + col1Width - 10, y + infoRowHeight - 2);
+
+        // Employee Name
+        gfx.DrawString("Employee:", fontInfoLabel, XBrushes.Black,
+            new XRect(Margin + col1Width, y, 60, infoRowHeight), XStringFormats.CenterLeft);
+        gfx.DrawString(employeeName, fontInfoValue, XBrushes.Black,
+            new XRect(Margin + col1Width + 60, y, col2Width - 70, infoRowHeight), XStringFormats.CenterLeft);
+        // Underline
+        gfx.DrawLine(thinBorderPen, Margin + col1Width + 60, y + infoRowHeight - 2, Margin + col1Width + col2Width - 10, y + infoRowHeight - 2);
+
+        // Date
+        gfx.DrawString("Date:", fontInfoLabel, XBrushes.Black,
+            new XRect(Margin + col1Width + col2Width, y, 35, infoRowHeight), XStringFormats.CenterLeft);
+        gfx.DrawString(reportDate, fontInfoValue, XBrushes.Black,
+            new XRect(Margin + col1Width + col2Width + 35, y, col3Width - 40, infoRowHeight), XStringFormats.CenterLeft);
+        // Underline
+        gfx.DrawLine(thinBorderPen, Margin + col1Width + col2Width + 35, y + infoRowHeight - 2, Margin + contentWidth, y + infoRowHeight - 2);
+
+        y += infoRowHeight + 8;
+
+        // ============================================
+        // DEPARTMENT ROW
+        // ============================================
+        // Get department and supervisor data
+        var departmentCode = report.User?.Department ?? lines.FirstOrDefault()?.DepartmentCode ?? "N/A";
+        var supervisorName = _options.DefaultSupervisor;
+
+        // Department
+        gfx.DrawString("Department:", fontInfoLabel, XBrushes.Black,
+            new XRect(Margin, y, 70, infoRowHeight), XStringFormats.CenterLeft);
+        gfx.DrawString(departmentCode, fontInfoValue, XBrushes.Black,
+            new XRect(Margin + 70, y, col1Width - 75, infoRowHeight), XStringFormats.CenterLeft);
+        // Underline
+        gfx.DrawLine(thinBorderPen, Margin + 70, y + infoRowHeight - 2, Margin + col1Width - 10, y + infoRowHeight - 2);
+
+        // Supervisor
+        gfx.DrawString("Supervisor:", fontInfoLabel, XBrushes.Black,
+            new XRect(Margin + col1Width, y, 60, infoRowHeight), XStringFormats.CenterLeft);
+        gfx.DrawString(supervisorName, fontInfoValue, XBrushes.Black,
+            new XRect(Margin + col1Width + 60, y, col2Width - 70, infoRowHeight), XStringFormats.CenterLeft);
+        // Underline
+        gfx.DrawLine(thinBorderPen, Margin + col1Width + 60, y + infoRowHeight - 2, Margin + col1Width + col2Width - 10, y + infoRowHeight - 2);
+
+        // Total
+        gfx.DrawString("Total:", fontInfoLabel, XBrushes.Black,
+            new XRect(Margin + col1Width + col2Width, y, 35, infoRowHeight), XStringFormats.CenterLeft);
+        gfx.DrawString($"$ {totalAmount:N2}", fontInfoValue, XBrushes.Black,
+            new XRect(Margin + col1Width + col2Width + 35, y, col3Width - 40, infoRowHeight), XStringFormats.CenterLeft);
+        // Underline
+        gfx.DrawLine(thinBorderPen, Margin + col1Width + col2Width + 35, y + infoRowHeight - 2, Margin + contentWidth, y + infoRowHeight - 2);
+
+        y += infoRowHeight + 15;
+
+        return y;
     }
 
     /// <summary>

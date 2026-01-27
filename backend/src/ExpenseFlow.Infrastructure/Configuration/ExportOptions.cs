@@ -29,4 +29,24 @@ public class ExportOptions
     /// Date format for Excel export (e.g., "MM/dd/yy").
     /// </summary>
     public string DateFormat { get; set; } = "MM/dd/yy";
+
+    /// <summary>
+    /// Company name displayed in PDF header.
+    /// </summary>
+    public string CompanyName { get; set; } = "I&I";
+
+    /// <summary>
+    /// Form name displayed in PDF header.
+    /// </summary>
+    public string FormName { get; set; } = "Expense & Mileage Reimbursement";
+
+    /// <summary>
+    /// Form revision number displayed in PDF header.
+    /// </summary>
+    public string FormRevision { get; set; } = "1.0";
+
+    /// <summary>
+    /// Default supervisor name when not available.
+    /// </summary>
+    public string DefaultSupervisor { get; set; } = "See Manager";
 }
