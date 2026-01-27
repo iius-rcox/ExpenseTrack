@@ -47,7 +47,7 @@ public class ReportGenerationBackgroundJobTests : IDisposable
         // Default mock setups
         _matchRepositoryMock
             .Setup(r => r.GetConfirmedByPeriodAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>()))
-            .ReturnsAsync(new List<Match>());
+            .ReturnsAsync(new List<ReceiptTransactionMatch>());
 
         _transactionRepositoryMock
             .Setup(r => r.GetUnmatchedByPeriodAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>()))
@@ -114,7 +114,7 @@ public class ReportGenerationBackgroundJobTests : IDisposable
 
         _matchRepositoryMock
             .Setup(r => r.GetConfirmedByPeriodAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>()))
-            .ReturnsAsync(new List<Match>());
+            .ReturnsAsync(new List<ReceiptTransactionMatch>());
 
         _transactionRepositoryMock
             .Setup(r => r.GetUnmatchedByPeriodAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>()))

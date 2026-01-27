@@ -100,7 +100,7 @@ public class ReportServiceTests
 
         SetupMocksForDraftGeneration(matches, unmatchedTransactions);
 
-        var transactionId = matches[0].TransactionId;
+        var transactionId = matches[0].TransactionId!.Value;
         var glSuggestion = new CategorizationSuggestionDto
         {
             Code = "6200",
@@ -952,7 +952,7 @@ public class ReportServiceTests
 
         SetupMocksForDraftGeneration(matches, unmatchedTransactions);
 
-        var transactionId = matches[0].TransactionId;
+        var transactionId = matches[0].TransactionId!.Value;
         var deptSuggestion = new CategorizationSuggestionDto
         {
             Code = "SALES",

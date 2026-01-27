@@ -446,8 +446,8 @@ public class MissingReceiptServiceTests : IDisposable
             ReceiptDismissed = isDismissed ? true : null,
             CreatedAt = DateTime.UtcNow,
             // Required fields
-            RawDescription = "TEST TRANSACTION 12345",
-            PostedDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-6)),
+            OriginalDescription = "TEST TRANSACTION 12345",
+            PostDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-6)),
             DuplicateHash = Guid.NewGuid().ToString()
         };
     }
@@ -465,12 +465,11 @@ public class MissingReceiptServiceTests : IDisposable
             UserId = userId,
             Status = isConfirmed ? PredictionStatus.Confirmed : PredictionStatus.Pending,
             IsManualOverride = isManualOverride,
-            IsReimbursable = true,
-            Confidence = 0.95m,
-            CreatedAt = DateTime.UtcNow,
-            // Required fields
-            PredictedGlAccountCode = "6000",
-            PredictedDepartment = "IT"
+            // TODO: IsReimbursable property was removed from TransactionPrediction entity
+            ConfidenceScore = 0.95m,
+            ConfidenceLevel = PredictionConfidence.High,
+            CreatedAt = DateTime.UtcNow
+            // TODO: PredictedGlAccountCode and PredictedDepartment properties were removed from TransactionPrediction entity
         };
     }
 

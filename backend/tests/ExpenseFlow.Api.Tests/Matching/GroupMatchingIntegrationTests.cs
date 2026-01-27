@@ -247,12 +247,14 @@ public class GroupMatchingIntegrationTests : IClassFixture<CustomWebApplicationF
             Id = receiptId,
             UserId = userId,
             AmountExtracted = receiptAmount,
-            ReceiptDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            DateExtracted = DateOnly.FromDateTime(DateTime.UtcNow),
             MatchStatus = MatchStatus.Unmatched,
-            OriginalFileUrl = "test://receipt.jpg",
-            UploadedAt = DateTime.UtcNow,
+            BlobUrl = "test://receipt.jpg",
+            OriginalFilename = "receipt.jpg",
+            ContentType = "image/jpeg",
+            CreatedAt = DateTime.UtcNow,
             ProcessedAt = DateTime.UtcNow,
-            ProcessingStatus = ProcessingStatus.Processed
+            Status = ReceiptStatus.Ready
         };
         db.Receipts.Add(receipt);
 
@@ -281,8 +283,8 @@ public class GroupMatchingIntegrationTests : IClassFixture<CustomWebApplicationF
                 TransactionDate = DateOnly.FromDateTime(DateTime.UtcNow),
                 Description = $"TWILIO {i + 1}",
                 MatchStatus = MatchStatus.Unmatched,
-                Currency = "USD",
-                CardId = Guid.NewGuid()
+                ImportId = Guid.NewGuid(),
+                OriginalDescription = $"TWILIO {i + 1}"
             };
             db.Transactions.Add(tx);
         }
@@ -304,12 +306,14 @@ public class GroupMatchingIntegrationTests : IClassFixture<CustomWebApplicationF
             Id = receiptId,
             UserId = userId,
             AmountExtracted = receiptAmount,
-            ReceiptDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            DateExtracted = DateOnly.FromDateTime(DateTime.UtcNow),
             MatchStatus = MatchStatus.Unmatched,
-            OriginalFileUrl = "test://receipt.jpg",
-            UploadedAt = DateTime.UtcNow,
+            BlobUrl = "test://receipt.jpg",
+            OriginalFilename = "receipt.jpg",
+            ContentType = "image/jpeg",
+            CreatedAt = DateTime.UtcNow,
             ProcessedAt = DateTime.UtcNow,
-            ProcessingStatus = ProcessingStatus.Processed
+            Status = ReceiptStatus.Ready
         };
         db.Receipts.Add(receipt);
 
@@ -336,8 +340,8 @@ public class GroupMatchingIntegrationTests : IClassFixture<CustomWebApplicationF
             TransactionDate = DateOnly.FromDateTime(DateTime.UtcNow),
             Description = "TWILIO INDIVIDUAL",
             MatchStatus = MatchStatus.Unmatched,
-            Currency = "USD",
-            CardId = Guid.NewGuid()
+            ImportId = Guid.NewGuid(),
+            OriginalDescription = "TWILIO"
         };
         db.Transactions.Add(individualTx);
 
@@ -356,12 +360,14 @@ public class GroupMatchingIntegrationTests : IClassFixture<CustomWebApplicationF
             Id = receiptId,
             UserId = userId,
             AmountExtracted = 75.00m,
-            ReceiptDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            DateExtracted = DateOnly.FromDateTime(DateTime.UtcNow),
             MatchStatus = MatchStatus.Unmatched,
-            OriginalFileUrl = "test://receipt.jpg",
-            UploadedAt = DateTime.UtcNow,
+            BlobUrl = "test://receipt.jpg",
+            OriginalFilename = "receipt.jpg",
+            ContentType = "image/jpeg",
+            CreatedAt = DateTime.UtcNow,
             ProcessedAt = DateTime.UtcNow,
-            ProcessingStatus = ProcessingStatus.Processed
+            Status = ReceiptStatus.Ready
         };
         db.Receipts.Add(receipt);
 
@@ -393,12 +399,14 @@ public class GroupMatchingIntegrationTests : IClassFixture<CustomWebApplicationF
             Id = receiptId,
             UserId = userId,
             AmountExtracted = receiptAmount,
-            ReceiptDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            DateExtracted = DateOnly.FromDateTime(DateTime.UtcNow),
             MatchStatus = MatchStatus.Unmatched,
-            OriginalFileUrl = "test://receipt.jpg",
-            UploadedAt = DateTime.UtcNow,
+            BlobUrl = "test://receipt.jpg",
+            OriginalFilename = "receipt.jpg",
+            ContentType = "image/jpeg",
+            CreatedAt = DateTime.UtcNow,
             ProcessedAt = DateTime.UtcNow,
-            ProcessingStatus = ProcessingStatus.Processed
+            Status = ReceiptStatus.Ready
         };
         db.Receipts.Add(receipt);
 
@@ -425,8 +433,8 @@ public class GroupMatchingIntegrationTests : IClassFixture<CustomWebApplicationF
             TransactionDate = DateOnly.FromDateTime(DateTime.UtcNow),
             Description = "GROUPED VENDOR",
             MatchStatus = MatchStatus.Unmatched,
-            Currency = "USD",
-            CardId = Guid.NewGuid()
+            ImportId = Guid.NewGuid(),
+            OriginalDescription = "TWILIO"
         };
         db.Transactions.Add(tx);
 
@@ -450,12 +458,14 @@ public class GroupMatchingIntegrationTests : IClassFixture<CustomWebApplicationF
             Id = receiptId,
             UserId = userId,
             AmountExtracted = 100.00m,
-            ReceiptDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            DateExtracted = DateOnly.FromDateTime(DateTime.UtcNow),
             MatchStatus = MatchStatus.Matched,
-            OriginalFileUrl = "test://receipt.jpg",
-            UploadedAt = DateTime.UtcNow,
+            BlobUrl = "test://receipt.jpg",
+            OriginalFilename = "receipt.jpg",
+            ContentType = "image/jpeg",
+            CreatedAt = DateTime.UtcNow,
             ProcessedAt = DateTime.UtcNow,
-            ProcessingStatus = ProcessingStatus.Processed
+            Status = ReceiptStatus.Ready
         };
         db.Receipts.Add(receipt);
 
