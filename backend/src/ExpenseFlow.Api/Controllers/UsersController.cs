@@ -57,7 +57,10 @@ public class UsersController : ApiControllerBase
             {
                 Theme = prefs.Theme,
                 DefaultDepartmentId = prefs.DefaultDepartmentId,
-                DefaultProjectId = prefs.DefaultProjectId
+                DefaultProjectId = prefs.DefaultProjectId,
+                EmployeeId = prefs.EmployeeId,
+                SupervisorName = prefs.SupervisorName,
+                DepartmentName = prefs.DepartmentName
             }
         };
 
@@ -86,7 +89,10 @@ public class UsersController : ApiControllerBase
         {
             Theme = prefs.Theme,
             DefaultDepartmentId = prefs.DefaultDepartmentId,
-            DefaultProjectId = prefs.DefaultProjectId
+            DefaultProjectId = prefs.DefaultProjectId,
+            EmployeeId = prefs.EmployeeId,
+            SupervisorName = prefs.SupervisorName,
+            DepartmentName = prefs.DepartmentName
         });
     }
 
@@ -119,7 +125,10 @@ public class UsersController : ApiControllerBase
             {
                 Theme = prefs.Theme,
                 DefaultDepartmentId = prefs.DefaultDepartmentId,
-                DefaultProjectId = prefs.DefaultProjectId
+                DefaultProjectId = prefs.DefaultProjectId,
+                EmployeeId = prefs.EmployeeId,
+                SupervisorName = prefs.SupervisorName,
+                DepartmentName = prefs.DepartmentName
             });
         }
         catch (ArgumentException ex)

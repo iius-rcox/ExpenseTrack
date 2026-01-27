@@ -110,6 +110,24 @@ public class UserPreferencesService : IUserPreferencesService
             prefs.DefaultProjectId = request.DefaultProjectId;
         }
 
+        // Update EmployeeId if provided (simple string, no validation needed)
+        if (request.EmployeeIdProvided)
+        {
+            prefs.EmployeeId = request.EmployeeId?.Trim();
+        }
+
+        // Update SupervisorName if provided (simple string, no validation needed)
+        if (request.SupervisorNameProvided)
+        {
+            prefs.SupervisorName = request.SupervisorName?.Trim();
+        }
+
+        // Update DepartmentName if provided (simple string, no validation needed)
+        if (request.DepartmentNameProvided)
+        {
+            prefs.DepartmentName = request.DepartmentName?.Trim();
+        }
+
         prefs.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync();
 

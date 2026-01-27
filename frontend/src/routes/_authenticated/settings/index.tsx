@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   useUserInfo,
@@ -63,6 +63,8 @@ import {
   Moon,
   Sun,
   Monitor,
+  FileText,
+  UserCog,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/settings/')({
@@ -87,6 +89,22 @@ function SettingsPage() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null)
+
+  // Report preferences form state
+  const [employeeId, setEmployeeId] = useState('')
+  const [supervisorName, setSupervisorName] = useState('')
+  const [departmentName, setDepartmentName] = useState('')
+  const [reportPrefsEdited, setReportPrefsEdited] = useState(false)
+
+  // Sync report preferences form state with fetched preferences
+  useEffect(() => {
+    if (preferences) {
+      setEmployeeId(preferences.employeeId || '')
+      setSupervisorName(preferences.supervisorName || '')
+      setDepartmentName(preferences.departmentName || '')
+      setReportPrefsEdited(false)
+    }
+  }, [preferences])
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
     updatePreferences({ theme }, {
@@ -192,6 +210,32 @@ function SettingsPage() {
         },
         onError: () => {
           toast.error('Failed to update category')
+        },
+      }
+    )
+  }
+
+  const handleReportPrefsChange = (field: 'employeeId' | 'supervisorName' | 'departmentName', value: string) => {
+    setReportPrefsEdited(true)
+    if (field === 'employeeId') setEmployeeId(value)
+    else if (field === 'supervisorName') setSupervisorName(value)
+    else if (field === 'departmentName') setDepartmentName(value)
+  }
+
+  const handleSaveReportPrefs = () => {
+    updatePreferences(
+      {
+        employeeId: employeeId || undefined,
+        supervisorName: supervisorName || undefined,
+        departmentName: departmentName || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success('Report preferences saved')
+          setReportPrefsEdited(false)
+        },
+        onError: () => {
+          toast.error('Failed to save report preferences')
         },
       }
     )
@@ -350,6 +394,69 @@ function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Report Preferences - Employee Info for PDF Header */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Report Preferences
+            </CardTitle>
+            <CardDescription>
+              Your information for expense report PDF headers
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="employee-id">Employee ID</Label>
+                  <Input
+                    id="employee-id"
+                    placeholder="e.g., EMP-001"
+                    value={employeeId}
+                    onChange={(e) => handleReportPrefsChange('employeeId', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="supervisor-name">Supervisor</Label>
+                  <Input
+                    id="supervisor-name"
+                    placeholder="e.g., John Smith"
+                    value={supervisorName}
+                    onChange={(e) => handleReportPrefsChange('supervisorName', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="department-name">Department Name</Label>
+                  <Input
+                    id="department-name"
+                    placeholder="e.g., Engineering"
+                    value={departmentName}
+                    onChange={(e) => handleReportPrefsChange('departmentName', e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This appears in the PDF header. Different from your default department selection above.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleSaveReportPrefs}
+                  disabled={!reportPrefsEdited || updatingPrefs}
+                  className="w-full"
+                >
+                  {updatingPrefs && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Report Preferences
+                </Button>
               </>
             )}
           </CardContent>

@@ -35,6 +35,18 @@ public class UserPreferencesConfiguration : IEntityTypeConfiguration<UserPrefere
         builder.Property(p => p.DefaultProjectId)
             .HasColumnName("default_project_id");
 
+        builder.Property(p => p.EmployeeId)
+            .HasColumnName("employee_id")
+            .HasMaxLength(50);
+
+        builder.Property(p => p.SupervisorName)
+            .HasColumnName("supervisor_name")
+            .HasMaxLength(100);
+
+        builder.Property(p => p.DepartmentName)
+            .HasColumnName("department_name")
+            .HasMaxLength(100);
+
         builder.Property(p => p.CreatedAt)
             .HasColumnName("created_at")
             .HasDefaultValueSql("NOW()")

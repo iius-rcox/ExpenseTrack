@@ -555,6 +555,12 @@ export interface UserPreferences {
   defaultDepartment?: string
   defaultProject?: string
   theme: 'light' | 'dark' | 'system'
+  /** User's employee ID for expense reports (displayed in PDF header) */
+  employeeId?: string
+  /** User's supervisor name for expense reports (displayed in PDF header) */
+  supervisorName?: string
+  /** User's department name for expense reports (displayed in PDF header) */
+  departmentName?: string
 }
 
 // Dashboard Types

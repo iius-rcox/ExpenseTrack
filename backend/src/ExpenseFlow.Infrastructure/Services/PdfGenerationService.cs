@@ -23,6 +23,7 @@ public class PdfGenerationService : IPdfGenerationService
 {
     private readonly IExpenseReportRepository _reportRepository;
     private readonly IBlobStorageService _blobService;
+    private readonly IUserPreferencesService _preferencesService;
     private readonly ExportOptions _options;
     private readonly ILogger<PdfGenerationService> _logger;
 
@@ -55,11 +56,13 @@ public class PdfGenerationService : IPdfGenerationService
     public PdfGenerationService(
         IExpenseReportRepository reportRepository,
         IBlobStorageService blobService,
+        IUserPreferencesService preferencesService,
         IOptions<ExportOptions> options,
         ILogger<PdfGenerationService> logger)
     {
         _reportRepository = reportRepository;
         _blobService = blobService;
+        _preferencesService = preferencesService;
         _options = options.Value;
         _logger = logger;
     }
@@ -1110,6 +1113,13 @@ public class PdfGenerationService : IPdfGenerationService
         var report = await _reportRepository.GetByIdWithLinesAsync(reportId, ct)
             ?? throw new InvalidOperationException($"Report {reportId} not found");
 
+        // Load user preferences for PDF header customization
+        UserPreferences? userPrefs = null;
+        if (report.UserId != Guid.Empty)
+        {
+            userPrefs = await _preferencesService.GetOrCreateDefaultsAsync(report.UserId);
+        }
+
         using var document = new PdfDocument();
         document.Info.Title = $"Expense Report - {report.Period}";
         document.Info.Author = report.User?.DisplayName ?? "ExpenseFlow";
@@ -1143,7 +1153,7 @@ public class PdfGenerationService : IPdfGenerationService
             .ToHashSet();
 
         // Section 1: Generate itemized expense list pages
-        var summaryPageCount = AddItemizedSummarySection(document, report, orderedLines, sharedReceiptMap, combinedReceiptIds);
+        var summaryPageCount = AddItemizedSummarySection(document, report, orderedLines, sharedReceiptMap, combinedReceiptIds, userPrefs);
 
         // Section 2: Generate receipt pages with line references (6 per page grid layout)
         int receiptPageCount = 0;
@@ -1247,7 +1257,8 @@ public class PdfGenerationService : IPdfGenerationService
         ExpenseReport report,
         List<ExpenseLine> lines,
         Dictionary<Guid, List<(int lineIndex, Guid lineId)>> sharedReceiptMap,
-        HashSet<Guid> combinedReceiptIds)
+        HashSet<Guid> combinedReceiptIds,
+        UserPreferences? userPrefs)
     {
         int pageCount = 0;
         var linesPerPage = 30;
@@ -1273,7 +1284,7 @@ public class PdfGenerationService : IPdfGenerationService
             if (pageNum == 0)
             {
                 var totalAmount = lines.Sum(l => l.Amount);
-                y = DrawFormHeader(gfx, report, totalAmount, lines);
+                y = DrawFormHeader(gfx, report, totalAmount, lines, userPrefs);
             }
             else
             {
@@ -1523,13 +1534,15 @@ public class PdfGenerationService : IPdfGenerationService
     /// <summary>
     /// Draws the company form header with logo area, form info, and employee details.
     /// Matches the I&amp;I Expense &amp; Mileage Reimbursement form design.
+    /// Uses user preferences for employee info when available.
     /// </summary>
     /// <returns>The Y position after the header for content to continue.</returns>
     private double DrawFormHeader(
         XGraphics gfx,
         ExpenseReport report,
         decimal totalAmount,
-        List<ExpenseLine> lines)
+        List<ExpenseLine> lines,
+        UserPreferences? userPrefs)
     {
         // Colors
         var logoBlue = XColor.FromArgb(0, 51, 102); // Dark navy blue for logo
@@ -1652,8 +1665,10 @@ public class PdfGenerationService : IPdfGenerationService
         // ============================================
         double infoRowHeight = 20;
 
-        // Get employee data with fallbacks
-        var employeeId = report.User?.Id.ToString().Substring(0, 8).ToUpper() ?? "N/A";
+        // Get employee data with fallbacks - prefer user preferences, then user entity, then defaults
+        var employeeId = userPrefs?.EmployeeId
+            ?? report.User?.Id.ToString().Substring(0, 8).ToUpper()
+            ?? "N/A";
         var employeeName = report.User?.DisplayName ?? "Unknown";
         var reportDate = report.Period; // Use period as the report date
 
@@ -1691,9 +1706,12 @@ public class PdfGenerationService : IPdfGenerationService
         // ============================================
         // DEPARTMENT ROW
         // ============================================
-        // Get department and supervisor data
-        var departmentCode = report.User?.Department ?? lines.FirstOrDefault()?.DepartmentCode ?? "N/A";
-        var supervisorName = _options.DefaultSupervisor;
+        // Get department and supervisor data - prefer user preferences, then existing fields, then defaults
+        var departmentCode = userPrefs?.DepartmentName
+            ?? report.User?.Department
+            ?? lines.FirstOrDefault()?.DepartmentCode
+            ?? "N/A";
+        var supervisorName = userPrefs?.SupervisorName ?? _options.DefaultSupervisor;
 
         // Department
         gfx.DrawString("Department:", fontInfoLabel, XBrushes.Black,

@@ -1527,6 +1527,21 @@ namespace ExpenseFlow.Infrastructure.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("default_project_id");
 
+                    b.Property<string>("DepartmentName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("department_name");
+
+                    b.Property<string>("EmployeeId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("SupervisorName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("supervisor_name");
+
                     b.Property<string>("Theme")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

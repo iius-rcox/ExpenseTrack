@@ -11,6 +11,9 @@ public class UpdatePreferencesRequest
 {
     private Guid? _defaultDepartmentId;
     private Guid? _defaultProjectId;
+    private string? _employeeId;
+    private string? _supervisorName;
+    private string? _departmentName;
 
     /// <summary>
     /// Theme preference. Valid values: "light", "dark", "system".
@@ -54,4 +57,61 @@ public class UpdatePreferencesRequest
     /// </summary>
     [JsonIgnore]
     public bool DefaultProjectIdProvided { get; private set; }
+
+    /// <summary>
+    /// User's employee ID for expense reports. Set to null to clear.
+    /// </summary>
+    public string? EmployeeId
+    {
+        get => _employeeId;
+        set
+        {
+            _employeeId = value;
+            EmployeeIdProvided = true;
+        }
+    }
+
+    /// <summary>
+    /// User's supervisor name for expense reports. Set to null to clear.
+    /// </summary>
+    public string? SupervisorName
+    {
+        get => _supervisorName;
+        set
+        {
+            _supervisorName = value;
+            SupervisorNameProvided = true;
+        }
+    }
+
+    /// <summary>
+    /// User's department name for expense reports. Set to null to clear.
+    /// </summary>
+    public string? DepartmentName
+    {
+        get => _departmentName;
+        set
+        {
+            _departmentName = value;
+            DepartmentNameProvided = true;
+        }
+    }
+
+    /// <summary>
+    /// Indicates whether EmployeeId was explicitly provided in the request.
+    /// </summary>
+    [JsonIgnore]
+    public bool EmployeeIdProvided { get; private set; }
+
+    /// <summary>
+    /// Indicates whether SupervisorName was explicitly provided in the request.
+    /// </summary>
+    [JsonIgnore]
+    public bool SupervisorNameProvided { get; private set; }
+
+    /// <summary>
+    /// Indicates whether DepartmentName was explicitly provided in the request.
+    /// </summary>
+    [JsonIgnore]
+    public bool DepartmentNameProvided { get; private set; }
 }
