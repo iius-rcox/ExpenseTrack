@@ -64,7 +64,6 @@ import {
   Sun,
   Monitor,
   FileText,
-  UserCog,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/settings/')({
