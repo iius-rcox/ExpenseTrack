@@ -219,8 +219,8 @@ public class MatchingServiceGroupTests
     [Theory]
     [Trait("Category", "Unit")]
     [Trait("Story", "US1")]
-    [InlineData("", "")]
-    [InlineData("   ", "")]
+    [InlineData("")]
+    [InlineData("   ")]
     public void ExtractVendorFromGroupName_EmptyOrWhitespace_ReturnsEmpty(string groupName)
     {
         // Act
