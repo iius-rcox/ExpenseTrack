@@ -64,7 +64,10 @@ import {
   Sun,
   Monitor,
   FileText,
+  Repeat,
 } from 'lucide-react'
+import { AllowanceList } from '@/components/settings/allowance-list'
+import { AllowanceFormDialog } from '@/components/settings/allowance-form-dialog'
 
 export const Route = createFileRoute('/_authenticated/settings/')({
   component: SettingsPage,
@@ -88,6 +91,9 @@ function SettingsPage() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null)
+
+  // Allowance dialog state
+  const [allowanceDialogOpen, setAllowanceDialogOpen] = useState(false)
 
   // Report preferences form state
   const [employeeId, setEmployeeId] = useState('')
@@ -395,6 +401,35 @@ function SettingsPage() {
                 </div>
               </>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Recurring Allowances */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Repeat className="h-5 w-5" />
+              Recurring Allowances
+            </CardTitle>
+            <CardDescription>
+              Pre-configure recurring expenses for automatic categorization
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAllowanceDialogOpen(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Allowance
+            </Button>
+            <Separator />
+            <AllowanceList />
+            <AllowanceFormDialog
+              open={allowanceDialogOpen}
+              onOpenChange={setAllowanceDialogOpen}
+            />
           </CardContent>
         </Card>
 
