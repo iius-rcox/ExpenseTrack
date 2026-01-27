@@ -365,7 +365,7 @@ public class SaveReportControllerTests
                 {
                     LineId = lineId,
                     GlCode = "65000",
-                    MissingReceiptJustification = MissingReceiptJustification.Under25,
+                    MissingReceiptJustification = MissingReceiptJustification.UnderThreshold,
                     JustificationNote = "Small purchase"
                 }
             }

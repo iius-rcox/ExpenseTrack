@@ -64,7 +64,7 @@ public class ThumbnailBackfillJobTests
     {
         // Arrange
         _receiptRepositoryMock
-            .Setup(r => r.GetReceiptsWithoutThumbnailsCountAsync(It.IsAny<IEnumerable<string>?>()))
+            .Setup(r => r.GetReceiptsWithoutThumbnailsCountAsync(It.IsAny<List<string>?>()))
             .ReturnsAsync(0);
 
         var request = new ThumbnailBackfillRequest();
@@ -83,7 +83,7 @@ public class ThumbnailBackfillJobTests
     {
         // Arrange
         _receiptRepositoryMock
-            .Setup(r => r.GetReceiptsWithoutThumbnailsCountAsync(It.IsAny<IEnumerable<string>?>()))
+            .Setup(r => r.GetReceiptsWithoutThumbnailsCountAsync(It.IsAny<List<string>?>()))
             .ReturnsAsync(100);
 
         _backgroundJobClientMock
@@ -106,7 +106,7 @@ public class ThumbnailBackfillJobTests
     {
         // Arrange
         _receiptRepositoryMock
-            .Setup(r => r.GetReceiptsWithoutThumbnailsCountAsync(It.IsAny<IEnumerable<string>?>()))
+            .Setup(r => r.GetReceiptsWithoutThumbnailsCountAsync(It.IsAny<List<string>?>()))
             .ReturnsAsync(10);
 
         _backgroundJobClientMock
