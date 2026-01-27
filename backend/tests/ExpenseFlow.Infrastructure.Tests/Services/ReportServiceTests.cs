@@ -139,10 +139,10 @@ public class ReportServiceTests
         SetupMocksForDraftGeneration(matches, unmatchedTransactions);
 
         // Setup different tiers for different transactions
-        SetupCategorizationWithTier(matches[0].TransactionId, 1);
-        SetupCategorizationWithTier(matches[1].TransactionId, 1);
-        SetupCategorizationWithTier(matches[2].TransactionId, 2);
-        SetupCategorizationWithTier(matches[3].TransactionId, 3);
+        SetupCategorizationWithTier(matches[0].TransactionId!.Value, 1);
+        SetupCategorizationWithTier(matches[1].TransactionId!.Value, 1);
+        SetupCategorizationWithTier(matches[2].TransactionId!.Value, 2);
+        SetupCategorizationWithTier(matches[3].TransactionId!.Value, 3);
 
         // Act
         var result = await _service.GenerateDraftAsync(_testUserId, TestPeriod);
