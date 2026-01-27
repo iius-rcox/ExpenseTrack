@@ -1585,34 +1585,41 @@ public class PdfGenerationService : IPdfGenerationService
 
         // --- LOGO SECTION (Left) ---
         // Draw company logo image from base64
-        _logger.LogInformation("Logo base64 length: {Length}, IsNullOrEmpty: {IsEmpty}",
-            _options.LogoBase64?.Length ?? 0, string.IsNullOrEmpty(_options.LogoBase64));
-
         if (!string.IsNullOrEmpty(_options.LogoBase64))
         {
             try
             {
                 var logoBytes = Convert.FromBase64String(_options.LogoBase64);
-                _logger.LogInformation("Logo bytes decoded: {ByteCount} bytes", logoBytes.Length);
 
-                var logoImage = XImage.FromStream(() => new MemoryStream(logoBytes));
-                _logger.LogInformation("Logo image loaded: {Width}x{Height} pixels", logoImage.PixelWidth, logoImage.PixelHeight);
+                // Write to temp file to avoid ImageSharp version mismatch with XImage.FromStream
+                var tempLogoPath = Path.Combine(Path.GetTempPath(), $"logo_{Guid.NewGuid()}.png");
+                File.WriteAllBytes(tempLogoPath, logoBytes);
 
-                // Scale logo to fit within the logo section while maintaining aspect ratio
-                double maxWidth = 60;
-                double maxHeight = 40;
-                double logoWidth = logoImage.PixelWidth;
-                double logoHeight = logoImage.PixelHeight;
-                double scale = Math.Min(maxWidth / logoWidth, maxHeight / logoHeight);
-                double drawWidth = logoWidth * scale;
-                double drawHeight = logoHeight * scale;
+                try
+                {
+                    var logoImage = XImage.FromFile(tempLogoPath);
 
-                // Center the logo in the logo area
-                double logoX = Margin + 5;
-                double logoY = topBoxY + 5 + (maxHeight - drawHeight) / 2;
+                    // Scale logo to fit within the logo section while maintaining aspect ratio
+                    double maxWidth = 60;
+                    double maxHeight = 40;
+                    double logoWidth = logoImage.PixelWidth;
+                    double logoHeight = logoImage.PixelHeight;
+                    double scale = Math.Min(maxWidth / logoWidth, maxHeight / logoHeight);
+                    double drawWidth = logoWidth * scale;
+                    double drawHeight = logoHeight * scale;
 
-                _logger.LogInformation("Drawing logo at ({X}, {Y}) size ({W}x{H})", logoX, logoY, drawWidth, drawHeight);
-                gfx.DrawImage(logoImage, logoX, logoY, drawWidth, drawHeight);
+                    // Center the logo in the logo area
+                    double logoX = Margin + 5;
+                    double logoY = topBoxY + 5 + (maxHeight - drawHeight) / 2;
+
+                    gfx.DrawImage(logoImage, logoX, logoY, drawWidth, drawHeight);
+                }
+                finally
+                {
+                    // Clean up temp file
+                    if (File.Exists(tempLogoPath))
+                        File.Delete(tempLogoPath);
+                }
             }
             catch (Exception ex)
             {
@@ -1628,7 +1635,6 @@ public class PdfGenerationService : IPdfGenerationService
         }
         else
         {
-            _logger.LogWarning("LogoBase64 is empty, using text fallback");
             // Fallback to text if no logo configured
             var logoBrush = new XSolidBrush(logoBlue);
             gfx.DrawString(
