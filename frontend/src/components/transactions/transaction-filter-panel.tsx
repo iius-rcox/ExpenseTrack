@@ -387,7 +387,7 @@ export function TransactionFilterPanel({
                 className="gap-2"
               >
                 <Briefcase className="h-4 w-4" />
-                <span className="hidden sm:inline">Expense</span>
+                <span className="hidden sm:inline">Expense Type</span>
                 {filters.reimbursability.length > 0 && (
                   <Badge variant="secondary" className="ml-1">
                     {filters.reimbursability.length}
