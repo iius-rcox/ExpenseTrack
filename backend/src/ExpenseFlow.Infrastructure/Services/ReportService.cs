@@ -307,10 +307,12 @@ public class ReportService : IReportService
         }
 
         // Set report summary values
+        // Filter out split children to avoid double-counting (parent already includes child amounts)
+        var parentLines = lines.Where(l => !l.IsSplitChild).ToList();
         report.Lines = lines;
-        report.TotalAmount = lines.Sum(l => l.Amount);
-        report.LineCount = lines.Count;
-        report.MissingReceiptCount = missingReceiptCount;
+        report.TotalAmount = parentLines.Sum(l => l.Amount);
+        report.LineCount = parentLines.Count;
+        report.MissingReceiptCount = parentLines.Count(l => !l.HasReceipt);
         report.Tier1HitCount = tier1Hits;
         report.Tier2HitCount = tier2Hits;
         report.Tier3HitCount = tier3Hits;
