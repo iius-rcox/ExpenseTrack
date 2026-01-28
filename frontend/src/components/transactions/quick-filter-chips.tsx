@@ -57,12 +57,19 @@ function getStartOfMonth(): Date {
 }
 
 /**
- * Helper to get start of last 30 days.
+ * Helper to get start of last month.
  */
-function getLast30Days(): Date {
-  const date = new Date()
-  date.setDate(date.getDate() - 30)
-  return date
+function getStartOfLastMonth(): Date {
+  const today = new Date()
+  return new Date(today.getFullYear(), today.getMonth() - 1, 1)
+}
+
+/**
+ * Helper to get end of last month.
+ */
+function getEndOfLastMonth(): Date {
+  const today = new Date()
+  return new Date(today.getFullYear(), today.getMonth(), 0)
 }
 
 /**
@@ -102,22 +109,6 @@ const QUICK_FILTERS: QuickFilterChip[] = [
       const monthStart = getStartOfMonth()
       return filters.dateRange.start.toDateString() === monthStart.toDateString()
     },
-  },
-  {
-    id: 'unmatched',
-    label: 'Unmatched',
-    icon: '🔍',
-    // Only show BUSINESS transactions that are unmatched (personal transactions don't need matching)
-    getFilters: (defaults) => ({
-      ...defaults,
-      matchStatus: ['unmatched'],
-      reimbursability: ['business'],
-    }),
-    isActive: (filters) =>
-      filters.matchStatus.length === 1 &&
-      filters.matchStatus[0] === 'unmatched' &&
-      filters.reimbursability.length === 1 &&
-      filters.reimbursability[0] === 'business',
   },
   {
     id: 'needs-receipt',
@@ -166,24 +157,24 @@ const QUICK_FILTERS: QuickFilterChip[] = [
       filters.amountRange.min === 100 && filters.amountRange.max === null,
   },
   {
-    id: 'last-30-days',
-    label: 'Last 30 Days',
+    id: 'last-month',
+    label: 'Last Month',
     icon: '📆',
     getFilters: (defaults) => ({
       ...defaults,
       dateRange: {
-        start: getLast30Days(),
-        end: new Date(),
+        start: getStartOfLastMonth(),
+        end: getEndOfLastMonth(),
       },
     }),
     isActive: (filters) => {
-      if (!filters.dateRange.start) return false
-      const thirtyDaysAgo = getLast30Days()
-      // Allow 1 day variance for timing
-      const diff = Math.abs(
-        filters.dateRange.start.getTime() - thirtyDaysAgo.getTime()
+      if (!filters.dateRange.start || !filters.dateRange.end) return false
+      const lastMonthStart = getStartOfLastMonth()
+      const lastMonthEnd = getEndOfLastMonth()
+      return (
+        filters.dateRange.start.toDateString() === lastMonthStart.toDateString() &&
+        filters.dateRange.end.toDateString() === lastMonthEnd.toDateString()
       )
-      return diff < 86400000 // Within 1 day
     },
   },
 ]

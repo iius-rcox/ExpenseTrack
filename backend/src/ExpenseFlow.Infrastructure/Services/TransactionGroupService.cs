@@ -589,15 +589,20 @@ public class TransactionGroupService : ITransactionGroupService
         List<string>? matchStatus = null,
         List<string>? reimbursability = null,
         string? search = null,
+        decimal? minAmount = null,
+        decimal? maxAmount = null,
+        List<string>? categories = null,
+        bool? hasPendingPrediction = null,
         string sortBy = "date",
         string sortOrder = "desc",
         CancellationToken ct = default)
     {
         _logger.LogDebug(
-            "Getting mixed list for user {UserId}, page {Page}, pageSize {PageSize}, matchStatus {MatchStatus}, reimbursability {Reimbursability}",
+            "Getting mixed list for user {UserId}, page {Page}, pageSize {PageSize}, matchStatus {MatchStatus}, reimbursability {Reimbursability}, minAmount {MinAmount}, maxAmount {MaxAmount}",
             userId, page, pageSize,
             matchStatus != null ? string.Join(",", matchStatus) : "all",
-            reimbursability != null ? string.Join(",", reimbursability) : "all");
+            reimbursability != null ? string.Join(",", reimbursability) : "all",
+            minAmount, maxAmount);
 
         // Query ungrouped transactions
         var transactionsQuery = _dbContext.Transactions
@@ -683,6 +688,46 @@ public class TransactionGroupService : ITransactionGroupService
                 t.Description.ToLower().Contains(searchLower) ||
                 t.OriginalDescription.ToLower().Contains(searchLower));
             groupsQuery = groupsQuery.Where(g => g.Name.ToLower().Contains(searchLower));
+        }
+
+        // Apply amount range filters
+        if (minAmount.HasValue)
+        {
+            transactionsQuery = transactionsQuery.Where(t => t.Amount >= minAmount.Value);
+            groupsQuery = groupsQuery.Where(g => g.CombinedAmount >= minAmount.Value);
+        }
+        if (maxAmount.HasValue)
+        {
+            transactionsQuery = transactionsQuery.Where(t => t.Amount <= maxAmount.Value);
+            groupsQuery = groupsQuery.Where(g => g.CombinedAmount <= maxAmount.Value);
+        }
+
+        // Apply categories filter (based on ExpensePattern.Category via TransactionPrediction)
+        if (categories != null && categories.Count > 0)
+        {
+            var categorizedTransactionIds = _dbContext.Set<TransactionPrediction>()
+                .Where(p => p.UserId == userId && p.PatternId != null)
+                .Join(
+                    _dbContext.Set<ExpensePattern>(),
+                    p => p.PatternId,
+                    pattern => pattern.Id,
+                    (p, pattern) => new { p.TransactionId, pattern.Category })
+                .Where(x => x.Category != null && categories.Contains(x.Category))
+                .Select(x => x.TransactionId);
+            transactionsQuery = transactionsQuery.Where(t => categorizedTransactionIds.Contains(t.Id));
+            // Groups don't have categories - exclude them when filtering by category
+            groupsQuery = groupsQuery.Where(g => false);
+        }
+
+        // Apply pending prediction filter (transactions awaiting user confirmation)
+        if (hasPendingPrediction == true)
+        {
+            var pendingPredictionTransactionIds = _dbContext.Set<TransactionPrediction>()
+                .Where(p => p.UserId == userId && p.Status == PredictionStatus.Pending)
+                .Select(p => p.TransactionId);
+            transactionsQuery = transactionsQuery.Where(t => pendingPredictionTransactionIds.Contains(t.Id));
+            // Groups don't have predictions - exclude them
+            groupsQuery = groupsQuery.Where(g => false);
         }
 
         // Get counts first

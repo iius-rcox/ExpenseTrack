@@ -280,6 +280,10 @@ public class TransactionGroupsController : ApiControllerBase
     /// <param name="matchStatus">Optional filter by match status (matched, pending, unmatched). Supports multiple values.</param>
     /// <param name="reimbursability">Optional filter by reimbursability (business, personal, uncategorized). Supports multiple values.</param>
     /// <param name="search">Optional text search on description.</param>
+    /// <param name="minAmount">Optional minimum amount filter.</param>
+    /// <param name="maxAmount">Optional maximum amount filter.</param>
+    /// <param name="categories">Optional filter by expense categories. Supports multiple values.</param>
+    /// <param name="hasPendingPrediction">Filter to transactions with pending expense predictions.</param>
     /// <param name="sortBy">Sort field: "date" (default), "amount".</param>
     /// <param name="sortOrder">Sort order: "desc" (default), "asc".</param>
     /// <returns>Combined list of ungrouped transactions and groups.</returns>
@@ -293,6 +297,10 @@ public class TransactionGroupsController : ApiControllerBase
         [FromQuery] List<string>? matchStatus = null,
         [FromQuery] List<string>? reimbursability = null,
         [FromQuery] string? search = null,
+        [FromQuery] decimal? minAmount = null,
+        [FromQuery] decimal? maxAmount = null,
+        [FromQuery] List<string>? categories = null,
+        [FromQuery] bool? hasPendingPrediction = null,
         [FromQuery] string sortBy = "date",
         [FromQuery] string sortOrder = "desc")
     {
@@ -312,6 +320,10 @@ public class TransactionGroupsController : ApiControllerBase
             matchStatus,
             reimbursability,
             search,
+            minAmount,
+            maxAmount,
+            categories,
+            hasPendingPrediction,
             sortBy,
             sortOrder);
 
