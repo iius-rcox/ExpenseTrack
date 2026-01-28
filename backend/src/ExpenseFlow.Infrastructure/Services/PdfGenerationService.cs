@@ -1597,35 +1597,24 @@ public class PdfGenerationService : IPdfGenerationService
             {
                 var logoBytes = Convert.FromBase64String(_options.LogoBase64);
 
-                // Write to temp file to avoid ImageSharp version mismatch with XImage.FromStream
-                var tempLogoPath = Path.Combine(Path.GetTempPath(), $"logo_{Guid.NewGuid()}.png");
-                File.WriteAllBytes(tempLogoPath, logoBytes);
+                // Use MemoryStream to avoid ImageSharp/PdfSharpCore version incompatibility
+                using var logoStream = new MemoryStream(logoBytes);
+                var logoImage = XImage.FromStream(() => new MemoryStream(logoBytes));
 
-                try
-                {
-                    var logoImage = XImage.FromFile(tempLogoPath);
+                // Scale logo to fit within the logo section while maintaining aspect ratio
+                double maxWidth = 60;
+                double maxHeight = 40;
+                double logoWidth = logoImage.PixelWidth;
+                double logoHeight = logoImage.PixelHeight;
+                double scale = Math.Min(maxWidth / logoWidth, maxHeight / logoHeight);
+                double drawWidth = logoWidth * scale;
+                double drawHeight = logoHeight * scale;
 
-                    // Scale logo to fit within the logo section while maintaining aspect ratio
-                    double maxWidth = 60;
-                    double maxHeight = 40;
-                    double logoWidth = logoImage.PixelWidth;
-                    double logoHeight = logoImage.PixelHeight;
-                    double scale = Math.Min(maxWidth / logoWidth, maxHeight / logoHeight);
-                    double drawWidth = logoWidth * scale;
-                    double drawHeight = logoHeight * scale;
+                // Center the logo in the logo area
+                double logoX = Margin + 5;
+                double logoY = topBoxY + 5 + (maxHeight - drawHeight) / 2;
 
-                    // Center the logo in the logo area
-                    double logoX = Margin + 5;
-                    double logoY = topBoxY + 5 + (maxHeight - drawHeight) / 2;
-
-                    gfx.DrawImage(logoImage, logoX, logoY, drawWidth, drawHeight);
-                }
-                finally
-                {
-                    // Clean up temp file
-                    if (File.Exists(tempLogoPath))
-                        File.Delete(tempLogoPath);
-                }
+                gfx.DrawImage(logoImage, logoX, logoY, drawWidth, drawHeight);
             }
             catch (Exception ex)
             {
