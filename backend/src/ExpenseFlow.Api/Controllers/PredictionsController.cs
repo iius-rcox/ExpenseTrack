@@ -478,5 +478,45 @@ public class PredictionsController : ApiControllerBase
         return Ok(predictionsCount);
     }
 
+    /// <summary>
+    /// Backfills transaction types based on learned vendor patterns.
+    /// Auto-classifies existing transactions as Business or Personal based on
+    /// feedback history (ActiveClassification from ExpensePattern).
+    /// </summary>
+    /// <returns>Count of transactions classified as business and personal.</returns>
+    [HttpPost("backfill")]
+    [ProducesResponseType(typeof(BackfillResultDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<BackfillResultDto>> BackfillTransactionTypes()
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+        var (businessCount, personalCount) = await _predictionService.BackfillTransactionTypesAsync(user.Id);
+
+        _logger.LogInformation(
+            "Backfill complete for user {UserId}: {BusinessCount} business, {PersonalCount} personal",
+            user.Id, businessCount, personalCount);
+
+        return Ok(new BackfillResultDto
+        {
+            BusinessCount = businessCount,
+            PersonalCount = personalCount,
+            TotalClassified = businessCount + personalCount
+        });
+    }
+
     #endregion
+}
+
+/// <summary>
+/// Result of transaction type backfill operation.
+/// </summary>
+public class BackfillResultDto
+{
+    /// <summary>Number of transactions classified as Business.</summary>
+    public int BusinessCount { get; set; }
+
+    /// <summary>Number of transactions classified as Personal.</summary>
+    public int PersonalCount { get; set; }
+
+    /// <summary>Total transactions classified.</summary>
+    public int TotalClassified { get; set; }
 }

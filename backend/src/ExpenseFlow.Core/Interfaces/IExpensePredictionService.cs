@@ -72,6 +72,15 @@ public interface IExpensePredictionService
     Task<int> GenerateAllPendingPredictionsAsync(Guid userId);
 
     /// <summary>
+    /// Backfills transaction types based on learned vendor patterns.
+    /// Auto-classifies transactions as Business or Personal based on ActiveClassification
+    /// from ExpensePattern feedback history.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>Tuple of (businessCount, personalCount) auto-classified.</returns>
+    Task<(int BusinessCount, int PersonalCount)> BackfillTransactionTypesAsync(Guid userId);
+
+    /// <summary>
     /// Gets a single prediction for a transaction if one exists and meets confidence threshold.
     /// </summary>
     /// <param name="transactionId">Transaction ID.</param>

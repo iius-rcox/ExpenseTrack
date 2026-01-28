@@ -346,6 +346,111 @@ public class ExpensePredictionService : IExpensePredictionService
     }
 
     /// <inheritdoc />
+    public async Task<(int BusinessCount, int PersonalCount)> BackfillTransactionTypesAsync(Guid userId)
+    {
+        _logger.LogInformation("Starting transaction type backfill for user {UserId}", userId);
+
+        // Get all patterns with a definitive classification (not null)
+        var patterns = await _dbContext.ExpensePatterns
+            .Where(p => p.UserId == userId && !p.IsSuppressed)
+            .ToListAsync();
+
+        var businessPatterns = patterns.Where(p => p.ActiveClassification == true).ToList();
+        var personalPatterns = patterns.Where(p => p.ActiveClassification == false).ToList();
+
+        _logger.LogDebug(
+            "Found {BusinessCount} business patterns and {PersonalCount} personal patterns",
+            businessPatterns.Count, personalPatterns.Count);
+
+        // Get transactions that are uncategorized (no prediction OR pending prediction)
+        var uncategorizedTransactions = await _dbContext.Transactions
+            .Where(t => t.UserId == userId)
+            .Where(t => !_dbContext.TransactionPredictions.Any(p =>
+                p.TransactionId == t.Id &&
+                (p.Status == PredictionStatus.Confirmed || p.Status == PredictionStatus.Rejected)))
+            .ToListAsync();
+
+        _logger.LogDebug("Found {Count} uncategorized transactions to process", uncategorizedTransactions.Count);
+
+        int businessCount = 0;
+        int personalCount = 0;
+
+        foreach (var transaction in uncategorizedTransactions)
+        {
+            // Try to match against business patterns first
+            var matchedBusinessPattern = businessPatterns.FirstOrDefault(p =>
+                NormalizeVendorName(transaction.Description).Contains(p.NormalizedVendor, StringComparison.OrdinalIgnoreCase) ||
+                p.NormalizedVendor.Contains(NormalizeVendorName(transaction.Description), StringComparison.OrdinalIgnoreCase));
+
+            if (matchedBusinessPattern != null)
+            {
+                await CreateOrUpdatePrediction(transaction, matchedBusinessPattern, PredictionStatus.Confirmed);
+                businessCount++;
+                continue;
+            }
+
+            // Try to match against personal patterns
+            var matchedPersonalPattern = personalPatterns.FirstOrDefault(p =>
+                NormalizeVendorName(transaction.Description).Contains(p.NormalizedVendor, StringComparison.OrdinalIgnoreCase) ||
+                p.NormalizedVendor.Contains(NormalizeVendorName(transaction.Description), StringComparison.OrdinalIgnoreCase));
+
+            if (matchedPersonalPattern != null)
+            {
+                await CreateOrUpdatePrediction(transaction, matchedPersonalPattern, PredictionStatus.Rejected);
+                personalCount++;
+            }
+        }
+
+        await _dbContext.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Backfill complete for user {UserId}: {BusinessCount} business, {PersonalCount} personal",
+            userId, businessCount, personalCount);
+
+        return (businessCount, personalCount);
+    }
+
+    private async Task CreateOrUpdatePrediction(Transaction transaction, ExpensePattern pattern, PredictionStatus status)
+    {
+        var existingPrediction = await _dbContext.TransactionPredictions
+            .FirstOrDefaultAsync(p => p.TransactionId == transaction.Id);
+
+        if (existingPrediction != null)
+        {
+            existingPrediction.Status = status;
+            existingPrediction.PatternId = pattern.Id;
+            existingPrediction.ConfidenceScore = 0.95m; // High confidence from pattern match
+            existingPrediction.ConfidenceLevel = PredictionConfidence.High;
+            existingPrediction.ResolvedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            var prediction = new TransactionPrediction
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                UserId = transaction.UserId,
+                PatternId = pattern.Id,
+                Status = status,
+                ConfidenceScore = 0.95m,
+                ConfidenceLevel = PredictionConfidence.High,
+                ResolvedAt = DateTime.UtcNow,
+                IsManualOverride = false
+            };
+            _dbContext.TransactionPredictions.Add(prediction);
+        }
+    }
+
+    private static string NormalizeVendorName(string description)
+    {
+        // Simple normalization - lowercase and remove common suffixes
+        return description.ToLowerInvariant()
+            .Replace("*", " ")
+            .Replace("#", " ")
+            .Trim();
+    }
+
+    /// <inheritdoc />
     public async Task<PredictionSummaryDto?> GetPredictionForTransactionAsync(Guid transactionId)
     {
         var prediction = await _predictionRepository.GetByTransactionIdAsync(transactionId);
