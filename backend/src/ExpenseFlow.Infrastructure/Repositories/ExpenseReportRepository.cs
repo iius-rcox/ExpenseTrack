@@ -29,8 +29,11 @@ public class ExpenseReportRepository : IExpenseReportRepository
 
     public async Task<ExpenseReport?> GetByIdWithLinesAsync(Guid id, CancellationToken ct = default)
     {
+        // Note: We intentionally do NOT use AsNoTracking() here because ChildAllocations
+        // is a self-referencing navigation property (ExpenseLine -> ExpenseLine).
+        // AsNoTracking() prevents EF Core from "fixing up" these circular references,
+        // which would cause ChildAllocations to be empty even when data exists.
         return await _context.ExpenseReports
-            .AsNoTracking()
             .Include(r => r.User)
             .Include(r => r.Lines.OrderBy(l => l.LineOrder))
                 .ThenInclude(l => l.Receipt)
