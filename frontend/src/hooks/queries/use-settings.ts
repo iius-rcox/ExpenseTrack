@@ -58,7 +58,7 @@ interface Project {
   departmentId: string
 }
 
-interface Category {
+export interface Category {
   id: string
   name: string
   description?: string
@@ -68,7 +68,7 @@ interface Category {
 export function useDepartments() {
   return useQuery({
     queryKey: settingsKeys.departments(),
-    queryFn: () => apiFetch<Department[]>('/settings/departments'),
+    queryFn: () => apiFetch<Department[]>('/reference/departments'),
     staleTime: 10 * 60 * 1000,
   })
 }
@@ -78,7 +78,7 @@ export function useProjects(departmentId?: string) {
     queryKey: [...settingsKeys.projects(), departmentId],
     queryFn: () => {
       const params = departmentId ? `?departmentId=${departmentId}` : ''
-      return apiFetch<Project[]>(`/settings/projects${params}`)
+      return apiFetch<Project[]>(`/reference/projects${params}`)
     },
     staleTime: 10 * 60 * 1000,
   })
@@ -87,21 +87,27 @@ export function useProjects(departmentId?: string) {
 export function useCategories() {
   return useQuery({
     queryKey: settingsKeys.categories(),
-    queryFn: () => apiFetch<Category[]>('/settings/categories'),
+    queryFn: () => apiFetch<{ categories: string[] }>('/transactions/categories')
+      .then(res => res.categories.map((name, index): Category => ({
+        id: String(index),
+        name,
+        description: undefined, // Categories from transactions don't have descriptions
+        isActive: true
+      }))),
     staleTime: 10 * 60 * 1000,
   })
 }
+
+// Note: Category CRUD operations are not yet implemented in the backend.
+// Categories are currently derived from transaction patterns.
+// These hooks are stubbed for future implementation.
 
 export function useCreateCategory() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string }) => {
-      return apiFetch<Category>('/settings/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+    mutationFn: async (_data: { name: string; description?: string }) => {
+      throw new Error('Category creation not yet implemented')
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.categories() })
@@ -113,12 +119,8 @@ export function useUpdateCategory() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; name?: string; description?: string; isActive?: boolean }) => {
-      return apiFetch<Category>(`/settings/categories/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+    mutationFn: async (_params: { id: string; name?: string; description?: string; isActive?: boolean }) => {
+      throw new Error('Category update not yet implemented')
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.categories() })
@@ -130,10 +132,8 @@ export function useDeleteCategory() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      return apiFetch(`/settings/categories/${id}`, {
-        method: 'DELETE',
-      })
+    mutationFn: async (_id: string) => {
+      throw new Error('Category deletion not yet implemented')
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.categories() })
