@@ -57,6 +57,38 @@ public class ExpensePattern : BaseEntity
     /// <summary>Last update timestamp</summary>
     public DateTime UpdatedAt { get; set; }
 
+    /// <summary>
+    /// Active classification calculated from feedback.
+    /// true = business expense (50%+ confirm rate, count >= 1)
+    /// false = personal expense (75%+ reject rate, count >= 4)
+    /// null = undetermined (doesn't meet either threshold)
+    /// </summary>
+    public bool? ActiveClassification
+    {
+        get
+        {
+            var totalCount = ConfirmCount + RejectCount;
+
+            // No feedback data
+            if (totalCount == 0)
+                return null;
+
+            var confirmRate = (decimal)ConfirmCount / totalCount;
+            var rejectRate = (decimal)RejectCount / totalCount;
+
+            // Business: 50%+ confirm rate AND total count >= 1
+            if (confirmRate >= 0.50m && totalCount >= 1)
+                return true;
+
+            // Personal: 75%+ reject rate AND total count >= 4
+            if (rejectRate >= 0.75m && totalCount >= 4)
+                return false;
+
+            // Undetermined
+            return null;
+        }
+    }
+
     // Navigation properties
     public User User { get; set; } = null!;
     public ICollection<TransactionPrediction> Predictions { get; set; } = new List<TransactionPrediction>();

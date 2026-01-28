@@ -397,9 +397,21 @@ public class ExpensePredictionService : IExpensePredictionService
         }
         if (pattern != null)
         {
+            var previousClassification = pattern.ActiveClassification;
             pattern.ConfirmCount++;
             pattern.UpdatedAt = DateTime.UtcNow;
             await _patternRepository.UpdateAsync(pattern);
+
+            // Log classification change if it occurred
+            var newClassification = pattern.ActiveClassification;
+            if (previousClassification != newClassification)
+            {
+                _logger.LogInformation(
+                    "Pattern {PatternId} ({VendorName}) classification changed from {PreviousClassification} to {NewClassification} after confirm",
+                    pattern.Id, pattern.DisplayName,
+                    ClassificationToString(previousClassification),
+                    ClassificationToString(newClassification));
+            }
         }
 
         // Record feedback for observability
@@ -456,6 +468,7 @@ public class ExpensePredictionService : IExpensePredictionService
         var patternSuppressed = false;
         if (pattern != null)
         {
+            var previousClassification = pattern.ActiveClassification;
             pattern.RejectCount++;
             pattern.UpdatedAt = DateTime.UtcNow;
 
@@ -473,6 +486,17 @@ public class ExpensePredictionService : IExpensePredictionService
             }
 
             await _patternRepository.UpdateAsync(pattern);
+
+            // Log classification change if it occurred
+            var newClassification = pattern.ActiveClassification;
+            if (previousClassification != newClassification)
+            {
+                _logger.LogInformation(
+                    "Pattern {PatternId} ({VendorName}) classification changed from {PreviousClassification} to {NewClassification} after reject",
+                    pattern.Id, pattern.DisplayName,
+                    ClassificationToString(previousClassification),
+                    ClassificationToString(newClassification));
+            }
         }
 
         // Record feedback for observability
@@ -1228,6 +1252,15 @@ public class ExpensePredictionService : IExpensePredictionService
         if (matchingPattern == null || matchingPattern.OccurrenceCount < MinOccurrencesForPrediction)
             return null;
 
+        // Skip patterns classified as personal (ActiveClassification == false)
+        if (matchingPattern.ActiveClassification == false)
+        {
+            _logger.LogDebug(
+                "Pattern {PatternId} ({VendorName}) is classified as personal - skipping prediction for transaction {TransactionId}",
+                matchingPattern.Id, matchingPattern.DisplayName, transaction.Id);
+            return null;
+        }
+
         // Check if pattern requires a confirmed receipt match before generating prediction
         if (matchingPattern.RequiresReceiptMatch)
         {
@@ -1418,6 +1451,20 @@ public class ExpensePredictionService : IExpensePredictionService
             ResolvedAt = prediction.ResolvedAt
         };
     }
+
+    #endregion
+
+    #region Classification Helpers
+
+    /// <summary>
+    /// Converts classification bool? to human-readable string for logging.
+    /// </summary>
+    private static string ClassificationToString(bool? classification) => classification switch
+    {
+        true => "Business",
+        false => "Personal",
+        null => "Undetermined"
+    };
 
     #endregion
 }
