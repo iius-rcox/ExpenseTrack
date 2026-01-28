@@ -163,7 +163,7 @@ export const ExpenseBadge = memo(function ExpenseBadge({
               )}
             >
               <Sparkles className={cn('h-3 w-3', colors.icon)} />
-              <span className="text-xs font-medium">Expense</span>
+              <span className="text-xs font-medium">Pending Review</span>
             </Badge>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-xs">
@@ -208,7 +208,7 @@ export const ExpenseBadge = memo(function ExpenseBadge({
       <div className="flex items-center gap-1.5">
         <Sparkles className={cn('h-3.5 w-3.5', colors.icon)} />
         <span className={cn('text-xs font-medium', colors.text)}>
-          Expense
+          Pending Review
         </span>
       </div>
 
@@ -357,7 +357,7 @@ export function ExpenseBadgeInline({
       )}
     >
       <Sparkles className={cn('h-2.5 w-2.5', colors.icon)} />
-      <span>Expense</span>
+      <span>Pending Review</span>
     </span>
   );
 }
