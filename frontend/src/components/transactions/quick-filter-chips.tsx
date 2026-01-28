@@ -180,15 +180,33 @@ export function QuickFilterChips({
   // Future: could show "Clear All" chip when filters are active
   // const hasFilters = useMemo(() => hasActiveFilters(filters), [filters])
 
-  // Handle chip click - toggle behavior
+  // Handle chip click - toggle behavior while preserving other filters
   const handleChipClick = useCallback(
     (chip: QuickFilterChip) => {
       if (chip.isActive(filters)) {
-        // If chip is active, clear to defaults
-        onApplyFilter(defaultFilters)
+        // If chip is active, clear only this chip's filter fields (preserve other filters)
+        // Get the chip's filter to know which fields to clear
+        const chipFilter = chip.getFilters(defaultFilters)
+        const clearedFilter = { ...filters }
+
+        // Clear only the fields that the chip sets
+        if (chipFilter.matchStatus.length > 0) {
+          clearedFilter.matchStatus = []
+        }
+        if (chipFilter.reimbursability.length > 0) {
+          clearedFilter.reimbursability = []
+        }
+        if (chipFilter.hasPendingPrediction) {
+          clearedFilter.hasPendingPrediction = false
+        }
+        if (chipFilter.dateRange.start || chipFilter.dateRange.end) {
+          clearedFilter.dateRange = { start: null, end: null }
+        }
+
+        onApplyFilter(clearedFilter)
       } else {
-        // Apply the chip's filter preset
-        onApplyFilter(chip.getFilters(defaultFilters))
+        // Apply the chip's filter preset while preserving other filters
+        onApplyFilter(chip.getFilters(filters))
       }
     },
     [filters, onApplyFilter, defaultFilters]

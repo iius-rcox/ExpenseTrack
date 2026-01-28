@@ -12,7 +12,7 @@
  * @see data-model.md Section 4.2 for props specification
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDebounce } from 'use-debounce';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -108,12 +108,23 @@ export function TransactionFilterPanel({
   // Debounce search input - useDebounce returns [debouncedValue, ...]
   const [debouncedSearch] = useDebounce(localSearch, 300);
 
-  // Update filters when debounced search changes
+  // Sync local search state when filters change from parent (e.g., preset load, URL change)
   useEffect(() => {
-    if (debouncedSearch !== filters.search) {
-      onChange({ ...filters, search: debouncedSearch });
+    if (filters.search !== localSearch) {
+      setLocalSearch(filters.search);
     }
-  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters.search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update parent filters when debounced search changes
+  // Use a ref to get current filters without adding to dependencies (avoids infinite loop)
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+
+  useEffect(() => {
+    if (debouncedSearch !== filtersRef.current.search) {
+      onChange({ ...filtersRef.current, search: debouncedSearch });
+    }
+  }, [debouncedSearch, onChange]);
 
   const activeFilterCount = getActiveFilterCount(filters);
 

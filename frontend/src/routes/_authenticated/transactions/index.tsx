@@ -91,7 +91,9 @@ const transactionSearchSchema = z.object({
   maxAmount: z.coerce.number().optional(),
   // Multi-select filters (comma-separated in URL)
   matchStatus: z.string().optional(), // comma-separated: matched,pending,unmatched
+  reimbursability: z.string().optional(), // comma-separated: business,personal,uncategorized
   categories: z.string().optional(),  // comma-separated category IDs
+  tags: z.string().optional(),        // comma-separated tag names
   // Boolean filters
   hasPendingPrediction: z.coerce.boolean().optional(),
   // Sort
@@ -137,7 +139,9 @@ function TransactionsPage() {
       max: typeof search.maxAmount === 'number' ? search.maxAmount : null,
     },
     matchStatus: parseCommaSeparated(search.matchStatus) as ('matched' | 'pending' | 'unmatched' | 'manual')[],
+    reimbursability: parseCommaSeparated(search.reimbursability) as ('business' | 'personal' | 'uncategorized')[],
     categories: parseCommaSeparated(search.categories),
+    tags: parseCommaSeparated(search.tags),
     hasPendingPrediction: search.hasPendingPrediction ?? false,
   }))
 
@@ -297,7 +301,9 @@ function TransactionsPage() {
           maxAmount: newFilters.amountRange.max ?? undefined,
           // Multi-select filters (comma-separated)
           matchStatus: newFilters.matchStatus.length > 0 ? newFilters.matchStatus.join(',') : undefined,
+          reimbursability: newFilters.reimbursability.length > 0 ? newFilters.reimbursability.join(',') : undefined,
           categories: newFilters.categories.length > 0 ? newFilters.categories.join(',') : undefined,
+          tags: newFilters.tags.length > 0 ? newFilters.tags.join(',') : undefined,
           // Boolean filters
           hasPendingPrediction: newFilters.hasPendingPrediction || undefined,
           // Reset pagination on filter change
@@ -325,7 +331,9 @@ function TransactionsPage() {
         minAmount: undefined,
         maxAmount: undefined,
         matchStatus: undefined,
+        reimbursability: undefined,
         categories: undefined,
+        tags: undefined,
         hasPendingPrediction: undefined,
       },
     })
