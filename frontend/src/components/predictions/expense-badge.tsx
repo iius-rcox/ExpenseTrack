@@ -194,20 +194,14 @@ export const ExpenseBadge = memo(function ExpenseBadge({
             <DropdownMenuSeparator className="my-0" />
             {/* Actions */}
             <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                onConfirm?.(prediction.id);
-              }}
+              onSelect={() => onConfirm?.(prediction.id)}
               disabled={isProcessing}
             >
               <CircleCheck className="mr-2 h-4 w-4 text-green-600" />
               Mark as Business
             </DropdownMenuItem>
             <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                onReject?.(prediction.id);
-              }}
+              onSelect={() => onReject?.(prediction.id)}
               disabled={isProcessing}
             >
               <CircleX className="mr-2 h-4 w-4 text-red-600" />
