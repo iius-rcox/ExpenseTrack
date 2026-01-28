@@ -218,6 +218,9 @@ export function QuickFilterChips({
         if (chipFilter.dateRange.start || chipFilter.dateRange.end) {
           clearedFilter.dateRange = { start: null, end: null }
         }
+        if (chipFilter.amountRange.min !== null || chipFilter.amountRange.max !== null) {
+          clearedFilter.amountRange = { min: null, max: null }
+        }
 
         onApplyFilter(clearedFilter)
       } else {
