@@ -387,7 +387,7 @@ export function TransactionFilterPanel({
                 className="gap-2"
               >
                 <Briefcase className="h-4 w-4" />
-                <span className="hidden sm:inline">Expense Type</span>
+                <span className="hidden sm:inline">Type</span>
                 {filters.reimbursability.length > 0 && (
                   <Badge variant="secondary" className="ml-1">
                     {filters.reimbursability.length}
@@ -397,7 +397,7 @@ export function TransactionFilterPanel({
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-48" align="end">
               <div className="space-y-3 p-2">
-                <div className="font-medium">Expense Type</div>
+                <div className="font-medium">Type</div>
                 <div className="space-y-2">
                   {REIMBURSABILITY_OPTIONS.map((option) => (
                     <label

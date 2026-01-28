@@ -782,8 +782,8 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
                 </Button>
               </TableHead>
 
-              {/* Expense/Reimbursability Column */}
-              <TableHead className="w-[180px]">Expense</TableHead>
+              {/* Type Column (Business/Personal) */}
+              <TableHead className="w-[180px]">Type</TableHead>
 
               {/* Amount Column */}
               <TableHead className="w-[100px] text-right">
