@@ -1593,13 +1593,24 @@ public class PdfGenerationService : IPdfGenerationService
         // Draw company logo image from base64
         if (!string.IsNullOrEmpty(_options.LogoBase64))
         {
+            string? tempJpegPath = null;
             try
             {
                 var logoBytes = Convert.FromBase64String(_options.LogoBase64);
 
-                // Use MemoryStream to avoid ImageSharp/PdfSharpCore version incompatibility
-                using var logoStream = new MemoryStream(logoBytes);
-                var logoImage = XImage.FromStream(() => new MemoryStream(logoBytes));
+                // PdfSharpCore's XImage methods internally use ImageSharp with method signatures
+                // from an older version, causing MissingMethodException with ImageSharp 3.x.
+                // Workaround: Use ImageSharp directly to decode PNG and save as JPEG to temp file,
+                // then use XImage.FromFile which may use a different code path.
+                using var pngStream = new MemoryStream(logoBytes);
+                using var image = Image.Load<Rgba32>(pngStream);
+
+                // Save as JPEG to temp file
+                tempJpegPath = Path.Combine(Path.GetTempPath(), $"logo_{Guid.NewGuid()}.jpg");
+                image.Save(tempJpegPath, new JpegEncoder { Quality = 95 });
+
+                // Load from file - PdfSharpCore handles JPEG files natively
+                var logoImage = XImage.FromFile(tempJpegPath);
 
                 // Scale logo to fit within the logo section while maintaining aspect ratio
                 double maxWidth = 60;
@@ -1626,6 +1637,14 @@ public class PdfGenerationService : IPdfGenerationService
                     logoBrush,
                     new XRect(Margin + 8, topBoxY + 8, 60, 40),
                     XStringFormats.TopLeft);
+            }
+            finally
+            {
+                // Clean up temp file
+                if (tempJpegPath != null && File.Exists(tempJpegPath))
+                {
+                    try { File.Delete(tempJpegPath); } catch { /* ignore cleanup errors */ }
+                }
             }
         }
         else
