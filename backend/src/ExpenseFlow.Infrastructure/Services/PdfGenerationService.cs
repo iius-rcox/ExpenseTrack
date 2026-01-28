@@ -4,6 +4,7 @@ using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Infrastructure.Configuration;
 using ExpenseFlow.Shared.DTOs;
 using ExpenseFlow.Shared.Enums;
+using ImageMagick;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using static MigraDocCore.DocumentObjectModel.MigraDoc.DocumentObjectModel.Shapes.ImageSource;
@@ -1593,24 +1594,30 @@ public class PdfGenerationService : IPdfGenerationService
         // Draw company logo image from base64
         if (!string.IsNullOrEmpty(_options.LogoBase64))
         {
-            string? tempJpegPath = null;
+            string? tempBmpPath = null;
             try
             {
                 var logoBytes = Convert.FromBase64String(_options.LogoBase64);
 
-                // PdfSharpCore's XImage methods internally use ImageSharp with method signatures
+                // PdfSharpCore's XImage internally uses ImageSharp with method signatures
                 // from an older version, causing MissingMethodException with ImageSharp 3.x.
-                // Workaround: Use ImageSharp directly to decode PNG and save as JPEG to temp file,
-                // then use XImage.FromFile which may use a different code path.
-                using var pngStream = new MemoryStream(logoBytes);
-                using var image = Image.Load<Rgba32>(pngStream);
+                // Workaround: Use Magick.NET (ImageMagick) which is a completely separate library.
+                // Convert PNG to BMP format which PdfSharpCore may handle natively.
+                tempBmpPath = Path.Combine(Path.GetTempPath(), $"logo_{Guid.NewGuid()}.bmp");
 
-                // Save as JPEG to temp file
-                tempJpegPath = Path.Combine(Path.GetTempPath(), $"logo_{Guid.NewGuid()}.jpg");
-                image.Save(tempJpegPath, new JpegEncoder { Quality = 95 });
+                using (var magickImage = new MagickImage(logoBytes))
+                {
+                    // Flatten transparency onto white background (BMP doesn't support alpha)
+                    magickImage.BackgroundColor = MagickColors.White;
+                    magickImage.Alpha(AlphaOption.Remove);
 
-                // Load from file - PdfSharpCore handles JPEG files natively
-                var logoImage = XImage.FromFile(tempJpegPath);
+                    // Write as BMP format
+                    magickImage.Format = MagickFormat.Bmp;
+                    magickImage.Write(tempBmpPath);
+                }
+
+                // Load BMP - PdfSharpCore has native BMP support without ImageSharp
+                var logoImage = XImage.FromFile(tempBmpPath);
 
                 // Scale logo to fit within the logo section while maintaining aspect ratio
                 double maxWidth = 60;
@@ -1626,6 +1633,8 @@ public class PdfGenerationService : IPdfGenerationService
                 double logoY = topBoxY + 5 + (maxHeight - drawHeight) / 2;
 
                 gfx.DrawImage(logoImage, logoX, logoY, drawWidth, drawHeight);
+
+                _logger.LogDebug("Successfully drew logo image using Magick.NET BMP conversion");
             }
             catch (Exception ex)
             {
@@ -1641,9 +1650,9 @@ public class PdfGenerationService : IPdfGenerationService
             finally
             {
                 // Clean up temp file
-                if (tempJpegPath != null && File.Exists(tempJpegPath))
+                if (tempBmpPath != null && File.Exists(tempBmpPath))
                 {
-                    try { File.Delete(tempJpegPath); } catch { /* ignore cleanup errors */ }
+                    try { File.Delete(tempBmpPath); } catch { /* ignore cleanup errors */ }
                 }
             }
         }
