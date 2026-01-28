@@ -261,9 +261,12 @@ export const TransactionRow = memo(function TransactionRow({
       data-state={isSelected ? 'selected' : undefined}
       onClick={handleRowClick}
     >
-      {/* Selection Checkbox */}
-      <TableCell className="w-[40px]">
-        <div onClick={handleCheckboxClick}>
+      {/* Selection Checkbox - larger hit box for easier clicking */}
+      <TableCell className="w-[50px] p-0">
+        <div
+          onClick={handleCheckboxClick}
+          className="flex items-center justify-center w-full h-full min-h-[48px] px-3 cursor-pointer hover:bg-muted/50 transition-colors"
+        >
           <Checkbox
             checked={isSelected}
             onCheckedChange={() => {}}
@@ -280,7 +283,7 @@ export const TransactionRow = memo(function TransactionRow({
       </TableCell>
 
       {/* Description / Merchant */}
-      <TableCell className="min-w-[200px] max-w-[300px]">
+      <TableCell className="w-[180px]">
         <div className="space-y-0.5">
           <div className="font-medium truncate" title={safeDisplayString(transaction.description, '', 'TransactionRow.description.title')}>
             {safeDisplayString(transaction.merchant, '', 'TransactionRow.merchant.display') || safeDisplayString(transaction.description, '', 'TransactionRow.description.display')}
@@ -298,7 +301,7 @@ export const TransactionRow = memo(function TransactionRow({
       </TableCell>
 
       {/* Expense Prediction Badge / Reimbursability Status (Feature 023) */}
-      <TableCell className="w-[180px]">
+      <TableCell className="w-[140px]">
         {/* Show ExpenseBadge for pending predictions */}
         {transaction.prediction &&
           transaction.prediction.status === 'Pending' &&

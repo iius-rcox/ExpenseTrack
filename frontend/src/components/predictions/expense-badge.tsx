@@ -15,7 +15,7 @@
 
 import { memo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Check, X, ChevronRight } from 'lucide-react';
+import { Sparkles, Check, X, ChevronRight, CircleCheck, CircleX } from 'lucide-react';
 import { cn, safeDisplayString } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ConfidenceIndicator } from '@/components/design-system/confidence-indicator';
 import type {
   PredictionConfidence,
@@ -146,45 +153,69 @@ export const ExpenseBadge = memo(function ExpenseBadge({
   const label = CONFIDENCE_LABELS[prediction.confidenceLevel];
   const confidenceScore = confidenceToScore(prediction.confidenceLevel);
 
-  // Compact mode - just the badge
+  // Compact mode - interactive badge with dropdown
   if (compact) {
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
+      <div className={cn('flex items-center', className)} onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Badge
               variant="outline"
               className={cn(
-                'gap-1.5 cursor-default transition-colors',
+                'gap-1.5 cursor-pointer transition-colors hover:opacity-80',
                 colors.bg,
                 colors.border,
                 colors.text,
-                className
+                isProcessing && 'opacity-50 cursor-not-allowed'
               )}
+              title={`${label} - Click to change`}
             >
               <Sparkles className={cn('h-3 w-3', colors.icon)} />
               <span className="text-xs font-medium">Pending Review</span>
             </Badge>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            <div className="space-y-1">
-              <p className="font-medium">{label}</p>
-              {safeDisplayString(prediction.suggestedCategory, '', 'ExpenseBadge.suggestedCategory.compact.check') && (
-                <p className="text-xs text-muted-foreground">
-                  Suggested: {safeDisplayString(prediction.suggestedCategory, '', 'ExpenseBadge.suggestedCategory.compact.display')}
-                </p>
-              )}
-              <div className="flex items-center gap-2 pt-1">
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            {/* Header with confidence info */}
+            <div className="px-2 py-1.5 border-b">
+              <p className="text-sm font-medium">{label}</p>
+              <div className="flex items-center gap-2 mt-1">
                 <ConfidenceIndicator
                   score={prediction.confidenceScore}
                   showLabel
                   size="sm"
                 />
               </div>
+              {safeDisplayString(prediction.suggestedCategory, '', 'ExpenseBadge.suggestedCategory.compact.check') && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Suggested: {safeDisplayString(prediction.suggestedCategory, '', 'ExpenseBadge.suggestedCategory.compact.display')}
+                </p>
+              )}
             </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+            <DropdownMenuSeparator className="my-0" />
+            {/* Actions */}
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                onConfirm?.(prediction.id);
+              }}
+              disabled={isProcessing}
+            >
+              <CircleCheck className="mr-2 h-4 w-4 text-green-600" />
+              Mark as Business
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                onReject?.(prediction.id);
+              }}
+              disabled={isProcessing}
+            >
+              <CircleX className="mr-2 h-4 w-4 text-red-600" />
+              Mark as Personal
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     );
   }
 

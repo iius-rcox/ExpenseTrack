@@ -742,18 +742,20 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               {/* Select All Checkbox */}
-              <TableHead className="w-[40px]">
-                <Checkbox
-                  checked={selection.isSelectAll}
-                  onCheckedChange={handleSelectAll}
-                  aria-label="Select all transactions"
-                  ref={(el) => {
-                    if (el) {
-                      // Handle indeterminate state
-                      (el as unknown as HTMLInputElement).indeterminate = isIndeterminate;
-                    }
-                  }}
-                />
+              <TableHead className="w-[50px] p-0">
+                <div className="flex items-center justify-center px-3">
+                  <Checkbox
+                    checked={selection.isSelectAll}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all transactions"
+                    ref={(el) => {
+                      if (el) {
+                        // Handle indeterminate state
+                        (el as unknown as HTMLInputElement).indeterminate = isIndeterminate;
+                      }
+                    }}
+                  />
+                </div>
               </TableHead>
 
               {/* Date Column */}
@@ -770,7 +772,7 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
               </TableHead>
 
               {/* Description Column */}
-              <TableHead className="min-w-[200px]">
+              <TableHead className="w-[180px]">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -783,7 +785,7 @@ export function TransactionGrid(props: TransactionGridPropsWithLegacy) {
               </TableHead>
 
               {/* Type Column (Business/Personal) */}
-              <TableHead className="w-[180px]">Type</TableHead>
+              <TableHead className="w-[140px]">Type</TableHead>
 
               {/* Amount Column */}
               <TableHead className="w-[100px] text-right">
