@@ -1261,10 +1261,11 @@ public class PdfGenerationService : IPdfGenerationService
         UserPreferences? userPrefs)
     {
         int pageCount = 0;
-        var linesPerPage = 30;
-        var totalPages = (int)Math.Ceiling((double)lines.Count / linesPerPage);
+        int currentLineIndex = 0; // Track which line we're on across all pages
+        int pageNum = 0;
 
-        for (int pageNum = 0; pageNum < Math.Max(1, totalPages); pageNum++)
+        // Continue adding pages until all lines are rendered
+        while (currentLineIndex < lines.Count)
         {
             var page = document.AddPage();
             page.Width = PageWidth;
@@ -1321,14 +1322,12 @@ public class PdfGenerationService : IPdfGenerationService
             gfx.DrawLine(XPens.Black, Margin, y, PageWidth - Margin, y);
             y += 6;
 
-            // Draw table rows for this page
-            var pageLines = lines.Skip(pageNum * linesPerPage).Take(linesPerPage).ToList();
-            var lineIndex = pageNum * linesPerPage;
-
-            foreach (var line in pageLines)
+            // Draw table rows for this page - continue from currentLineIndex until page is full
+            while (currentLineIndex < lines.Count)
             {
+                var line = lines[currentLineIndex];
                 colX = Margin;
-                lineIndex++;
+                var lineNumber = currentLineIndex + 1; // 1-based for display
 
                 // Check if this is a split parent with child allocations
                 var isSplitLine = line.IsSplitParent && line.ChildAllocations.Any();
@@ -1381,12 +1380,12 @@ public class PdfGenerationService : IPdfGenerationService
                     // Combined receipt - find the first line index in the group (the "primary" reference)
                     var group = sharedReceiptMap[line.ReceiptId.Value];
                     var primaryRef = group.OrderBy(g => g.lineIndex).First().lineIndex;
-                    receiptIndicator = lineIndex == primaryRef ? $"★#{primaryRef}" : $"→#{primaryRef}";
+                    receiptIndicator = lineNumber == primaryRef ? $"★#{primaryRef}" : $"→#{primaryRef}";
                     receiptBrush = XBrushes.DodgerBlue;
                 }
                 else
                 {
-                    receiptIndicator = $"#{lineIndex}";
+                    receiptIndicator = $"#{lineNumber}";
                     receiptBrush = XBrushes.DarkGreen;
                 }
 
@@ -1406,6 +1405,10 @@ public class PdfGenerationService : IPdfGenerationService
 
                     foreach (var alloc in allocations)
                     {
+                        // Check if we need to move to next page before drawing allocation
+                        if (y > PageHeight - Margin - 30)
+                            break; // Will continue allocations on next iteration if parent not fully rendered
+
                         colX = Margin + 10; // Indent allocation rows
 
                         // Arrow indicator for allocation row
@@ -1439,23 +1442,26 @@ public class PdfGenerationService : IPdfGenerationService
                             new XRect(colX, y, colWidths[5], 10), XStringFormats.TopRight);
 
                         y += 11;
-
-                        if (y > PageHeight - Margin - 30)
-                            break;
                     }
                 }
 
+                // Move to next line
+                currentLineIndex++;
+
+                // Check if page is full - break to start new page
                 if (y > PageHeight - Margin - 30)
                     break;
             }
 
-            // Footer with page number
+            // Footer with page number (will be updated with actual total after all pages rendered)
             gfx.DrawString(
-                $"Page {pageNum + 1} of {Math.Max(1, totalPages)} (Itemized List)",
+                $"Page {pageNum + 1} (Itemized List)",
                 fontSmall,
                 XBrushes.Gray,
                 new XRect(0, PageHeight - Margin, PageWidth, 14),
                 XStringFormats.TopCenter);
+
+            pageNum++;
         }
 
         return pageCount;
