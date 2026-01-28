@@ -50,6 +50,26 @@ public interface IExpensePredictionService
     /// <returns>Import result with counts.</returns>
     Task<ImportPatternsResponseDto> ImportPatternsAsync(Guid userId, ImportPatternsRequestDto request);
 
+    /// <summary>
+    /// Learns from a user's transaction classification (Business/Personal marking).
+    /// Creates or updates a pattern for the vendor based on the classification.
+    /// This enables learning from ALL transactions, not just expense reports.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="transactionId">Transaction that was classified.</param>
+    /// <param name="isBusiness">True if classified as business, false if personal.</param>
+    /// <returns>The pattern that was created or updated.</returns>
+    Task<ExpensePattern?> LearnFromTransactionClassificationAsync(Guid userId, Guid transactionId, bool isBusiness);
+
+    /// <summary>
+    /// Backfills patterns from all historical transaction classifications.
+    /// Scans existing Confirmed/Rejected predictions and learns patterns from them.
+    /// Use this once to catch up on historical data after enabling pattern learning from classifications.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>Tuple of (patternsCreated, patternsUpdated, classificationsProcessed).</returns>
+    Task<(int PatternsCreated, int PatternsUpdated, int ClassificationsProcessed)> LearnFromHistoricalClassificationsAsync(Guid userId);
+
     #endregion
 
     #region Prediction Generation

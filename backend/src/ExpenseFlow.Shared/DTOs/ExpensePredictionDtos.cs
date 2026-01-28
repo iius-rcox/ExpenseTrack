@@ -536,6 +536,24 @@ public class ImportPatternsResponseDto
     public string Message { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Response DTO for learning from historical transaction classifications.
+/// </summary>
+public class LearnFromHistoryResponseDto
+{
+    /// <summary>Number of new patterns created.</summary>
+    public int PatternsCreated { get; set; }
+
+    /// <summary>Number of existing patterns updated.</summary>
+    public int PatternsUpdated { get; set; }
+
+    /// <summary>Total transaction classifications processed.</summary>
+    public int ClassificationsProcessed { get; set; }
+
+    /// <summary>Summary message.</summary>
+    public string Message { get; set; } = string.Empty;
+}
+
 #endregion
 
 #region User Story 2 - Draft Pre-Population

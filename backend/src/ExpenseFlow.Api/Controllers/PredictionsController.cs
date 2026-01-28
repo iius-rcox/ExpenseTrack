@@ -461,6 +461,45 @@ public class PredictionsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Learns patterns from all historical transaction classifications.
+    /// Scans existing Confirmed/Rejected predictions and creates patterns from them.
+    /// Use this once to backfill patterns from historical Business/Personal markings.
+    /// </summary>
+    /// <returns>Summary of patterns created and updated.</returns>
+    [HttpPost("learn-from-history")]
+    [ProducesResponseType(typeof(LearnFromHistoryResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<LearnFromHistoryResponseDto>> LearnFromHistoricalClassifications()
+    {
+        try
+        {
+            var user = await _userService.GetOrCreateUserAsync(User);
+            var (created, updated, processed) = await _predictionService.LearnFromHistoricalClassificationsAsync(user.Id);
+
+            _logger.LogInformation(
+                "Learned from historical classifications for user {UserId}: {Created} created, {Updated} updated, {Processed} processed",
+                user.Id, created, updated, processed);
+
+            return Ok(new LearnFromHistoryResponseDto
+            {
+                PatternsCreated = created,
+                PatternsUpdated = updated,
+                ClassificationsProcessed = processed,
+                Message = $"Successfully learned from {processed} historical classifications: {created} patterns created, {updated} patterns updated"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to learn from historical classifications");
+            return StatusCode(500, new ProblemDetailsResponse
+            {
+                Title = "Failed to learn from historical classifications",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
     /// Generates predictions for all unprocessed transactions.
     /// </summary>
     /// <returns>Number of predictions generated.</returns>

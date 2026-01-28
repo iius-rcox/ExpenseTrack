@@ -179,6 +179,223 @@ public class ExpensePredictionService : IExpensePredictionService
     }
 
     /// <inheritdoc />
+    public async Task<ExpensePattern?> LearnFromTransactionClassificationAsync(Guid userId, Guid transactionId, bool isBusiness)
+    {
+        var transaction = await _dbContext.Transactions
+            .FirstOrDefaultAsync(t => t.Id == transactionId && t.UserId == userId);
+
+        if (transaction == null)
+        {
+            _logger.LogWarning(
+                "Cannot learn from classification: Transaction {TransactionId} not found for user {UserId}",
+                transactionId, userId);
+            return null;
+        }
+
+        var vendorName = transaction.OriginalDescription ?? transaction.Description;
+        var normalized = await NormalizeVendorAsync(vendorName);
+
+        // Find or create pattern for this vendor
+        var pattern = await _patternRepository.GetByNormalizedVendorAsync(userId, normalized);
+
+        if (pattern == null)
+        {
+            // Create new pattern from this transaction
+            pattern = new ExpensePattern
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                NormalizedVendor = normalized,
+                DisplayName = vendorName,
+                Category = null, // Will be set from expense reports if confirmed later
+                AverageAmount = transaction.Amount,
+                MinAmount = transaction.Amount,
+                MaxAmount = transaction.Amount,
+                OccurrenceCount = 1,
+                LastSeenAt = DateTime.UtcNow,
+                DefaultGLCode = null,
+                DefaultDepartment = null,
+                ConfirmCount = isBusiness ? 1 : 0,
+                RejectCount = isBusiness ? 0 : 1,
+                IsSuppressed = false,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await _patternRepository.AddAsync(pattern);
+
+            _logger.LogInformation(
+                "Created new pattern from transaction classification: Vendor={Vendor}, Classification={Classification}, PatternId={PatternId}",
+                normalized, isBusiness ? "Business" : "Personal", pattern.Id);
+        }
+        else
+        {
+            // Update existing pattern with this classification
+            var previousClassification = pattern.ActiveClassification;
+
+            if (isBusiness)
+            {
+                pattern.ConfirmCount++;
+            }
+            else
+            {
+                pattern.RejectCount++;
+            }
+
+            // Update amount statistics
+            pattern.AverageAmount = ((pattern.AverageAmount * pattern.OccurrenceCount) + transaction.Amount) / (pattern.OccurrenceCount + 1);
+            pattern.MinAmount = Math.Min(pattern.MinAmount, transaction.Amount);
+            pattern.MaxAmount = Math.Max(pattern.MaxAmount, transaction.Amount);
+            pattern.OccurrenceCount++;
+            pattern.LastSeenAt = DateTime.UtcNow;
+            pattern.UpdatedAt = DateTime.UtcNow;
+
+            await _patternRepository.UpdateAsync(pattern);
+
+            // Log classification change if it occurred
+            var newClassification = pattern.ActiveClassification;
+            if (previousClassification != newClassification)
+            {
+                _logger.LogInformation(
+                    "Pattern {PatternId} ({VendorName}) classification changed from {PreviousClassification} to {NewClassification} after transaction classification",
+                    pattern.Id, pattern.DisplayName,
+                    ClassificationToString(previousClassification),
+                    ClassificationToString(newClassification));
+            }
+            else
+            {
+                _logger.LogDebug(
+                    "Updated pattern from transaction classification: PatternId={PatternId}, Vendor={Vendor}, Classification={Classification}, ConfirmCount={ConfirmCount}, RejectCount={RejectCount}",
+                    pattern.Id, normalized, isBusiness ? "Business" : "Personal", pattern.ConfirmCount, pattern.RejectCount);
+            }
+        }
+
+        await _patternRepository.SaveChangesAsync();
+        return pattern;
+    }
+
+    /// <inheritdoc />
+    public async Task<(int PatternsCreated, int PatternsUpdated, int ClassificationsProcessed)> LearnFromHistoricalClassificationsAsync(Guid userId)
+    {
+        _logger.LogInformation("Learning patterns from historical transaction classifications for user {UserId}", userId);
+
+        // Get all resolved predictions (Confirmed = Business, Rejected = Personal)
+        var resolvedPredictions = await _dbContext.TransactionPredictions
+            .Include(p => p.Transaction)
+            .Where(p => p.UserId == userId &&
+                       (p.Status == PredictionStatus.Confirmed || p.Status == PredictionStatus.Rejected))
+            .ToListAsync();
+
+        _logger.LogInformation("Found {Count} historical classifications to process", resolvedPredictions.Count);
+
+        var patternsCreated = 0;
+        var patternsUpdated = 0;
+        var classificationsProcessed = 0;
+
+        // Group by normalized vendor to batch process
+        var groupedByVendor = new Dictionary<string, List<(TransactionPrediction Prediction, Transaction Transaction)>>(
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var prediction in resolvedPredictions)
+        {
+            if (prediction.Transaction == null) continue;
+
+            var vendorName = prediction.Transaction.OriginalDescription ?? prediction.Transaction.Description;
+            var normalized = await NormalizeVendorAsync(vendorName);
+
+            if (!groupedByVendor.ContainsKey(normalized))
+            {
+                groupedByVendor[normalized] = new List<(TransactionPrediction, Transaction)>();
+            }
+            groupedByVendor[normalized].Add((prediction, prediction.Transaction));
+        }
+
+        foreach (var (normalizedVendor, classifications) in groupedByVendor)
+        {
+            var existingPattern = await _patternRepository.GetByNormalizedVendorAsync(userId, normalizedVendor);
+
+            var confirmCount = classifications.Count(c => c.Prediction.Status == PredictionStatus.Confirmed);
+            var rejectCount = classifications.Count(c => c.Prediction.Status == PredictionStatus.Rejected);
+            var amounts = classifications.Select(c => c.Transaction.Amount).ToList();
+            var lastSeen = classifications.Max(c => c.Transaction.TransactionDate);
+            var displayName = classifications.First().Transaction.OriginalDescription
+                           ?? classifications.First().Transaction.Description;
+
+            if (existingPattern == null)
+            {
+                // Create new pattern from historical data
+                var pattern = new ExpensePattern
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    NormalizedVendor = normalizedVendor,
+                    DisplayName = displayName,
+                    Category = null,
+                    AverageAmount = amounts.Average(),
+                    MinAmount = amounts.Min(),
+                    MaxAmount = amounts.Max(),
+                    OccurrenceCount = classifications.Count,
+                    LastSeenAt = lastSeen.ToDateTime(TimeOnly.MinValue),
+                    DefaultGLCode = null,
+                    DefaultDepartment = null,
+                    ConfirmCount = confirmCount,
+                    RejectCount = rejectCount,
+                    IsSuppressed = false,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await _patternRepository.AddAsync(pattern);
+                patternsCreated++;
+
+                _logger.LogInformation(
+                    "Created pattern from historical classifications: Vendor={Vendor}, Confirms={ConfirmCount}, Rejects={RejectCount}, Classification={Classification}",
+                    normalizedVendor, confirmCount, rejectCount, ClassificationToString(pattern.ActiveClassification));
+            }
+            else
+            {
+                // Update existing pattern with historical data
+                var previousClassification = existingPattern.ActiveClassification;
+
+                existingPattern.ConfirmCount += confirmCount;
+                existingPattern.RejectCount += rejectCount;
+                existingPattern.OccurrenceCount += classifications.Count;
+
+                // Update amount stats
+                var allAmounts = new[] { existingPattern.AverageAmount }.Concat(amounts).ToList();
+                existingPattern.AverageAmount = amounts.Average();
+                existingPattern.MinAmount = Math.Min(existingPattern.MinAmount, amounts.Min());
+                existingPattern.MaxAmount = Math.Max(existingPattern.MaxAmount, amounts.Max());
+
+                if (lastSeen.ToDateTime(TimeOnly.MinValue) > existingPattern.LastSeenAt)
+                {
+                    existingPattern.LastSeenAt = lastSeen.ToDateTime(TimeOnly.MinValue);
+                }
+
+                existingPattern.UpdatedAt = DateTime.UtcNow;
+                await _patternRepository.UpdateAsync(existingPattern);
+                patternsUpdated++;
+
+                var newClassification = existingPattern.ActiveClassification;
+                _logger.LogInformation(
+                    "Updated pattern from historical classifications: Vendor={Vendor}, Confirms={ConfirmCount}, Rejects={RejectCount}, Classification={PrevClass}->{NewClass}",
+                    normalizedVendor, existingPattern.ConfirmCount, existingPattern.RejectCount,
+                    ClassificationToString(previousClassification), ClassificationToString(newClassification));
+            }
+
+            classificationsProcessed += classifications.Count;
+        }
+
+        await _patternRepository.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Historical classification learning complete for user {UserId}: {Created} patterns created, {Updated} patterns updated, {Processed} classifications processed",
+            userId, patternsCreated, patternsUpdated, classificationsProcessed);
+
+        return (patternsCreated, patternsUpdated, classificationsProcessed);
+    }
+
+    /// <inheritdoc />
     public async Task<ImportPatternsResponseDto> ImportPatternsAsync(Guid userId, ImportPatternsRequestDto request)
     {
         _logger.LogInformation("Importing {Count} expense entries for user {UserId}", request.Entries.Count, userId);
@@ -692,6 +909,7 @@ public class ExpensePredictionService : IExpensePredictionService
 
     /// <summary>
     /// Internal helper to mark a transaction with the specified status.
+    /// Also learns from the classification to build patterns for future predictions.
     /// </summary>
     private async Task<PredictionActionResponseDto> MarkTransactionAsync(
         Guid userId,
@@ -716,6 +934,11 @@ public class ExpensePredictionService : IExpensePredictionService
             };
         }
 
+        // Learn from this classification to build vendor patterns
+        // Business (Confirmed) = true, Personal (Rejected) = false
+        var isBusiness = status == PredictionStatus.Confirmed;
+        var pattern = await LearnFromTransactionClassificationAsync(userId, transactionId, isBusiness);
+
         // Check for existing prediction
         var existingPrediction = await _dbContext.TransactionPredictions
             .FirstOrDefaultAsync(p => p.TransactionId == transactionId && p.UserId == userId);
@@ -728,20 +951,25 @@ public class ExpensePredictionService : IExpensePredictionService
             existingPrediction.Status = status;
             existingPrediction.IsManualOverride = true;
             existingPrediction.ResolvedAt = DateTime.UtcNow;
+            // Link to pattern if one was created/updated
+            if (pattern != null && !existingPrediction.PatternId.HasValue)
+            {
+                existingPrediction.PatternId = pattern.Id;
+            }
             prediction = existingPrediction;
 
             _logger.LogInformation(
-                "Updated existing prediction {PredictionId} to {Status} (manual override) for transaction {TransactionId}",
-                existingPrediction.Id, status, transactionId);
+                "Updated existing prediction {PredictionId} to {Status} (manual override) for transaction {TransactionId}, linked to pattern {PatternId}",
+                existingPrediction.Id, status, transactionId, pattern?.Id);
         }
         else
         {
-            // Create new manual override prediction
+            // Create new manual override prediction (linked to pattern)
             prediction = new TransactionPrediction
             {
                 TransactionId = transactionId,
                 UserId = userId,
-                PatternId = null, // No pattern for manual overrides
+                PatternId = pattern?.Id, // Link to learned pattern
                 Status = status,
                 ConfidenceScore = 1.0m, // User is 100% confident
                 ConfidenceLevel = PredictionConfidence.High,
@@ -755,8 +983,8 @@ public class ExpensePredictionService : IExpensePredictionService
             await _dbContext.SaveChangesAsync();
 
             _logger.LogInformation(
-                "Created manual override prediction {PredictionId} for transaction {TransactionId} with status {Status}",
-                prediction.Id, transactionId, status);
+                "Created manual override prediction {PredictionId} for transaction {TransactionId} with status {Status}, linked to pattern {PatternId}",
+                prediction.Id, transactionId, status, pattern?.Id);
         }
 
         // Record feedback for audit trail
