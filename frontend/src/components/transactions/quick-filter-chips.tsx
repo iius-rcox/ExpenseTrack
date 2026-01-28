@@ -107,33 +107,49 @@ const QUICK_FILTERS: QuickFilterChip[] = [
     id: 'unmatched',
     label: 'Unmatched',
     icon: '🔍',
+    // Only show BUSINESS transactions that are unmatched (personal transactions don't need matching)
     getFilters: (defaults) => ({
       ...defaults,
       matchStatus: ['unmatched'],
+      reimbursability: ['business'],
     }),
     isActive: (filters) =>
-      filters.matchStatus.length === 1 && filters.matchStatus[0] === 'unmatched',
+      filters.matchStatus.length === 1 &&
+      filters.matchStatus[0] === 'unmatched' &&
+      filters.reimbursability.length === 1 &&
+      filters.reimbursability[0] === 'business',
   },
   {
-    id: 'pending-match',
-    label: 'Pending Match',
-    icon: '⏳',
+    id: 'needs-receipt',
+    label: 'Needs Receipt',
+    icon: '🧾',
+    // Business transactions that need a receipt attached (unmatched or pending)
     getFilters: (defaults) => ({
       ...defaults,
-      matchStatus: ['pending'],
+      matchStatus: ['unmatched', 'pending'],
+      reimbursability: ['business'],
     }),
     isActive: (filters) =>
-      filters.matchStatus.length === 1 && filters.matchStatus[0] === 'pending',
+      filters.matchStatus.length === 2 &&
+      filters.matchStatus.includes('unmatched') &&
+      filters.matchStatus.includes('pending') &&
+      filters.reimbursability.length === 1 &&
+      filters.reimbursability[0] === 'business',
   },
   {
     id: 'needs-review',
     label: 'Needs Review',
     icon: '💡',
+    // AI predictions awaiting user confirmation (business transactions only)
     getFilters: (defaults) => ({
       ...defaults,
       hasPendingPrediction: true,
+      reimbursability: ['business'],
     }),
-    isActive: (filters) => filters.hasPendingPrediction === true,
+    isActive: (filters) =>
+      filters.hasPendingPrediction === true &&
+      filters.reimbursability.length === 1 &&
+      filters.reimbursability[0] === 'business',
   },
   {
     id: 'high-value',
