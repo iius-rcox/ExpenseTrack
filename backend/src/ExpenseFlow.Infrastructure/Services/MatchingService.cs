@@ -938,8 +938,10 @@ public partial class MatchingService : IMatchingService
         // T040: Handle group matches vs transaction matches
         if (match.TransactionGroupId.HasValue)
         {
-            // Group match - update group status
-            var group = await _context.TransactionGroups.FindAsync(match.TransactionGroupId.Value)
+            // Group match - update group status and mark all transactions as reimbursable
+            var group = await _context.TransactionGroups
+                .Include(g => g.Transactions)
+                .FirstOrDefaultAsync(g => g.Id == match.TransactionGroupId.Value)
                 ?? throw new InvalidOperationException("Transaction group not found");
 
             receipt.MatchedTransactionId = group.Id; // Store group ID in MatchedTransactionId for unmatch lookup
@@ -949,7 +951,15 @@ public partial class MatchingService : IMatchingService
 
             vendorPattern = ExtractVendorFromGroupName(group.Name);
 
-            _logger.LogDebug("Confirmed group match: Receipt {ReceiptId} -> Group {GroupId}", receipt.Id, group.Id);
+            // Auto-confirm predictions for all transactions in the group
+            // (matching a receipt to a group implies all transactions are business expenses)
+            foreach (var transaction in group.Transactions)
+            {
+                await _predictionService.MarkTransactionReimbursableAsync(userId, transaction.Id);
+            }
+
+            _logger.LogDebug("Confirmed group match: Receipt {ReceiptId} -> Group {GroupId} ({TransactionCount} transactions)",
+                receipt.Id, group.Id, group.Transactions.Count);
         }
         else
         {
@@ -1210,8 +1220,9 @@ public partial class MatchingService : IMatchingService
             throw new InvalidOperationException("Receipt is already matched");
         }
 
-        // Validate group exists and is unmatched
+        // Validate group exists and is unmatched, include transactions for auto-confirm
         var group = await _context.TransactionGroups
+            .Include(g => g.Transactions)
             .FirstOrDefaultAsync(g => g.Id == transactionGroupId && g.UserId == userId)
             ?? throw new InvalidOperationException("Transaction group not found");
 
@@ -1263,9 +1274,16 @@ public partial class MatchingService : IMatchingService
 
         await _matchRepository.AddAsync(match);
 
+        // Auto-confirm predictions for all transactions in the group
+        // (matching a receipt to a group implies all transactions are business expenses)
+        foreach (var transaction in group.Transactions)
+        {
+            await _predictionService.MarkTransactionReimbursableAsync(userId, transaction.Id);
+        }
+
         _logger.LogInformation(
-            "Manual group match created by user {UserId}: Receipt {ReceiptId} -> Group {GroupId} ({GroupName})",
-            userId, receiptId, transactionGroupId, group.Name);
+            "Manual group match created by user {UserId}: Receipt {ReceiptId} -> Group {GroupId} ({GroupName}, {TransactionCount} transactions)",
+            userId, receiptId, transactionGroupId, group.Name, group.Transactions.Count);
 
         return match;
     }
