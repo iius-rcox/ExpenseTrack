@@ -117,22 +117,22 @@ export const ExpenseBadge = memo(function ExpenseBadge({
   className,
 }: ExpenseBadgeProps) {
   // Define all hooks unconditionally first (React rules of hooks)
-  // Handle confirm action
+  // Handle confirm action - use transactionId for mutation compatibility
   const handleConfirm = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      onConfirm?.(prediction.id);
+      onConfirm?.(prediction.transactionId);
     },
-    [onConfirm, prediction.id]
+    [onConfirm, prediction.transactionId]
   );
 
-  // Handle reject action
+  // Handle reject action - use transactionId for mutation compatibility
   const handleReject = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      onReject?.(prediction.id);
+      onReject?.(prediction.transactionId);
     },
-    [onReject, prediction.id]
+    [onReject, prediction.transactionId]
   );
 
   // Handle view details
@@ -192,16 +192,16 @@ export const ExpenseBadge = memo(function ExpenseBadge({
               )}
             </div>
             <DropdownMenuSeparator className="my-0" />
-            {/* Actions */}
+            {/* Actions - use transactionId for mutation compatibility */}
             <DropdownMenuItem
-              onSelect={() => onConfirm?.(prediction.id)}
+              onSelect={() => onConfirm?.(prediction.transactionId)}
               disabled={isProcessing}
             >
               <CircleCheck className="mr-2 h-4 w-4 text-green-600" />
               Mark as Business
             </DropdownMenuItem>
             <DropdownMenuItem
-              onSelect={() => onReject?.(prediction.id)}
+              onSelect={() => onReject?.(prediction.transactionId)}
               disabled={isProcessing}
             >
               <CircleX className="mr-2 h-4 w-4 text-red-600" />

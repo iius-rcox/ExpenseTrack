@@ -831,6 +831,10 @@ function TransactionsPage() {
             onTransactionClick={handleTransactionClick}
             savingIds={savingIds}
             containerHeight={Math.min(600, Math.max(400, items.length * 56))}
+            // Prediction confirm/reject for "Pending Review" badges (ExpenseBadge)
+            onPredictionConfirm={handleMarkReimbursable}
+            onPredictionReject={handleMarkNotReimbursable}
+            // Reimbursability actions for confirmed/rejected/no-prediction (ReimbursabilityActions)
             onMarkReimbursable={handleMarkReimbursable}
             onMarkNotReimbursable={handleMarkNotReimbursable}
             onClearReimbursabilityOverride={handleClearReimbursabilityOverride}
