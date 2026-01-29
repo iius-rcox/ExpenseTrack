@@ -844,6 +844,8 @@ import { predictionKeys } from './use-predictions'
  * Creates or updates a manual override prediction with Confirmed status.
  * This marks the transaction as a valid business expense.
  *
+ * Features optimistic updates for instant UI feedback.
+ *
  * @example
  * ```tsx
  * const markReimbursable = useMarkTransactionReimbursable();
@@ -861,8 +863,53 @@ export function useMarkTransactionReimbursable() {
       )
     },
 
-    onSuccess: () => {
-      // Invalidate both transaction and prediction caches
+    // Optimistic update for instant UI feedback
+    onMutate: async (transactionId) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: transactionKeys.lists() })
+
+      // Snapshot previous values for rollback
+      const previousLists = queryClient.getQueriesData({
+        queryKey: transactionKeys.lists(),
+      })
+
+      // Optimistically update transaction prediction status
+      queryClient.setQueriesData(
+        { queryKey: transactionKeys.lists() },
+        (old: TransactionListResult | undefined) => {
+          if (!old) return old
+          return {
+            ...old,
+            transactions: old.transactions.map((t) =>
+              t.id === transactionId
+                ? {
+                    ...t,
+                    prediction: {
+                      ...(t.prediction || {}),
+                      status: 'Confirmed' as const,
+                      isManualOverride: true,
+                    },
+                  }
+                : t
+            ),
+          }
+        }
+      )
+
+      return { previousLists }
+    },
+
+    // Rollback on error
+    onError: (_error, _transactionId, context) => {
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data)
+        })
+      }
+    },
+
+    // Refetch on settle to sync with server
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() })
       queryClient.invalidateQueries({ queryKey: predictionKeys.all })
     },
@@ -874,6 +921,8 @@ export function useMarkTransactionReimbursable() {
  *
  * Creates or updates a manual override prediction with Rejected status.
  * Use this for personal purchases that shouldn't be included in expense reports.
+ *
+ * Features optimistic updates for instant UI feedback.
  *
  * @example
  * ```tsx
@@ -892,8 +941,53 @@ export function useMarkTransactionNotReimbursable() {
       )
     },
 
-    onSuccess: () => {
-      // Invalidate both transaction and prediction caches
+    // Optimistic update for instant UI feedback
+    onMutate: async (transactionId) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: transactionKeys.lists() })
+
+      // Snapshot previous values for rollback
+      const previousLists = queryClient.getQueriesData({
+        queryKey: transactionKeys.lists(),
+      })
+
+      // Optimistically update transaction prediction status
+      queryClient.setQueriesData(
+        { queryKey: transactionKeys.lists() },
+        (old: TransactionListResult | undefined) => {
+          if (!old) return old
+          return {
+            ...old,
+            transactions: old.transactions.map((t) =>
+              t.id === transactionId
+                ? {
+                    ...t,
+                    prediction: {
+                      ...(t.prediction || {}),
+                      status: 'Rejected' as const,
+                      isManualOverride: true,
+                    },
+                  }
+                : t
+            ),
+          }
+        }
+      )
+
+      return { previousLists }
+    },
+
+    // Rollback on error
+    onError: (_error, _transactionId, context) => {
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data)
+        })
+      }
+    },
+
+    // Refetch on settle to sync with server
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() })
       queryClient.invalidateQueries({ queryKey: predictionKeys.all })
     },
@@ -905,6 +999,8 @@ export function useMarkTransactionNotReimbursable() {
  *
  * Removes the manual prediction, allowing the system to auto-predict
  * based on learned patterns on the next prediction cycle.
+ *
+ * Features optimistic updates for instant UI feedback.
  *
  * @example
  * ```tsx
@@ -923,8 +1019,49 @@ export function useClearReimbursabilityOverride() {
       )
     },
 
-    onSuccess: () => {
-      // Invalidate both transaction and prediction caches
+    // Optimistic update for instant UI feedback
+    onMutate: async (transactionId) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: transactionKeys.lists() })
+
+      // Snapshot previous values for rollback
+      const previousLists = queryClient.getQueriesData({
+        queryKey: transactionKeys.lists(),
+      })
+
+      // Optimistically clear the prediction (will be re-predicted later)
+      queryClient.setQueriesData(
+        { queryKey: transactionKeys.lists() },
+        (old: TransactionListResult | undefined) => {
+          if (!old) return old
+          return {
+            ...old,
+            transactions: old.transactions.map((t) =>
+              t.id === transactionId
+                ? {
+                    ...t,
+                    prediction: null, // Clear prediction until server re-predicts
+                  }
+                : t
+            ),
+          }
+        }
+      )
+
+      return { previousLists }
+    },
+
+    // Rollback on error
+    onError: (_error, _transactionId, context) => {
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data)
+        })
+      }
+    },
+
+    // Refetch on settle to sync with server
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() })
       queryClient.invalidateQueries({ queryKey: predictionKeys.all })
     },
@@ -936,6 +1073,8 @@ export function useClearReimbursabilityOverride() {
  *
  * Creates or updates manual override predictions for all specified transactions.
  * Useful for quickly categorizing multiple transactions from the transaction list.
+ *
+ * Features optimistic updates for instant UI feedback.
  *
  * @example
  * ```tsx
@@ -968,12 +1107,60 @@ export function useBulkMarkReimbursability() {
       )
     },
 
-    onSuccess: (_data, variables) => {
-      // Invalidate both transaction and prediction caches
+    // Optimistic update for instant UI feedback
+    onMutate: async ({ transactionIds, isReimbursable }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: transactionKeys.lists() })
+
+      // Snapshot previous values for rollback
+      const previousLists = queryClient.getQueriesData({
+        queryKey: transactionKeys.lists(),
+      })
+
+      const idSet = new Set(transactionIds)
+      const newStatus = isReimbursable ? 'Confirmed' : 'Rejected'
+
+      // Optimistically update all affected transactions
+      queryClient.setQueriesData(
+        { queryKey: transactionKeys.lists() },
+        (old: TransactionListResult | undefined) => {
+          if (!old) return old
+          return {
+            ...old,
+            transactions: old.transactions.map((t) =>
+              idSet.has(t.id)
+                ? {
+                    ...t,
+                    prediction: {
+                      ...(t.prediction || {}),
+                      status: newStatus as 'Confirmed' | 'Rejected',
+                      isManualOverride: true,
+                    },
+                  }
+                : t
+            ),
+          }
+        }
+      )
+
+      return { previousLists }
+    },
+
+    // Rollback on error
+    onError: (_error, _variables, context) => {
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data)
+        })
+      }
+    },
+
+    // Refetch on settle to sync with server
+    onSettled: (_data, _error, variables) => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() })
       queryClient.invalidateQueries({ queryKey: predictionKeys.all })
 
-      // Optionally invalidate specific transaction details
+      // Invalidate specific transaction details
       variables.transactionIds.forEach((id) => {
         queryClient.invalidateQueries({ queryKey: transactionKeys.detail(id) })
       })
