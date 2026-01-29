@@ -22,6 +22,7 @@ import {
   CircleX,
   Undo2,
   Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -284,6 +285,56 @@ export const ReimbursabilityStatusBadge = memo(function ReimbursabilityStatusBad
           </Badge>
         </TooltipTrigger>
         <TooltipContent>{config.tooltip}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+});
+
+/**
+ * Missing Receipt Badge - Warning for Business expenses without matched receipts
+ *
+ * Shows a prominent warning when a transaction/group is:
+ * - Marked as Business (reimbursable)
+ * - AND does not have a matched receipt
+ *
+ * This helps users identify incomplete expense documentation.
+ */
+export const MissingReceiptBadge = memo(function MissingReceiptBadge({
+  isReimbursable,
+  isMatched,
+  className,
+}: {
+  /** Whether the item is marked as Business (reimbursable) */
+  isReimbursable: boolean | undefined;
+  /** Whether the item has a matched receipt */
+  isMatched: boolean;
+  /** Additional CSS classes */
+  className?: string;
+}) {
+  // Only show for Business expenses without matched receipts
+  if (isReimbursable !== true || isMatched) {
+    return null;
+  }
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            variant="outline"
+            className={cn(
+              'gap-1 cursor-default',
+              'text-orange-600 bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700',
+              className
+            )}
+          >
+            <AlertTriangle className="h-3 w-3" />
+            <span className="text-xs">Missing Receipt</span>
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>This business expense needs a receipt for reimbursement</p>
+        </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

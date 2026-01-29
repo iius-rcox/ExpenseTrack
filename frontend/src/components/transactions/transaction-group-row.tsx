@@ -69,6 +69,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import { MissingReceiptBadge } from '@/components/transactions/reimbursability-actions';
 import type {
   TransactionGroupRowProps,
   GroupMatchStatus,
@@ -528,30 +529,38 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
 
         {/* Match Status */}
         <TableCell className="w-[120px]">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge
-                  variant="outline"
-                  className={cn('gap-1 cursor-default', matchConfig.color)}
-                >
-                  <MatchIcon className="h-3 w-3" />
-                  <span className="text-xs">{matchConfig.label}</span>
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                {group.matchStatus === 'matched' && (
-                  <p>Group matched to receipt</p>
-                )}
-                {group.matchStatus === 'unmatched' && (
-                  <p>No receipt matched to this group</p>
-                )}
-                {group.matchStatus === 'proposed' && (
-                  <p>Receipt match proposed, awaiting review</p>
-                )}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {/* Show Missing Receipt badge for Business groups without matched receipts */}
+          {group.isReimbursable === true && group.matchStatus !== 'matched' ? (
+            <MissingReceiptBadge
+              isReimbursable={true}
+              isMatched={false}
+            />
+          ) : (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className={cn('gap-1 cursor-default', matchConfig.color)}
+                  >
+                    <MatchIcon className="h-3 w-3" />
+                    <span className="text-xs">{matchConfig.label}</span>
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {group.matchStatus === 'matched' && (
+                    <p>Group matched to receipt</p>
+                  )}
+                  {group.matchStatus === 'unmatched' && (
+                    <p>No receipt matched to this group</p>
+                  )}
+                  {group.matchStatus === 'proposed' && (
+                    <p>Receipt match proposed, awaiting review</p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </TableCell>
 
         {/* Empty cell for tags column */}

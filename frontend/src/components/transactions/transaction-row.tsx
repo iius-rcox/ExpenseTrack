@@ -42,7 +42,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ExpenseBadge } from '@/components/predictions/expense-badge';
-import { ReimbursabilityActions } from '@/components/transactions/reimbursability-actions';
+import { ReimbursabilityActions, MissingReceiptBadge } from '@/components/transactions/reimbursability-actions';
 import type {
   TransactionView,
   TransactionMatchStatus,
@@ -435,38 +435,46 @@ export const TransactionRow = memo(function TransactionRow({
 
       {/* Match Status */}
       <TableCell className="w-[120px]">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge
-                variant="outline"
-                className={cn(
-                  'gap-1 cursor-default',
-                  matchConfig.color
+        {/* Show Missing Receipt badge for Business expenses without matched receipts */}
+        {transaction.prediction?.status === 'Confirmed' && transaction.matchStatus !== 'matched' && transaction.matchStatus !== 'manual' ? (
+          <MissingReceiptBadge
+            isReimbursable={true}
+            isMatched={false}
+          />
+        ) : (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'gap-1 cursor-default',
+                    matchConfig.color
+                  )}
+                >
+                  <MatchIcon className="h-3 w-3" />
+                  <span className="text-xs">{matchConfig.label}</span>
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {transaction.matchStatus === 'matched' && transaction.matchConfidence && (
+                  <p>
+                    Confidence: {Math.round(transaction.matchConfidence * 100)}%
+                  </p>
                 )}
-              >
-                <MatchIcon className="h-3 w-3" />
-                <span className="text-xs">{matchConfig.label}</span>
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              {transaction.matchStatus === 'matched' && transaction.matchConfidence && (
-                <p>
-                  Confidence: {Math.round(transaction.matchConfidence * 100)}%
-                </p>
-              )}
-              {transaction.matchStatus === 'unmatched' && (
-                <p>No receipt matched to this transaction</p>
-              )}
-              {transaction.matchStatus === 'pending' && (
-                <p>Receipt match pending review</p>
-              )}
-              {transaction.matchStatus === 'manual' && (
-                <p>Manually matched by user</p>
-              )}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+                {transaction.matchStatus === 'unmatched' && (
+                  <p>No receipt matched to this transaction</p>
+                )}
+                {transaction.matchStatus === 'pending' && (
+                  <p>Receipt match pending review</p>
+                )}
+                {transaction.matchStatus === 'manual' && (
+                  <p>Manually matched by user</p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </TableCell>
 
       {/* Tags */}
