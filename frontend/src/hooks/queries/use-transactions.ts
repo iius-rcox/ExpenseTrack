@@ -880,18 +880,32 @@ export function useMarkTransactionReimbursable() {
           if (!old) return old
           return {
             ...old,
-            transactions: old.transactions.map((t) =>
-              t.id === transactionId
+            transactions: old.transactions.map((t) => {
+              if (t.id !== transactionId) return t
+
+              // Create optimistic prediction with all required fields
+              const optimisticPrediction = t.prediction
                 ? {
-                    ...t,
-                    prediction: {
-                      ...(t.prediction || {}),
-                      status: 'Confirmed' as const,
-                      isManualOverride: true,
-                    },
+                    ...t.prediction,
+                    status: 'Confirmed' as const,
+                    isManualOverride: true,
                   }
-                : t
-            ),
+                : {
+                    // Create minimal valid prediction for optimistic UI
+                    id: `temp-${transactionId}`,
+                    transactionId,
+                    patternId: null,
+                    vendorName: 'Manual',
+                    confidenceScore: 1.0,
+                    confidenceLevel: 'High' as const,
+                    status: 'Confirmed' as const,
+                    suggestedCategory: null,
+                    suggestedGLCode: null,
+                    isManualOverride: true,
+                  }
+
+              return { ...t, prediction: optimisticPrediction }
+            }),
           }
         }
       )
@@ -958,18 +972,32 @@ export function useMarkTransactionNotReimbursable() {
           if (!old) return old
           return {
             ...old,
-            transactions: old.transactions.map((t) =>
-              t.id === transactionId
+            transactions: old.transactions.map((t) => {
+              if (t.id !== transactionId) return t
+
+              // Create optimistic prediction with all required fields
+              const optimisticPrediction = t.prediction
                 ? {
-                    ...t,
-                    prediction: {
-                      ...(t.prediction || {}),
-                      status: 'Rejected' as const,
-                      isManualOverride: true,
-                    },
+                    ...t.prediction,
+                    status: 'Rejected' as const,
+                    isManualOverride: true,
                   }
-                : t
-            ),
+                : {
+                    // Create minimal valid prediction for optimistic UI
+                    id: `temp-${transactionId}`,
+                    transactionId,
+                    patternId: null,
+                    vendorName: 'Manual',
+                    confidenceScore: 1.0,
+                    confidenceLevel: 'High' as const,
+                    status: 'Rejected' as const,
+                    suggestedCategory: null,
+                    suggestedGLCode: null,
+                    isManualOverride: true,
+                  }
+
+              return { ...t, prediction: optimisticPrediction }
+            }),
           }
         }
       )
@@ -1127,18 +1155,32 @@ export function useBulkMarkReimbursability() {
           if (!old) return old
           return {
             ...old,
-            transactions: old.transactions.map((t) =>
-              idSet.has(t.id)
+            transactions: old.transactions.map((t) => {
+              if (!idSet.has(t.id)) return t
+
+              // Create optimistic prediction with all required fields
+              const optimisticPrediction = t.prediction
                 ? {
-                    ...t,
-                    prediction: {
-                      ...(t.prediction || {}),
-                      status: newStatus as 'Confirmed' | 'Rejected',
-                      isManualOverride: true,
-                    },
+                    ...t.prediction,
+                    status: newStatus as 'Confirmed' | 'Rejected',
+                    isManualOverride: true,
                   }
-                : t
-            ),
+                : {
+                    // Create minimal valid prediction for optimistic UI
+                    id: `temp-${t.id}`,
+                    transactionId: t.id,
+                    patternId: null,
+                    vendorName: 'Manual',
+                    confidenceScore: 1.0,
+                    confidenceLevel: 'High' as const,
+                    status: newStatus as 'Confirmed' | 'Rejected',
+                    suggestedCategory: null,
+                    suggestedGLCode: null,
+                    isManualOverride: true,
+                  }
+
+              return { ...t, prediction: optimisticPrediction }
+            }),
           }
         }
       )
