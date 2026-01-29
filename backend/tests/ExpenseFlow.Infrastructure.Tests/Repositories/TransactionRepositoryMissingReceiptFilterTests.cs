@@ -335,6 +335,96 @@ public class TransactionRepositoryMissingReceiptFilterTests : IDisposable
         totalCount.Should().Be(0);
     }
 
+    [Fact]
+    [Trait("Category", "Unit")]
+    public async Task GetPagedAsync_MissingReceiptFilter_ExcludesTransactionsOnSubmittedReports()
+    {
+        // Arrange - Transaction in Business group already on a submitted report
+        var businessGroup = CreateTransactionGroup(_testUserId, isReimbursable: true);
+        var transaction = CreateTransaction(_testUserId, hasReceipt: false, groupId: businessGroup.Id);
+
+        // Create a submitted expense report with this transaction
+        var submittedReport = CreateExpenseReport(_testUserId, ReportStatus.Submitted);
+        var expenseLine = CreateExpenseLine(submittedReport.Id, transaction.Id);
+
+        _dbContext.TransactionGroups.Add(businessGroup);
+        _dbContext.Transactions.Add(transaction);
+        _dbContext.ExpenseReports.Add(submittedReport);
+        _dbContext.ExpenseLines.Add(expenseLine);
+        await _dbContext.SaveChangesAsync();
+
+        // Act
+        var (transactions, totalCount, _) = await _sut.GetPagedAsync(
+            _testUserId,
+            page: 1,
+            pageSize: 50,
+            matchStatus: new List<string> { "missing-receipt" });
+
+        // Assert
+        transactions.Should().BeEmpty("transactions on submitted reports should be excluded from missing-receipt filter");
+        totalCount.Should().Be(0);
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public async Task GetPagedAsync_MissingReceiptFilter_IncludesTransactionsOnDraftReports()
+    {
+        // Arrange - Transaction in Business group on a draft report (still editable)
+        var businessGroup = CreateTransactionGroup(_testUserId, isReimbursable: true);
+        var transaction = CreateTransaction(_testUserId, hasReceipt: false, groupId: businessGroup.Id);
+
+        // Create a draft expense report with this transaction
+        var draftReport = CreateExpenseReport(_testUserId, ReportStatus.Draft);
+        var expenseLine = CreateExpenseLine(draftReport.Id, transaction.Id);
+
+        _dbContext.TransactionGroups.Add(businessGroup);
+        _dbContext.Transactions.Add(transaction);
+        _dbContext.ExpenseReports.Add(draftReport);
+        _dbContext.ExpenseLines.Add(expenseLine);
+        await _dbContext.SaveChangesAsync();
+
+        // Act
+        var (transactions, totalCount, _) = await _sut.GetPagedAsync(
+            _testUserId,
+            page: 1,
+            pageSize: 50,
+            matchStatus: new List<string> { "missing-receipt" });
+
+        // Assert
+        transactions.Should().HaveCount(1, "transactions on draft reports should still appear in missing-receipt filter");
+        transactions[0].Id.Should().Be(transaction.Id);
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public async Task GetPagedAsync_MissingReceiptFilter_IncludesTransactionsOnGeneratedReports()
+    {
+        // Arrange - Transaction in Business group on a generated (but not submitted) report
+        var businessGroup = CreateTransactionGroup(_testUserId, isReimbursable: true);
+        var transaction = CreateTransaction(_testUserId, hasReceipt: false, groupId: businessGroup.Id);
+
+        // Create a generated expense report with this transaction
+        var generatedReport = CreateExpenseReport(_testUserId, ReportStatus.Generated);
+        var expenseLine = CreateExpenseLine(generatedReport.Id, transaction.Id);
+
+        _dbContext.TransactionGroups.Add(businessGroup);
+        _dbContext.Transactions.Add(transaction);
+        _dbContext.ExpenseReports.Add(generatedReport);
+        _dbContext.ExpenseLines.Add(expenseLine);
+        await _dbContext.SaveChangesAsync();
+
+        // Act
+        var (transactions, totalCount, _) = await _sut.GetPagedAsync(
+            _testUserId,
+            page: 1,
+            pageSize: 50,
+            matchStatus: new List<string> { "missing-receipt" });
+
+        // Assert
+        transactions.Should().HaveCount(1, "transactions on generated (not yet submitted) reports should still appear");
+        transactions[0].Id.Should().Be(transaction.Id);
+    }
+
     #endregion
 
     #region Helper Methods
@@ -394,6 +484,40 @@ public class TransactionRepositoryMissingReceiptFilterTests : IDisposable
             IsManualOverride = false,
             ConfidenceScore = 0.95m,
             ConfidenceLevel = PredictionConfidence.High,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    private ExpenseReport CreateExpenseReport(Guid userId, ReportStatus status)
+    {
+        return new ExpenseReport
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Period = "2025-01",
+            Status = status,
+            TotalAmount = 100m,
+            LineCount = 1,
+            MissingReceiptCount = 1,
+            CreatedAt = DateTime.UtcNow,
+            GeneratedAt = status >= ReportStatus.Generated ? DateTimeOffset.UtcNow : null,
+            SubmittedAt = status == ReportStatus.Submitted ? DateTimeOffset.UtcNow : null
+        };
+    }
+
+    private ExpenseLine CreateExpenseLine(Guid reportId, Guid transactionId)
+    {
+        return new ExpenseLine
+        {
+            Id = Guid.NewGuid(),
+            ReportId = reportId,
+            TransactionId = transactionId,
+            LineOrder = 1,
+            ExpenseDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)),
+            Amount = 99.99m,
+            OriginalDescription = "Test Transaction",
+            NormalizedDescription = "Test Transaction",
+            HasReceipt = false,
             CreatedAt = DateTime.UtcNow
         };
     }

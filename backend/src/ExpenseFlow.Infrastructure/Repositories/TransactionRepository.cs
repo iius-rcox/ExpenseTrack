@@ -92,6 +92,11 @@ public class TransactionRepository : ITransactionRepository
                     .Where(g => g.UserId == userId && g.IsReimbursable == true)
                     .Select(g => g.Id);
 
+                // Transaction IDs that are on submitted reports (should be excluded from missing-receipt)
+                var transactionIdsOnSubmittedReports = _context.ExpenseLines
+                    .Where(el => el.TransactionId != null && el.Report.Status == Shared.Enums.ReportStatus.Submitted)
+                    .Select(el => el.TransactionId!.Value);
+
                 query = query.Where(t =>
                     // Matched: MatchStatus == Matched (2)
                     (hasMatched && t.MatchStatus == Shared.Enums.MatchStatus.Matched) ||
@@ -104,9 +109,11 @@ public class TransactionRepository : ITransactionRepository
                     // 1. No matched receipt
                     // 2. Not dismissed (ReceiptDismissed is null or false)
                     // 3. Either in a Business group OR has a Confirmed prediction
+                    // 4. NOT already on a submitted expense report
                     (hasMissingReceipt &&
                         t.MatchedReceiptId == null &&
                         (t.ReceiptDismissed == null || t.ReceiptDismissed == false) &&
+                        !transactionIdsOnSubmittedReports.Contains(t.Id) &&
                         (
                             // In a Business group (IsReimbursable == true) - use subquery
                             (t.GroupId != null && businessGroupIds.Contains(t.GroupId.Value)) ||

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using ExpenseFlow.Core.Interfaces;
+using ExpenseFlow.Core.Services;
 using ExpenseFlow.Infrastructure.Services;
 using ExpenseFlow.Shared.DTOs;
 using ExpenseFlow.Shared.Enums;
@@ -25,6 +26,7 @@ public class ProcessReceiptJob : IReceiptProcessingJob
     private readonly IHtmlReceiptExtractionService _htmlExtractionService;
     private readonly IHtmlThumbnailService _htmlThumbnailService;
     private readonly ITravelDetectionService _travelDetectionService;
+    private readonly IVendorAliasService _vendorAliasService;
     private readonly ILogger<ProcessReceiptJob> _logger;
     private readonly double _confidenceThreshold;
     private readonly int _maxRetries;
@@ -40,6 +42,7 @@ public class ProcessReceiptJob : IReceiptProcessingJob
         IHtmlReceiptExtractionService htmlExtractionService,
         IHtmlThumbnailService htmlThumbnailService,
         ITravelDetectionService travelDetectionService,
+        IVendorAliasService vendorAliasService,
         IConfiguration configuration,
         ILogger<ProcessReceiptJob> logger)
     {
@@ -50,6 +53,7 @@ public class ProcessReceiptJob : IReceiptProcessingJob
         _htmlExtractionService = htmlExtractionService;
         _htmlThumbnailService = htmlThumbnailService;
         _travelDetectionService = travelDetectionService;
+        _vendorAliasService = vendorAliasService;
         _logger = logger;
 
         _confidenceThreshold = configuration.GetValue<double>("ReceiptProcessing:ConfidenceThreshold", 0.60);
@@ -135,7 +139,10 @@ public class ProcessReceiptJob : IReceiptProcessingJob
 
             // Update receipt with extracted data
             // BUG-004 fix: If vendor is missing, try to extract from filename or use fallback patterns
-            receipt.VendorExtracted = extractionResult.VendorName ?? ExtractVendorFromFilename(receipt.OriginalFilename);
+            var rawVendor = extractionResult.VendorName ?? ExtractVendorFromFilename(receipt.OriginalFilename);
+
+            // Normalize vendor name using VendorAlias lookup (e.g., "STRIPE*ANTHROPIC" → "Anthropic Claude")
+            receipt.VendorExtracted = await NormalizeVendorNameAsync(rawVendor);
 
             // BUG-003 fix: Validate/correct OCR date using filename date
             // Parking receipts often have entry AND exit dates; OCR may pick entry date incorrectly
@@ -377,6 +384,43 @@ public class ProcessReceiptJob : IReceiptProcessingJob
         // This method is a placeholder for future pattern matching if needed
         // (e.g., scanning-app generated filenames that include vendor)
         return null;
+    }
+
+    /// <summary>
+    /// Normalizes vendor name using VendorAlias lookup.
+    /// Maps raw extracted values (e.g., "STRIPE*ANTHROPIC") to canonical names (e.g., "Anthropic Claude").
+    /// </summary>
+    /// <param name="rawVendor">Raw vendor name from OCR extraction.</param>
+    /// <returns>Normalized vendor name if alias found, otherwise returns original value.</returns>
+    private async Task<string?> NormalizeVendorNameAsync(string? rawVendor)
+    {
+        if (string.IsNullOrWhiteSpace(rawVendor))
+            return rawVendor;
+
+        try
+        {
+            var alias = await _vendorAliasService.FindMatchingAliasAsync(rawVendor);
+            if (alias != null)
+            {
+                _logger.LogInformation(
+                    "Vendor normalized via alias: '{RawVendor}' → '{NormalizedVendor}' (pattern: {Pattern})",
+                    rawVendor,
+                    alias.DisplayName,
+                    alias.AliasPattern);
+
+                // Record the match for frequency tracking
+                await _vendorAliasService.RecordMatchAsync(alias.Id);
+
+                return alias.DisplayName;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Don't fail receipt processing if alias lookup fails
+            _logger.LogWarning(ex, "Failed to lookup vendor alias for '{RawVendor}', using original value", rawVendor);
+        }
+
+        return rawVendor;
     }
 
     /// <summary>
