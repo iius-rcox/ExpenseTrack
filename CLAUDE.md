@@ -1,11 +1,55 @@
-﻿# ExpenseFlow Development Guidelines
+# ExpenseFlow Development Guidelines
 
-Auto-generated from feature plans. Last updated: 2025-12-17
+Last updated: 2026-01-29
 
 ## Tool Usage
+
 ### MCP Servers
 - **ref.tools**: Use this to reference best practices when developing any feature
 - **shad.cn**: Use this for all frontend components and design choices
+
+## Technology Stack
+
+### Backend
+| Category | Technology |
+|----------|------------|
+| Framework | .NET 8 with C# 12, ASP.NET Core Web API |
+| ORM | Entity Framework Core 8, Npgsql |
+| Database | PostgreSQL 15+ with pgvector (Supabase self-hosted) |
+| Auth | Azure Entra ID (Microsoft.Identity.Web) |
+| Background Jobs | Hangfire (PostgreSQL backend) |
+| AI/ML | Microsoft.SemanticKernel 1.25.0, Azure.AI.OpenAI, Azure.AI.DocumentIntelligence |
+| Resilience | Polly v8 (Microsoft.Extensions.Resilience) |
+| Documents | PdfSharpCore, ClosedXML, HtmlAgilityPack, PuppeteerSharp |
+| Images | SixLabors.ImageSharp, SkiaSharp |
+| Validation | FluentValidation |
+| Matching | F23.StringSimilarity (Levenshtein) |
+| CSV/Excel | CsvHelper, ClosedXML |
+
+### Frontend
+| Category | Technology |
+|----------|------------|
+| Framework | React 18.3+ with TypeScript 5.7+ |
+| Build | Vite 6.0 |
+| Routing | TanStack Router v1.141+ |
+| State | TanStack Query v5.90+ |
+| Styling | Tailwind CSS 4.x, shadcn/ui (Radix primitives) |
+| Auth | Azure MSAL |
+| Animations | Framer Motion |
+| Charts | Recharts |
+| Icons | Lucide React |
+| Theming | next-themes |
+| Validation | Zod |
+
+### Infrastructure
+| Category | Technology |
+|----------|------------|
+| Orchestration | Azure Kubernetes Service (dev-aks, K8s 1.33.3) |
+| Manifests | YAML + Helm |
+| TLS | Let's Encrypt + cert-manager v1.19.x |
+| Database UI | Supabase Studio |
+| Storage | Azure Blob Storage (ccproctemp2025) |
+| CI/CD | GitHub Actions → ACR → ArgoCD |
 
 ## Viewpoint Vista ERP Integration
 
@@ -25,107 +69,94 @@ Reference data (departments, projects, GL accounts) is synced from Viewpoint Vis
 - Clear user preferences automatically when referenced records become inactive
 - On sync failure: Alert ops immediately, continue with stale cache
 
-## Active Technologies
-- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Microsoft.Identity.Web, Polly (002-core-backend-auth)
-- PostgreSQL 15+ (Supabase self-hosted with pgvector), Azure Blob Storage (002-core-backend-auth)
-- .NET 8 with C# 12 + ASP.NET Core Web API + Entity Framework Core 8, Npgsql, Hangfire, Azure.AI.FormRecognizer, Azure.Storage.Blobs, SkiaSharp (003-receipt-pipeline)
-- PostgreSQL 15+ (Supabase self-hosted), Azure Blob Storage (ccproctemp2025) (003-receipt-pipeline)
-- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, CsvHelper, ClosedXML (Excel), Semantic Kernel, Azure.AI.OpenAI (004-statement-fingerprinting)
-- PostgreSQL 15+ with pgvector (Supabase self-hosted), Azure Blob Storage (ccproctemp2025) (004-statement-fingerprinting)
-- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, F23.StringSimilarity (Levenshtein) (005-matching-engine)
-- PostgreSQL 15+ (Supabase self-hosted with pgvector), Azure Blob Storage (ccproctemp2025) (005-matching-engine)
-- .NET 8 with C# 12, ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Microsoft.SemanticKernel 1.25.0, Microsoft.SemanticKernel.Connectors.AzureOpenAI, Microsoft.Extensions.Resilience (Polly v8) (006-ai-categorization)
-- PostgreSQL 15+ with pgvector (Supabase self-hosted) for embedding similarity search (006-ai-categorization)
-- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire (recurring jobs for subscription alerts), System.Text.Json (JSON config storage) (007-advanced-features)
-- PostgreSQL 15+ with pgvector (Supabase self-hosted), Tier 1 rule-based detection (007-advanced-features)
-- .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, Semantic Kernel, Hangfire (008-draft-report-generation)
-- .NET 8 with C# 12 (ASP.NET Core Web API) + Entity Framework Core 8, Npgsql, ClosedXML (Excel), PdfSharpCore (PDF), SixLabors.ImageSharp (image conversion) (009-output-analytics)
-- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, Hangfire, Semantic Kernel (for embedding generation), NBomber or k6 (for load testing) (010-testing-cache-warming)
-- TypeScript 5.7+ with React 18.3+ (011-unified-frontend)
-- N/A (frontend consumes existing backend APIs) (011-unified-frontend)
-- .NET 8 with C# 12 (cleanup endpoint), JSON (expected values file) + ExpenseFlow.Api (existing), test-data folder, staging API (012-automated-uat-testing)
-- `test-data/receipts/` (19 images), `test-data/statements/chase.csv`, `test-data/expected-values.json` (new) (012-automated-uat-testing)
-- TypeScript 5.7+ with React 18.3+ + TanStack Router, TanStack Query, Tailwind CSS 4.x, shadcn/ui, Framer Motion (new), Recharts (013-frontend-redesign)
-- TypeScript 5.7+ with React 18.3+ + Tailwind CSS 4.x, shadcn/ui (Radix primitives), next-themes, Framer Motion, class-variance-authority (015-dual-theme-system)
-- localStorage (theme preference via next-themes) (015-dual-theme-system)
-- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Microsoft.Identity.Web, FluentValidation (016-user-preferences-api)
-- Markdown (GitHub Flavored Markdown) + None (documentation only) (017-how-to-guide)
-- Repository files in `docs/user-guide/` directory (018-end-user-guide)
-- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, FluentValidation (019-analytics-dashboard)
-- PostgreSQL 15+ (Supabase self-hosted), existing Transaction/VendorAlias tables (019-analytics-dashboard)
-- TypeScript 5.7+ with React 18.3+ + Vitest 4.x, Playwright 1.57+, MSW (Mock Service Worker), TanStack Query, TanStack Router (022-frontend-integration-tests)
-- N/A (testing infrastructure only) (022-frontend-integration-tests)
-- .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Query, shadcn/ui (023-expense-prediction)
-- .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Query, shadcn/ui (024-extraction-editor-training)
-- PostgreSQL 15+ (Supabase) (024-extraction-editor-training)
-- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, existing VendorAliasService (025-vendor-extraction)
-- PostgreSQL 15+ (Supabase) - existing VendorAlias table (025-vendor-extraction)
-- .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Router, TanStack Query, shadcn/ui (026-missing-receipts-ui)
-- PostgreSQL 15+ (Supabase self-hosted) - extends existing Transaction table (026-missing-receipts-ui)
-- .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Azure.AI.OpenAI, Microsoft.SemanticKernel, HtmlAgilityPack (HTML parsing/sanitization), PuppeteerSharp or Playwright (HTML-to-image for thumbnails) (029-html-receipt-parsing)
-- PostgreSQL 15+ (Supabase), Azure Blob Storage (ccproctemp2025) (029-html-receipt-parsing)
-
-- **Language/Version**: YAML/Helm (Kubernetes manifests), Bash/PowerShell (scripts)
-- **Primary Dependencies**: cert-manager v1.19.x, Supabase Helm chart, Azure CLI, kubectl
-- **Database**: PostgreSQL 15 with pgvector extension (Supabase self-hosted)
-- **Database UI**: Supabase Studio (graphical database explorer)
-- **Storage**: Azure Blob Storage (`ccproctemp2025`), Azure Premium SSD (PVC)
-- **Testing**: kubectl validation, connectivity tests, cert-manager readiness checks
-- **Target Platform**: Azure Kubernetes Service (`dev-aks`, Kubernetes 1.33.3)
-- **Project Type**: Infrastructure-as-Code (Kubernetes manifests + Helm)
-
 ## Project Structure
 
 ```text
-infrastructure/
-├── namespaces/
-│   ├── expenseflow-dev.yaml
-│   ├── expenseflow-staging.yaml
-│   ├── resource-quotas.yaml
-│   └── network-policies.yaml
-├── cert-manager/
-│   ├── namespace.yaml
-│   ├── cert-manager-values.yaml
-│   └── cluster-issuer.yaml
-├── supabase/
-│   ├── values.yaml           # Supabase Helm values (Auth/Storage disabled)
-│   ├── backup-pvc.yaml       # PVC for backup storage
-│   └── backup-cronjob.yaml   # Daily pg_dump CronJob
-├── storage/
-│   ├── blob-container-setup.ps1
-│   └── secrets.yaml
-├── monitoring/
-│   └── alerts.yaml
-└── scripts/
-    ├── deploy-all.ps1
-    ├── validate-deployment.ps1
-    └── test-connectivity.ps1
-
-specs/001-infrastructure-setup/
-├── spec.md              # Feature specification
-├── plan.md              # Implementation plan
-├── research.md          # Technology decisions
-├── data-model.md        # Kubernetes resource definitions
-├── quickstart.md        # Deployment instructions
-└── contracts/
-    └── validation-tests.md
+ExpenseTrack/
+├── backend/
+│   ├── src/
+│   │   ├── ExpenseFlow.Api/           # Controllers, middleware, endpoints
+│   │   ├── ExpenseFlow.Core/          # Domain models, entities, business logic
+│   │   ├── ExpenseFlow.Infrastructure/ # EF Core context, external services
+│   │   └── ExpenseFlow.Shared/        # DTOs, shared utilities
+│   ├── tests/
+│   │   ├── ExpenseFlow.Api.Tests/
+│   │   ├── ExpenseFlow.Core.Tests/
+│   │   ├── ExpenseFlow.Contracts.Tests/    # OpenAPI validation
+│   │   ├── ExpenseFlow.PropertyTests/      # FsCheck property tests
+│   │   ├── ExpenseFlow.Scenarios.Tests/    # Testcontainers, WireMock
+│   │   └── ExpenseFlow.TestCommon/
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   │   ├── components/         # Reusable UI components
+│   │   ├── pages/              # Page components
+│   │   ├── routes/             # TanStack Router config
+│   │   ├── services/           # API service layer
+│   │   ├── hooks/              # Custom React hooks
+│   │   ├── auth/               # Azure MSAL config
+│   │   ├── providers/          # Context providers
+│   │   ├── types/              # TypeScript definitions
+│   │   └── lib/                # Utilities
+│   ├── tests/
+│   │   ├── unit/               # Vitest unit tests
+│   │   ├── integration/        # Component tests
+│   │   └── e2e/                # Playwright E2E
+│   └── Dockerfile
+├── infrastructure/
+│   ├── namespaces/             # K8s namespace configs
+│   ├── cert-manager/           # TLS certificate management
+│   ├── supabase/               # Supabase Helm values
+│   ├── kubernetes/             # Deployment manifests
+│   └── scripts/                # Deployment scripts
+├── specs/                      # 31 feature specifications
+├── docs/                       # Documentation
+├── test-data/                  # Sample receipts/statements
+├── .github/workflows/          # CI/CD pipelines
+└── CLAUDE.md
 ```
 
 ## Commands
 
+### Backend Development
+```bash
+# Run backend locally
+cd backend && dotnet run --project src/ExpenseFlow.Api
+
+# Run backend tests
+dotnet test backend/tests/ExpenseFlow.Api.Tests
+dotnet test backend/tests/ExpenseFlow.Core.Tests
+
+# Run all backend tests with coverage
+dotnet test backend --collect:"XPlat Code Coverage"
+
+# Add EF Core migration
+dotnet ef migrations add MigrationName --project backend/src/ExpenseFlow.Infrastructure --startup-project backend/src/ExpenseFlow.Api
+```
+
+### Frontend Development
+```bash
+# Install dependencies
+cd frontend && npm install
+
+# Run development server
+npm run dev
+
+# Run tests
+npm run test          # Vitest unit tests
+npm run test:e2e      # Playwright E2E tests
+
+# Build for production
+npm run build
+```
+
+### Infrastructure / Kubernetes
 ```powershell
-# Get AKS credentials
-az aks get-credentials --resource-group rg_prod --name dev-aks
+# Get AKS credentials (use --public-fqdn for external access)
+az aks get-credentials --resource-group rg_prod --name dev-aks --public-fqdn
 
 # Apply Kubernetes manifests
 kubectl apply -f infrastructure/namespaces/
-
-# Install cert-manager
-helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --version v1.19.1 --set crds.enabled=true
-
-# Install Supabase (clone from GitHub - no Helm repo available)
-git clone --depth 1 https://github.com/supabase-community/supabase-kubernetes.git $env:TEMP\supabase-kubernetes
-helm install supabase "$env:TEMP\supabase-kubernetes\charts\supabase" --namespace expenseflow-dev --values infrastructure/supabase/values.yaml
 
 # Check Supabase pods
 kubectl get pods -n expenseflow-dev -l app.kubernetes.io/instance=supabase
@@ -133,11 +164,30 @@ kubectl get pods -n expenseflow-dev -l app.kubernetes.io/instance=supabase
 # Port-forward to Supabase Studio (for local access)
 kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 
+# Restart API deployment after changes
+kubectl rollout restart deployment/expenseflow-api -n expenseflow-staging
+
 # Validate deployment
 ./infrastructure/scripts/validate-deployment.ps1
 ```
 
 ## Code Style
+
+### C# / .NET Backend
+- Use file-scoped namespaces
+- Follow Microsoft C# naming conventions (PascalCase for public, camelCase for private with `_` prefix)
+- Use `async/await` for all I/O operations
+- Use FluentValidation for request validation
+- Prefer records for DTOs
+- Use `[Trait("Category", TestCategories.X)]` for test categorization
+
+### TypeScript / React Frontend
+- Use functional components with hooks
+- Prefer `const` over `let`
+- Use TanStack Query for all API calls (no raw fetch)
+- Use shadcn/ui components from `@/components/ui`
+- Follow file-based routing with TanStack Router
+- Use Zod for runtime validation
 
 ### Kubernetes Manifests (YAML)
 - Use 2-space indentation
@@ -151,31 +201,41 @@ kubectl port-forward svc/supabase-studio 3000:3000 -n expenseflow-dev
 - Include comment headers for complex functions
 - Use splatting for commands with many parameters
 
-## Recent Changes
-- 029-html-receipt-parsing: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Azure.AI.OpenAI, Microsoft.SemanticKernel, HtmlAgilityPack (HTML parsing/sanitization), PuppeteerSharp or Playwright (HTML-to-image for thumbnails)
-- 028-group-matching: Added .NET 8 with C# 12 + ASP.NET Core Web API, Entity Framework Core 8, Npgsql, FluentValidation
-- 026-missing-receipts-ui: Added .NET 8 with C# 12 (backend), TypeScript 5.7+ with React 18.3+ (frontend) + ASP.NET Core Web API, Entity Framework Core 8, TanStack Router, TanStack Query, shadcn/ui
-  - Entities: ImportJob (for tracking cache warming import jobs)
-  - Services: CacheWarmingService (historical data import, job management)
-  - Jobs: CacheWarmingJob (Hangfire background processing)
-  - Controller: CacheWarmingController (import upload, job tracking, cache statistics)
-  - Load Tests: NBomber scenarios for batch receipt processing (50 in 5min) and concurrent users (20 users, <2s P95)
-  - UAT: 7 test cases (TC-001 through TC-007) covering all Sprint 3-9 features
-  - InMemory Database: DbContext conditionally ignores pgvector/jsonb properties for testing
-  - Entities: TravelPeriod, DetectedSubscription, SubscriptionAlert, SplitPattern, SplitAllocation
-  - Services: TravelDetectionService, SubscriptionDetectionService, ExpenseSplittingService
-  - Jobs: SubscriptionAlertJob (Hangfire monthly recurring)
-  - All detection uses Tier 1 (rule-based) with logging for tier usage
+## Key Architectural Patterns
 
-### 001-infrastructure-setup
+### Three-Tier Categorization
+1. **Vendor Alias** - Exact match lookup in VendorAlias table
+2. **Embedding Similarity** - pgvector cosine similarity search
+3. **AI Inference** - Semantic Kernel + Azure OpenAI fallback
+
+### Tiered Detection
+- **Tier 1**: Rule-based detection (active)
+- **Tier 2**: ML-based detection (future)
+- All tiers log usage for analytics
+
+### Background Processing
+- Hangfire for async jobs (receipt processing, cache warming, alerts)
+- PostgreSQL backend for job persistence
+- Subscription alerts run as monthly recurring jobs
 
 ## Key Decisions
 
+### Infrastructure
 - **Supabase self-hosted**: Provides PostgreSQL + pgvector + Studio UI for graphical database exploration
-- **Auth/Storage disabled**: Using Entra ID for auth, Azure Blob for storage (per constitution)
+- **Auth/Storage disabled in Supabase**: Using Entra ID for auth, Azure Blob for storage
 - **Realtime enabled**: Required `APP_NAME` and `DB_SSL: "false"` env vars (not "disable")
 - **Let's Encrypt staging issuer**: Use for testing to avoid rate limits before switching to prod
 - **Zero-trust network policies**: Default-deny with explicit allow rules for security
+
+### Backend
+- **Semantic Kernel over direct OpenAI SDK**: Better abstraction for AI orchestration
+- **pgvector for embeddings**: Native PostgreSQL support, no separate vector DB needed
+- **Hangfire over hosted services**: Persistence, UI dashboard, retry policies
+
+### Frontend
+- **TanStack Router over React Router**: Type-safe routing, better code splitting
+- **TanStack Query over Redux**: Built-in caching, optimistic updates, simpler API
+- **shadcn/ui over MUI/Chakra**: Radix primitives, full control, Tailwind integration
 
 ## Azure Policy Compliance
 
