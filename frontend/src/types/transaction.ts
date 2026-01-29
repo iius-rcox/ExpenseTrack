@@ -24,7 +24,7 @@ import type { PredictionSummary } from './prediction';
  * - 'unmatched': no receipt linked
  * - 'manual': user manually linked receipt
  */
-export type TransactionMatchStatus = 'matched' | 'pending' | 'unmatched' | 'manual';
+export type TransactionMatchStatus = 'matched' | 'pending' | 'unmatched' | 'manual' | 'missing-receipt';
 
 /**
  * Transaction reimbursability status for expense filtering.

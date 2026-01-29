@@ -47,7 +47,7 @@ public class TransactionsController : ApiControllerBase
     /// <param name="pageSize">Page size (default 50, max 200).</param>
     /// <param name="startDate">Optional start date filter.</param>
     /// <param name="endDate">Optional end date filter.</param>
-    /// <param name="matchStatus">Optional filter by match status (matched, pending, unmatched). Supports multiple values.</param>
+    /// <param name="matchStatus">Optional filter by match status (matched, pending, unmatched, missing-receipt). Supports multiple values.</param>
     /// <param name="importId">Optional filter by specific import batch.</param>
     /// <param name="search">Optional text search on description (case-insensitive).</param>
     /// <param name="sortBy">Field to sort by: date (default), amount, description, merchant.</param>

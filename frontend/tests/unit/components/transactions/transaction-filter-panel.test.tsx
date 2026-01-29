@@ -246,7 +246,49 @@ describe('TransactionFilterPanel', () => {
       expect(screen.getByRole('button', { name: /status/i })).toBeInTheDocument();
     });
 
-    it('should show match status options when clicked', async () => {
+    it('should show all 5 match status options including Missing Receipt when clicked', async () => {
+      const user = userEvent.setup();
+      render(
+        <TransactionFilterPanel
+          filters={createMockFilters()}
+          categories={mockCategories}
+          tags={mockTags}
+          onChange={mockOnChange}
+          onReset={mockOnReset}
+        />
+      );
+
+      const statusButton = screen.getByRole('button', { name: /status/i });
+      await user.click(statusButton);
+
+      // Use getAllByText because some options may appear in multiple places
+      // (e.g., "Pending Review" appears both in quick filters button and dropdown)
+      await waitFor(() => {
+        expect(screen.getAllByText('Matched').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Pending Review').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Unmatched').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Manual Match').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Missing Receipt').length).toBeGreaterThan(0);
+      });
+    });
+
+    it('should display missing-receipt filter as badge when selected', () => {
+      render(
+        <TransactionFilterPanel
+          filters={createMockFilters({ matchStatus: ['missing-receipt'] })}
+          categories={mockCategories}
+          tags={mockTags}
+          onChange={mockOnChange}
+          onReset={mockOnReset}
+        />
+      );
+
+      // Look for Missing Receipt in the badges section
+      const badges = screen.getAllByText('Missing Receipt');
+      expect(badges.length).toBeGreaterThan(0);
+    });
+
+    it('should call onChange when Missing Receipt status is toggled', async () => {
       const user = userEvent.setup();
       render(
         <TransactionFilterPanel
@@ -262,11 +304,16 @@ describe('TransactionFilterPanel', () => {
       await user.click(statusButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Matched')).toBeInTheDocument();
-        expect(screen.getByText('Pending Review')).toBeInTheDocument();
-        expect(screen.getByText('Unmatched')).toBeInTheDocument();
-        expect(screen.getByText('Manual Match')).toBeInTheDocument();
+        expect(screen.getByText('Missing Receipt')).toBeInTheDocument();
       });
+
+      // Find and click the Missing Receipt checkbox
+      const missingReceiptLabel = screen.getByText('Missing Receipt');
+      await user.click(missingReceiptLabel);
+
+      expect(mockOnChange).toHaveBeenCalled();
+      const callArg = mockOnChange.mock.calls[0][0];
+      expect(callArg.matchStatus).toContain('missing-receipt');
     });
   });
 

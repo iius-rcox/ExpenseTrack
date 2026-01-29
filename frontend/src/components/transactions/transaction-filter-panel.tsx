@@ -55,6 +55,7 @@ const MATCH_STATUS_OPTIONS: { value: TransactionMatchStatus; label: string }[] =
   { value: 'pending', label: 'Pending Review' },
   { value: 'unmatched', label: 'Unmatched' },
   { value: 'manual', label: 'Manual Match' },
+  { value: 'missing-receipt', label: 'Missing Receipt' },
 ];
 
 // Reimbursability status options for the filter

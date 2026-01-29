@@ -102,3 +102,6 @@ example-data/*
 
 # Playwright MCP screenshots (temporary test artifacts)
 .playwright-mcp/
+
+# Accidental Windows device-file artifacts
+nul

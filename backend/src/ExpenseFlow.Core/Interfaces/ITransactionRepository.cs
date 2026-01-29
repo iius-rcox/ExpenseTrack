@@ -23,7 +23,7 @@ public interface ITransactionRepository
     /// <param name="pageSize">Page size.</param>
     /// <param name="startDate">Optional start date filter.</param>
     /// <param name="endDate">Optional end date filter.</param>
-    /// <param name="matchStatus">Optional match status filter (supports: matched, pending, unmatched).</param>
+    /// <param name="matchStatus">Optional match status filter (supports: matched, pending, unmatched, missing-receipt).</param>
     /// <param name="importId">Optional import batch filter.</param>
     /// <param name="search">Optional text search on description (case-insensitive).</param>
     /// <param name="sortBy">Field to sort by (date, amount, description, merchant). Defaults to date.</param>

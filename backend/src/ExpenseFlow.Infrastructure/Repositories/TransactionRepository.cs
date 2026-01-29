@@ -77,16 +77,44 @@ public class TransactionRepository : ITransactionRepository
             var hasMatched = matchStatus.Contains("matched", StringComparer.OrdinalIgnoreCase);
             var hasPending = matchStatus.Contains("pending", StringComparer.OrdinalIgnoreCase);
             var hasUnmatched = matchStatus.Contains("unmatched", StringComparer.OrdinalIgnoreCase);
+            var hasMissingReceipt = matchStatus.Contains("missing-receipt", StringComparer.OrdinalIgnoreCase);
 
-            if (hasMatched || hasPending || hasUnmatched)
+            if (hasMatched || hasPending || hasUnmatched || hasMissingReceipt)
             {
+                // Pre-compute subqueries for missing-receipt filter
+                // Transaction IDs with Confirmed predictions (marked as business expense)
+                var transactionIdsWithConfirmedPredictions = _context.TransactionPredictions
+                    .Where(p => p.UserId == userId && p.Status == PredictionStatus.Confirmed)
+                    .Select(p => p.TransactionId);
+
+                // Group IDs that are marked as Business (IsReimbursable == true)
+                var businessGroupIds = _context.TransactionGroups
+                    .Where(g => g.UserId == userId && g.IsReimbursable == true)
+                    .Select(g => g.Id);
+
                 query = query.Where(t =>
                     // Matched: MatchStatus == Matched (2)
                     (hasMatched && t.MatchStatus == Shared.Enums.MatchStatus.Matched) ||
                     // Pending/Proposed: MatchStatus == Proposed (1)
                     (hasPending && t.MatchStatus == Shared.Enums.MatchStatus.Proposed) ||
                     // Unmatched: MatchStatus == Unmatched (0) AND not in a group
-                    (hasUnmatched && t.MatchStatus == Shared.Enums.MatchStatus.Unmatched && t.GroupId == null));
+                    (hasUnmatched && t.MatchStatus == Shared.Enums.MatchStatus.Unmatched && t.GroupId == null) ||
+                    // Missing Receipt: Business expense without receipt that hasn't been dismissed
+                    // Criteria:
+                    // 1. No matched receipt
+                    // 2. Not dismissed (ReceiptDismissed is null or false)
+                    // 3. Either in a Business group OR has a Confirmed prediction
+                    (hasMissingReceipt &&
+                        t.MatchedReceiptId == null &&
+                        (t.ReceiptDismissed == null || t.ReceiptDismissed == false) &&
+                        (
+                            // In a Business group (IsReimbursable == true) - use subquery
+                            (t.GroupId != null && businessGroupIds.Contains(t.GroupId.Value)) ||
+                            // Has a Confirmed prediction (business expense)
+                            transactionIdsWithConfirmedPredictions.Contains(t.Id)
+                        )
+                    )
+                );
             }
         }
 
