@@ -110,6 +110,21 @@ public interface ITransactionGroupService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Marks all transactions in a group as reimbursable (Business) or not reimbursable (Personal).
+    /// Updates the group's IsReimbursable flag and creates/updates predictions for all member transactions.
+    /// </summary>
+    /// <param name="userId">The authenticated user ID.</param>
+    /// <param name="groupId">The group ID to mark.</param>
+    /// <param name="isReimbursable">True for Business, false for Personal.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Result with updated group details and count of transactions updated.</returns>
+    Task<TransactionGroupReimbursabilityResult> MarkGroupReimbursabilityAsync(
+        Guid userId,
+        Guid groupId,
+        bool isReimbursable,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Gets a mixed list of ungrouped transactions and transaction groups.
     /// Used by the Transactions page to display all items in a single view.
     /// </summary>

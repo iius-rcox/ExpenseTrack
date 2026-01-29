@@ -580,6 +580,62 @@ public class TransactionGroupService : ITransactionGroupService
     }
 
     /// <inheritdoc />
+    public async Task<TransactionGroupReimbursabilityResult> MarkGroupReimbursabilityAsync(
+        Guid userId,
+        Guid groupId,
+        bool isReimbursable,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation(
+            "Marking group {GroupId} as {Status} for user {UserId}",
+            groupId, isReimbursable ? "Business" : "Personal", userId);
+
+        var group = await _dbContext.TransactionGroups
+            .Include(g => g.Transactions)
+            .Where(g => g.Id == groupId && g.UserId == userId)
+            .FirstOrDefaultAsync(ct);
+
+        if (group == null)
+        {
+            return new TransactionGroupReimbursabilityResult
+            {
+                Success = false,
+                Message = "Group not found"
+            };
+        }
+
+        // Update group-level flag
+        group.IsReimbursable = isReimbursable;
+        await _dbContext.SaveChangesAsync(ct);
+
+        // Use bulk method for efficient batch processing (avoids N+1 queries)
+        var bulkRequest = new BulkTransactionReimbursabilityRequestDto
+        {
+            TransactionIds = group.Transactions.Select(t => t.Id).ToList(),
+            IsReimbursable = isReimbursable
+        };
+        var bulkResult = await _predictionService.BulkMarkTransactionsAsync(userId, bulkRequest);
+
+        _logger.LogInformation(
+            "Marked group {GroupId} as {Status}: {SuccessCount}/{TotalCount} transactions updated ({FailedCount} failed)",
+            groupId, isReimbursable ? "Business" : "Personal",
+            bulkResult.SuccessCount, group.TransactionCount, bulkResult.FailedCount);
+
+        var statusLabel = isReimbursable ? "Business" : "Personal";
+        var message = bulkResult.FailedCount == 0
+            ? $"Marked group as {statusLabel}"
+            : $"Marked group as {statusLabel} ({bulkResult.FailedCount} transaction(s) failed)";
+
+        return new TransactionGroupReimbursabilityResult
+        {
+            Success = bulkResult.FailedCount == 0,
+            Group = MapToDetailDto(group, group.Transactions.ToList()),
+            TransactionsUpdated = bulkResult.SuccessCount,
+            Message = message
+        };
+    }
+
+    /// <inheritdoc />
     public async Task<TransactionMixedListResponse> GetMixedListAsync(
         Guid userId,
         int page = 1,

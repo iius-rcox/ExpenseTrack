@@ -381,6 +381,8 @@ export interface TransactionGroupView {
   transactions?: GroupMemberTransaction[];
   /** When the group was created */
   createdAt: Date;
+  /** Whether this group is reimbursable (Business=true, Personal=false, Unknown=undefined) */
+  isReimbursable?: boolean;
 }
 
 /**

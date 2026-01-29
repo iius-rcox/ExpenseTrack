@@ -73,6 +73,7 @@ interface TransactionGroupSummaryDto {
   matchStatus: number; // 0=Unmatched, 1=Proposed, 2=Matched
   matchedReceiptId?: string;
   createdAt: string;
+  isReimbursable?: boolean | null;
 }
 
 /**
@@ -204,6 +205,7 @@ function transformToGroupView(
     matchStatus: mapMatchStatus(dto.matchStatus),
     matchedReceiptId: dto.matchedReceiptId ? safeString(dto.matchedReceiptId, 'group.matchedReceiptId') : undefined,
     createdAt: new Date(dto.createdAt),
+    isReimbursable: dto.isReimbursable ?? undefined,
   };
 }
 
@@ -866,4 +868,74 @@ export function useCanGroupTransactions(transactionIds: string[]) {
       ? 'Select at least 2 transactions to group'
       : undefined,
   };
+}
+
+/**
+ * API response for marking group reimbursability.
+ */
+interface GroupReimbursabilityResponse {
+  success: boolean;
+  group: TransactionGroupDetailDto | null;
+  transactionsUpdated: number;
+  message?: string;
+}
+
+/**
+ * Hook for marking a transaction group as Business or Personal.
+ * Updates all transactions in the group with the classification via the prediction system.
+ *
+ * @example
+ * ```tsx
+ * const markGroup = useMarkGroupReimbursability();
+ * markGroup.mutate({ groupId: 'group-123', isReimbursable: true }); // Mark as Business
+ * markGroup.mutate({ groupId: 'group-123', isReimbursable: false }); // Mark as Personal
+ * ```
+ */
+export function useMarkGroupReimbursability() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      groupId,
+      isReimbursable,
+    }: {
+      groupId: string;
+      isReimbursable: boolean;
+    }) => {
+      const response = await apiFetch<GroupReimbursabilityResponse>(
+        `/transaction-groups/${groupId}/reimbursability`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ isReimbursable }),
+        }
+      );
+
+      return {
+        ...response,
+        group: response.group ? transformToGroupDetailView(response.group) : null,
+      };
+    },
+
+    onSuccess: (data, { isReimbursable }) => {
+      // Invalidate group queries
+      queryClient.invalidateQueries({ queryKey: transactionGroupKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: transactionGroupKeys.mixed() });
+      queryClient.invalidateQueries({ queryKey: transactionGroupKeys.details() });
+
+      // Also invalidate transaction queries (predictions changed)
+      queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.details() });
+
+      const label = isReimbursable ? 'Business' : 'Personal';
+      toast.success(`Group marked as ${label}`, {
+        description: `${data.transactionsUpdated} transaction(s) classified.`,
+      });
+    },
+
+    onError: (error) => {
+      toast.error('Failed to classify group', {
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+      });
+    },
+  });
 }

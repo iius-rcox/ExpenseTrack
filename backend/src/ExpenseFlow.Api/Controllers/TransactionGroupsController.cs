@@ -270,6 +270,51 @@ public class TransactionGroupsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Marks a transaction group as Business (reimbursable) or Personal (not reimbursable).
+    /// Updates all transactions in the group with the classification via the prediction system.
+    /// </summary>
+    /// <param name="id">Group ID.</param>
+    /// <param name="request">Reimbursability request with isReimbursable flag.</param>
+    /// <returns>Updated group details with count of transactions updated.</returns>
+    [HttpPost("{id:guid}/reimbursability")]
+    [ProducesResponseType(typeof(TransactionGroupReimbursabilityResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetailsResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TransactionGroupReimbursabilityResult>> MarkReimbursability(
+        Guid id,
+        [FromBody] MarkGroupReimbursabilityRequest request)
+    {
+        var user = await _userService.GetOrCreateUserAsync(User);
+
+        var result = await _groupService.MarkGroupReimbursabilityAsync(
+            user.Id, id, request.IsReimbursable);
+
+        if (!result.Success && result.Message == "Group not found")
+        {
+            return NotFound(new ProblemDetailsResponse
+            {
+                Title = "Group not found",
+                Detail = $"No transaction group found with ID {id}"
+            });
+        }
+
+        if (!result.Success)
+        {
+            return BadRequest(new ProblemDetailsResponse
+            {
+                Title = "Failed to update reimbursability",
+                Detail = result.Message ?? "An error occurred"
+            });
+        }
+
+        _logger.LogInformation(
+            "Marked group {GroupId} as {Status} for user {UserId}, {Count} transactions updated",
+            id, request.IsReimbursable ? "Business" : "Personal", user.Id, result.TransactionsUpdated);
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Gets a mixed list of ungrouped transactions and transaction groups.
     /// This is the primary endpoint for the Transactions page, replacing the standard transaction list.
     /// </summary>

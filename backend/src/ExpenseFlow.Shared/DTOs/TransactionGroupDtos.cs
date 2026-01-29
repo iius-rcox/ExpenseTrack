@@ -116,6 +116,44 @@ public class AddToGroupRequest
     public List<Guid> TransactionIds { get; set; } = new();
 }
 
+/// <summary>
+/// Request to mark a transaction group as Business (reimbursable) or Personal (not reimbursable).
+/// </summary>
+public class MarkGroupReimbursabilityRequest
+{
+    /// <summary>
+    /// True = Business (reimbursable), False = Personal (not reimbursable).
+    /// </summary>
+    [Required]
+    public bool IsReimbursable { get; set; }
+}
+
+/// <summary>
+/// Result of marking a group's reimbursability.
+/// </summary>
+public class TransactionGroupReimbursabilityResult
+{
+    /// <summary>
+    /// Whether the operation succeeded.
+    /// </summary>
+    public bool Success { get; set; }
+
+    /// <summary>
+    /// Updated group details (null if not found).
+    /// </summary>
+    public TransactionGroupDetailDto? Group { get; set; }
+
+    /// <summary>
+    /// Number of transactions that were successfully classified.
+    /// </summary>
+    public int TransactionsUpdated { get; set; }
+
+    /// <summary>
+    /// Human-readable result message.
+    /// </summary>
+    public string? Message { get; set; }
+}
+
 // ============================================================================
 // Response DTOs
 // ============================================================================

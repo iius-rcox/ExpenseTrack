@@ -29,7 +29,11 @@ import {
   RefreshCw,
   MoreVertical,
   Trash2,
+  CircleCheck,
+  CircleX,
+  HelpCircle,
 } from 'lucide-react';
+import { useMarkGroupReimbursability } from '@/hooks/queries/use-transaction-groups';
 import { cn, safeDisplayString, safeDisplayNumber } from '@/lib/utils';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -91,6 +95,31 @@ const GROUP_MATCH_STATUS_CONFIG: Record<
     icon: Link2Off,
     color: 'text-muted-foreground bg-muted',
     label: 'Unmatched',
+  },
+};
+
+/**
+ * Reimbursability status configuration for visual display
+ */
+type ReimbursabilityStatus = 'business' | 'personal' | 'unknown';
+const REIMBURSABILITY_CONFIG: Record<
+  ReimbursabilityStatus,
+  { icon: React.ElementType; color: string; label: string }
+> = {
+  business: {
+    icon: CircleCheck,
+    color: 'text-green-600 bg-green-100 dark:bg-green-900/30 border-green-300',
+    label: 'Business',
+  },
+  personal: {
+    icon: CircleX,
+    color: 'text-red-600 bg-red-100 dark:bg-red-900/30 border-red-300',
+    label: 'Personal',
+  },
+  unknown: {
+    icon: HelpCircle,
+    color: 'text-muted-foreground bg-muted border-border',
+    label: 'Unknown',
   },
 };
 
@@ -263,6 +292,17 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
   const matchConfig = GROUP_MATCH_STATUS_CONFIG[group.matchStatus];
   const MatchIcon = matchConfig.icon;
 
+  // Reimbursability status and mutation hook
+  const markReimbursability = useMarkGroupReimbursability();
+  const reimbursabilityStatus: ReimbursabilityStatus =
+    group.isReimbursable === true
+      ? 'business'
+      : group.isReimbursable === false
+        ? 'personal'
+        : 'unknown';
+  const reimbursabilityConfig = REIMBURSABILITY_CONFIG[reimbursabilityStatus];
+  const ReimbursabilityIcon = reimbursabilityConfig.icon;
+
   // Calculate column count for expanded row (must match transaction grid)
   const columnCount = 10;
 
@@ -402,9 +442,48 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
           </AnimatePresence>
         </TableCell>
 
-        {/* Empty cell for prediction column */}
+        {/* Reimbursability Badge with Dropdown (replacing empty prediction column) */}
         <TableCell className="w-[180px]">
-          {/* Groups don't have individual predictions */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Badge
+                variant="outline"
+                className={cn(
+                  'gap-1.5 cursor-pointer transition-colors hover:opacity-80',
+                  reimbursabilityConfig.color,
+                  (isProcessing || markReimbursability.isPending) && 'opacity-50 cursor-not-allowed'
+                )}
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`Classification: ${reimbursabilityConfig.label}. Click to change.`}
+              >
+                <ReimbursabilityIcon className="h-3 w-3" />
+                <span className="text-xs">{reimbursabilityConfig.label}</span>
+              </Badge>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <div className="px-2 py-1.5 border-b">
+                <p className="text-sm font-medium">Classify Group</p>
+                <p className="text-xs text-muted-foreground">
+                  Mark all {safeDisplayNumber(group.transactionCount, 0, 'TransactionGroupRow.dropdown.count')} transactions
+                </p>
+              </div>
+              <DropdownMenuSeparator className="my-0" />
+              <DropdownMenuItem
+                onSelect={() => markReimbursability.mutate({ groupId: group.id, isReimbursable: true })}
+                disabled={isProcessing || markReimbursability.isPending}
+              >
+                <CircleCheck className="h-4 w-4 mr-2 text-green-600" />
+                Mark as Business
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => markReimbursability.mutate({ groupId: group.id, isReimbursable: false })}
+                disabled={isProcessing || markReimbursability.isPending}
+              >
+                <CircleX className="h-4 w-4 mr-2 text-red-600" />
+                Mark as Personal
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </TableCell>
 
         {/* Combined Amount */}
@@ -508,6 +587,21 @@ export const TransactionGroupRow = memo(function TransactionGroupRow({
                   Change Date
                 </DropdownMenuItem>
               )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => markReimbursability.mutate({ groupId: group.id, isReimbursable: true })}
+                disabled={isProcessing || markReimbursability.isPending}
+              >
+                <CircleCheck className="h-4 w-4 mr-2 text-green-600" />
+                Mark as Business
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => markReimbursability.mutate({ groupId: group.id, isReimbursable: false })}
+                disabled={isProcessing || markReimbursability.isPending}
+              >
+                <CircleX className="h-4 w-4 mr-2 text-red-600" />
+                Mark as Personal
+              </DropdownMenuItem>
               {onDeleteGroup && (
                 <>
                   <DropdownMenuSeparator />
