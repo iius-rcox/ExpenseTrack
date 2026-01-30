@@ -84,13 +84,21 @@ export function useProjects(departmentId?: string) {
   })
 }
 
+/**
+ * Category response from backend API.
+ * The backend returns CategoryDto objects with id and name.
+ */
+interface CategoryApiResponse {
+  categories: Array<{ id: string; name: string }>
+}
+
 export function useCategories() {
   return useQuery({
     queryKey: settingsKeys.categories(),
-    queryFn: () => apiFetch<{ categories: string[] }>('/transactions/categories')
-      .then(res => res.categories.map((name, index): Category => ({
-        id: String(index),
-        name,
+    queryFn: () => apiFetch<CategoryApiResponse>('/transactions/categories')
+      .then(res => res.categories.map((cat): Category => ({
+        id: cat.id,
+        name: cat.name,
         description: undefined, // Categories from transactions don't have descriptions
         isActive: true
       }))),
