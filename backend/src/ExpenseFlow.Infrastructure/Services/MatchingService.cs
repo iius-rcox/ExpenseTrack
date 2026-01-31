@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Diagnostics;
 using System.Text.RegularExpressions;
 using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Core.Interfaces;
@@ -933,6 +932,12 @@ public partial class MatchingService : IMatchingService
         var receipt = match.Receipt ?? throw new InvalidOperationException("Receipt not found");
         receipt.MatchStatus = MatchStatus.Matched;
 
+        // Synchronize receipt.Status with MatchStatus (only for valid states)
+        if (receipt.Status == ReceiptStatus.Ready || receipt.Status == ReceiptStatus.ReviewRequired)
+        {
+            receipt.Status = ReceiptStatus.Matched;
+        }
+
         string? vendorPattern = null;
 
         // T040: Handle group matches vs transaction matches
@@ -1044,6 +1049,8 @@ public partial class MatchingService : IMatchingService
         if (receipt != null)
         {
             receipt.MatchStatus = MatchStatus.Unmatched;
+            // Reset receipt.Status to Ready (restore to processable state)
+            receipt.Status = ReceiptStatus.Ready;
         }
 
         // T038-T039: Handle group matches - reset group status
@@ -1088,6 +1095,8 @@ public partial class MatchingService : IMatchingService
         {
             receipt.MatchStatus = MatchStatus.Unmatched;
             receipt.MatchedTransactionId = null;
+            // Reset receipt.Status to Ready (restore to processable state)
+            receipt.Status = ReceiptStatus.Ready;
             _context.Entry(receipt).State = EntityState.Modified;
         }
 
@@ -1168,6 +1177,11 @@ public partial class MatchingService : IMatchingService
         // Link receipt and transaction
         receipt.MatchedTransactionId = transaction.Id;
         receipt.MatchStatus = MatchStatus.Matched;
+        // Synchronize receipt.Status with MatchStatus (only for valid states)
+        if (receipt.Status == ReceiptStatus.Ready || receipt.Status == ReceiptStatus.ReviewRequired)
+        {
+            receipt.Status = ReceiptStatus.Matched;
+        }
         transaction.MatchedReceiptId = receipt.Id;
         transaction.MatchStatus = MatchStatus.Matched;
 
@@ -1252,6 +1266,11 @@ public partial class MatchingService : IMatchingService
         // Update statuses (the link is through the ReceiptTransactionMatch record)
         receipt.MatchedTransactionId = group.Id; // Store group ID for unmatch lookup
         receipt.MatchStatus = MatchStatus.Matched;
+        // Synchronize receipt.Status with MatchStatus (only for valid states)
+        if (receipt.Status == ReceiptStatus.Ready || receipt.Status == ReceiptStatus.ReviewRequired)
+        {
+            receipt.Status = ReceiptStatus.Matched;
+        }
         group.MatchedReceiptId = receipt.Id;
         group.MatchStatus = MatchStatus.Matched;
 
@@ -1555,6 +1574,11 @@ public partial class MatchingService : IMatchingService
 
                 receipt.MatchedTransactionId = transaction.Id;
                 receipt.MatchStatus = MatchStatus.Matched;
+                // Synchronize receipt.Status with MatchStatus (only for valid states)
+                if (receipt.Status == ReceiptStatus.Ready || receipt.Status == ReceiptStatus.ReviewRequired)
+                {
+                    receipt.Status = ReceiptStatus.Matched;
+                }
                 transaction.MatchedReceiptId = receipt.Id;
                 transaction.MatchStatus = MatchStatus.Matched;
 

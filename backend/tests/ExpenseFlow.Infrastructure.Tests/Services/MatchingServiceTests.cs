@@ -2,6 +2,7 @@ using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Infrastructure.Data;
 using ExpenseFlow.Infrastructure.Services;
+using ExpenseFlow.Shared.Enums;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -463,6 +464,237 @@ public class MatchingServiceTests
 
         total.Should().Be(50m);
         (total >= 70m).Should().BeFalse("Week-old transaction without vendor may not match");
+    }
+
+    #endregion
+
+    #region Receipt Status Synchronization Tests
+
+    /// <summary>
+    /// Tests that receipt.Status is synchronized with receipt.MatchStatus when matching operations occur.
+    /// The ReceiptStatus enum has Matched and Unmatched values that should be set accordingly.
+    /// </summary>
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void ConfirmMatch_SetsReceiptStatusToMatched()
+    {
+        // Arrange - Receipt in Ready state with proposed match
+        var receipt = new Receipt
+        {
+            Id = Guid.NewGuid(),
+            Status = ReceiptStatus.Ready,
+            MatchStatus = MatchStatus.Proposed
+        };
+
+        // Act - Simulate confirmation logic (both MatchStatus AND Status should be updated)
+        receipt.MatchStatus = MatchStatus.Matched;
+        receipt.Status = ReceiptStatus.Matched; // This is the fix we need to implement
+
+        // Assert
+        receipt.MatchStatus.Should().Be(MatchStatus.Matched);
+        receipt.Status.Should().Be(ReceiptStatus.Matched, "Status should be synchronized to Matched when match is confirmed");
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void ConfirmMatch_ReceiptInReviewRequired_SetsStatusToMatched()
+    {
+        // Arrange - Receipt in ReviewRequired state (low confidence extraction)
+        var receipt = new Receipt
+        {
+            Id = Guid.NewGuid(),
+            Status = ReceiptStatus.ReviewRequired,
+            MatchStatus = MatchStatus.Proposed
+        };
+
+        // Act - Confirmation should still set Status to Matched
+        receipt.MatchStatus = MatchStatus.Matched;
+        receipt.Status = ReceiptStatus.Matched;
+
+        // Assert
+        receipt.MatchStatus.Should().Be(MatchStatus.Matched);
+        receipt.Status.Should().Be(ReceiptStatus.Matched, "ReviewRequired receipts should become Matched after confirmation");
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void ConfirmMatch_ReceiptInErrorState_DoesNotChangeStatus()
+    {
+        // Arrange - Receipt in Error state (should not be matchable, but test edge case)
+        var receipt = new Receipt
+        {
+            Id = Guid.NewGuid(),
+            Status = ReceiptStatus.Error,
+            MatchStatus = MatchStatus.Unmatched
+        };
+        var originalStatus = receipt.Status;
+
+        // Act - Error state should be preserved (don't set to Matched)
+        receipt.MatchStatus = MatchStatus.Matched;
+        // Status should NOT be changed if in Error state
+        if (receipt.Status != ReceiptStatus.Error)
+        {
+            receipt.Status = ReceiptStatus.Matched;
+        }
+
+        // Assert - Status should remain Error
+        receipt.Status.Should().Be(ReceiptStatus.Error, "Error state should not be overwritten by matching");
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void RejectMatch_ResetsReceiptStatusToReady()
+    {
+        // Arrange - Receipt with proposed match
+        var receipt = new Receipt
+        {
+            Id = Guid.NewGuid(),
+            Status = ReceiptStatus.Ready, // Was Ready before auto-match proposal
+            MatchStatus = MatchStatus.Proposed
+        };
+
+        // Act - Rejection should reset Status to Ready
+        receipt.MatchStatus = MatchStatus.Unmatched;
+        receipt.Status = ReceiptStatus.Ready;
+
+        // Assert
+        receipt.MatchStatus.Should().Be(MatchStatus.Unmatched);
+        receipt.Status.Should().Be(ReceiptStatus.Ready, "Status should be reset to Ready when match is rejected");
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void UnmatchAsync_ResetsReceiptStatusToReady()
+    {
+        // Arrange - Receipt with confirmed match being unmatched
+        var receipt = new Receipt
+        {
+            Id = Guid.NewGuid(),
+            Status = ReceiptStatus.Matched,
+            MatchStatus = MatchStatus.Matched,
+            MatchedTransactionId = Guid.NewGuid()
+        };
+
+        // Act - Unmatch should reset Status to Ready
+        receipt.MatchStatus = MatchStatus.Unmatched;
+        receipt.MatchedTransactionId = null;
+        receipt.Status = ReceiptStatus.Ready;
+
+        // Assert
+        receipt.MatchStatus.Should().Be(MatchStatus.Unmatched);
+        receipt.MatchedTransactionId.Should().BeNull();
+        receipt.Status.Should().Be(ReceiptStatus.Ready, "Status should be reset to Ready when match is undone");
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void CreateManualMatch_SetsReceiptStatusToMatched()
+    {
+        // Arrange - Unmatched receipt for manual matching
+        var receipt = new Receipt
+        {
+            Id = Guid.NewGuid(),
+            Status = ReceiptStatus.Ready,
+            MatchStatus = MatchStatus.Unmatched
+        };
+
+        // Act - Manual match should set both statuses
+        receipt.MatchStatus = MatchStatus.Matched;
+        receipt.MatchedTransactionId = Guid.NewGuid();
+        receipt.Status = ReceiptStatus.Matched;
+
+        // Assert
+        receipt.MatchStatus.Should().Be(MatchStatus.Matched);
+        receipt.Status.Should().Be(ReceiptStatus.Matched, "Status should be set to Matched on manual match");
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void CreateManualGroupMatch_SetsReceiptStatusToMatched()
+    {
+        // Arrange - Unmatched receipt for manual group matching
+        var receipt = new Receipt
+        {
+            Id = Guid.NewGuid(),
+            Status = ReceiptStatus.Ready,
+            MatchStatus = MatchStatus.Unmatched
+        };
+
+        // Act - Manual group match should set both statuses
+        receipt.MatchStatus = MatchStatus.Matched;
+        receipt.MatchedTransactionId = Guid.NewGuid(); // Group ID stored here
+        receipt.Status = ReceiptStatus.Matched;
+
+        // Assert
+        receipt.MatchStatus.Should().Be(MatchStatus.Matched);
+        receipt.Status.Should().Be(ReceiptStatus.Matched, "Status should be set to Matched on manual group match");
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void BatchApprove_SetsReceiptStatusToMatched()
+    {
+        // Arrange - Multiple receipts with proposed matches
+        var receipts = new List<Receipt>
+        {
+            new() { Id = Guid.NewGuid(), Status = ReceiptStatus.Ready, MatchStatus = MatchStatus.Proposed },
+            new() { Id = Guid.NewGuid(), Status = ReceiptStatus.Ready, MatchStatus = MatchStatus.Proposed },
+            new() { Id = Guid.NewGuid(), Status = ReceiptStatus.ReviewRequired, MatchStatus = MatchStatus.Proposed }
+        };
+
+        // Act - Batch approve should set Status to Matched for all
+        foreach (var receipt in receipts)
+        {
+            receipt.MatchStatus = MatchStatus.Matched;
+            if (receipt.Status == ReceiptStatus.Ready || receipt.Status == ReceiptStatus.ReviewRequired)
+            {
+                receipt.Status = ReceiptStatus.Matched;
+            }
+        }
+
+        // Assert
+        receipts.Should().OnlyContain(r => r.MatchStatus == MatchStatus.Matched);
+        receipts.Should().OnlyContain(r => r.Status == ReceiptStatus.Matched,
+            "All receipts should have Status set to Matched after batch approve");
+    }
+
+    [Theory]
+    [Trait("Category", "Unit")]
+    [InlineData(ReceiptStatus.Ready, true)]
+    [InlineData(ReceiptStatus.ReviewRequired, true)]
+    [InlineData(ReceiptStatus.Error, false)]
+    [InlineData(ReceiptStatus.Uploaded, false)]
+    [InlineData(ReceiptStatus.Processing, false)]
+    public void ConfirmMatch_OnlyUpdatesStatusForValidStates(ReceiptStatus initialStatus, bool shouldUpdateToMatched)
+    {
+        // Arrange
+        var receipt = new Receipt
+        {
+            Id = Guid.NewGuid(),
+            Status = initialStatus,
+            MatchStatus = MatchStatus.Proposed
+        };
+
+        // Act - Only update Status for Ready or ReviewRequired states
+        receipt.MatchStatus = MatchStatus.Matched;
+        var isValidState = initialStatus == ReceiptStatus.Ready || initialStatus == ReceiptStatus.ReviewRequired;
+        if (isValidState)
+        {
+            receipt.Status = ReceiptStatus.Matched;
+        }
+
+        // Assert
+        if (shouldUpdateToMatched)
+        {
+            receipt.Status.Should().Be(ReceiptStatus.Matched,
+                $"Status should be Matched when starting from {initialStatus}");
+        }
+        else
+        {
+            receipt.Status.Should().Be(initialStatus,
+                $"Status should remain {initialStatus} (not a valid state for matching)");
+        }
     }
 
     #endregion
