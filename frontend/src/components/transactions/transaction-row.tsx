@@ -21,6 +21,7 @@ import {
   Link2Off,
   Clock,
   ExternalLink,
+  FileX,
 } from 'lucide-react';
 import { cn, safeDisplayString } from '@/lib/utils';
 import { TableCell, TableRow } from '@/components/ui/table';
@@ -107,6 +108,11 @@ const MATCH_STATUS_CONFIG: Record<
     icon: Check,
     color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30',
     label: 'Manual Match',
+  },
+  'missing-receipt': {
+    icon: FileX,
+    color: 'text-red-600 bg-red-100 dark:bg-red-900/30',
+    label: 'Missing Receipt',
   },
 };
 
