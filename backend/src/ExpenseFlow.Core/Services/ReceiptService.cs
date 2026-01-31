@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using ExpenseFlow.Core.Entities;
 using ExpenseFlow.Core.Interfaces;
 using ExpenseFlow.Shared.DTOs;
@@ -72,6 +75,10 @@ public class ReceiptService : IReceiptService
             throw new ArgumentException("File content does not match the declared content type");
         }
 
+        // Compute file hash for duplicate detection (stored for future checks)
+        memoryStream.Position = 0;
+        var fileHash = await ComputeFileHashAsync(memoryStream);
+
         Stream uploadStream = memoryStream;
         var finalContentType = contentType;
         var finalFilename = filename;
@@ -91,7 +98,7 @@ public class ReceiptService : IReceiptService
         var blobPath = _blobStorageService.GenerateReceiptPath(userId, finalFilename);
         var blobUrl = await _blobStorageService.UploadAsync(uploadStream, blobPath, finalContentType);
 
-        // Create receipt entity
+        // Create receipt entity with file hash
         var receipt = new Receipt
         {
             UserId = userId,
@@ -99,6 +106,7 @@ public class ReceiptService : IReceiptService
             OriginalFilename = filename,
             ContentType = finalContentType,
             FileSize = uploadStream.Length,
+            FileHash = fileHash,
             Status = ReceiptStatus.Uploaded,
             CreatedAt = DateTime.UtcNow
         };
@@ -106,8 +114,8 @@ public class ReceiptService : IReceiptService
         await _receiptRepository.AddAsync(receipt);
 
         _logger.LogInformation(
-            "Receipt {ReceiptId} uploaded successfully for user {UserId}. File: {Filename}, Size: {Size} bytes",
-            receipt.Id, userId, filename, uploadStream.Length);
+            "Receipt {ReceiptId} uploaded successfully for user {UserId}. File: {Filename}, Size: {Size} bytes, Hash: {FileHash}",
+            receipt.Id, userId, filename, uploadStream.Length, fileHash);
 
         // Queue background processing job
         _backgroundJobClient.Enqueue<IReceiptProcessingJob>(job => job.ProcessAsync(receipt.Id));
@@ -272,6 +280,15 @@ public class ReceiptService : IReceiptService
             receipt.Status = ReceiptStatus.Ready;
         }
 
+        // Update content hash when extraction data changes
+        if (request.Vendor != null || request.Date.HasValue || request.Amount.HasValue)
+        {
+            receipt.ContentHash = ComputeContentHash(
+                receipt.VendorExtracted,
+                receipt.DateExtracted,
+                receipt.AmountExtracted);
+        }
+
         await _receiptRepository.UpdateAsync(receipt);
 
         // Record corrections for training feedback if provided
@@ -363,4 +380,251 @@ public class ReceiptService : IReceiptService
             || content.StartsWith("<body", StringComparison.OrdinalIgnoreCase)
             || content.StartsWith("<!--", StringComparison.Ordinal); // HTML comment at start
     }
+
+    #region Duplicate Detection
+
+    /// <summary>
+    /// Computes SHA-256 hash of file content for exact duplicate detection.
+    /// </summary>
+    /// <param name="stream">File content stream</param>
+    /// <returns>Lowercase hex string of SHA-256 hash (64 characters)</returns>
+    public static async Task<string> ComputeFileHashAsync(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        using var sha256 = SHA256.Create();
+        var hashBytes = await sha256.ComputeHashAsync(stream);
+        stream.Position = 0; // Reset stream position for subsequent reading
+
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Computes SHA-256 hash of normalized content (vendor|date|amount) for semantic duplicate detection.
+    /// </summary>
+    /// <param name="vendor">Extracted vendor name (will be normalized: trimmed, lowercased)</param>
+    /// <param name="date">Extracted transaction date (formatted as yyyy-MM-dd)</param>
+    /// <param name="amount">Extracted amount (formatted with 2 decimal places)</param>
+    /// <returns>Lowercase hex string of SHA-256 hash (64 characters)</returns>
+    public static string ComputeContentHash(string? vendor, DateOnly? date, decimal? amount)
+    {
+        // Normalize vendor: trim whitespace, convert to lowercase
+        var normalizedVendor = vendor?.Trim().ToLowerInvariant() ?? string.Empty;
+
+        // Format date as ISO 8601 (yyyy-MM-dd) or empty string if null
+        var formattedDate = date?.ToString("yyyy-MM-dd") ?? string.Empty;
+
+        // Format amount with exactly 2 decimal places using InvariantCulture for consistent hashing
+        var formattedAmount = amount?.ToString("F2", CultureInfo.InvariantCulture) ?? string.Empty;
+
+        // Create content string with pipe separator
+        var content = $"{normalizedVendor}|{formattedDate}|{formattedAmount}";
+
+        // Compute SHA-256 hash
+        var contentBytes = Encoding.UTF8.GetBytes(content);
+        var hashBytes = SHA256.HashData(contentBytes);
+
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Checks if a receipt with the same content hash already exists.
+    /// </summary>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <param name="vendor">Extracted vendor name</param>
+    /// <param name="date">Extracted transaction date</param>
+    /// <param name="amount">Extracted amount</param>
+    /// <returns>Duplicate check result</returns>
+    public async Task<DuplicateCheckResult> CheckContentDuplicateAsync(
+        Guid userId,
+        string? vendor,
+        DateOnly? date,
+        decimal? amount)
+    {
+        var contentHash = ComputeContentHash(vendor, date, amount);
+        var existingReceipt = await _receiptRepository.FindByContentHashAsync(contentHash, userId);
+
+        if (existingReceipt != null)
+        {
+            return new DuplicateCheckResult
+            {
+                IsDuplicate = true,
+                DuplicateType = DuplicateType.SameContent,
+                ExistingReceiptId = existingReceipt.Id,
+                ContentHash = contentHash
+            };
+        }
+
+        return new DuplicateCheckResult
+        {
+            IsDuplicate = false,
+            DuplicateType = DuplicateType.None,
+            ContentHash = contentHash
+        };
+    }
+
+    /// <summary>
+    /// Uploads a receipt with duplicate detection.
+    /// </summary>
+    /// <param name="stream">File content stream</param>
+    /// <param name="filename">Original filename</param>
+    /// <param name="contentType">MIME type of the file</param>
+    /// <param name="userId">User ID uploading the receipt</param>
+    /// <param name="allowDuplicates">If true, allows duplicate uploads without returning conflict</param>
+    /// <returns>Upload result with receipt or duplicate information</returns>
+    public async Task<ReceiptUploadResult> UploadReceiptAsync(
+        Stream stream,
+        string filename,
+        string contentType,
+        Guid userId,
+        bool allowDuplicates)
+    {
+        // Validate content type
+        if (!_allowedContentTypes.Contains(contentType))
+        {
+            throw new ArgumentException($"Content type '{contentType}' is not allowed. Allowed types: {string.Join(", ", _allowedContentTypes)}");
+        }
+
+        // Read stream to memory to check size and potentially convert
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream);
+
+        // Validate file size
+        if (memoryStream.Length > _maxFileSizeBytes)
+        {
+            throw new ArgumentException($"File size exceeds maximum allowed size of {_maxFileSizeBytes / 1024 / 1024}MB");
+        }
+
+        // Validate magic bytes match content type
+        memoryStream.Position = 0;
+        if (!ValidateMagicBytes(memoryStream, contentType))
+        {
+            throw new ArgumentException("File content does not match the declared content type");
+        }
+
+        // Compute file hash for duplicate detection
+        memoryStream.Position = 0;
+        var fileHash = await ComputeFileHashAsync(memoryStream);
+
+        // Check for exact duplicate (unless allowDuplicates is true)
+        if (!allowDuplicates)
+        {
+            var existingReceipt = await _receiptRepository.FindByFileHashAsync(fileHash, userId);
+            if (existingReceipt != null)
+            {
+                _logger.LogInformation(
+                    "Duplicate file detected for user {UserId}. Existing receipt: {ExistingReceiptId}, File hash: {FileHash}",
+                    userId, existingReceipt.Id, fileHash);
+
+                return new ReceiptUploadResult
+                {
+                    IsDuplicate = true,
+                    DuplicateType = DuplicateType.ExactFile,
+                    ExistingReceiptId = existingReceipt.Id,
+                    Receipt = null
+                };
+            }
+        }
+
+        Stream uploadStream = memoryStream;
+        var finalContentType = contentType;
+        var finalFilename = filename;
+
+        // Convert HEIC to JPEG if needed
+        if (_heicConversionService.IsHeicFormat(contentType))
+        {
+            _logger.LogInformation("Converting HEIC image to JPEG for file {Filename}", filename);
+            memoryStream.Position = 0;
+            uploadStream = await _heicConversionService.ConvertToJpegAsync(memoryStream);
+            finalContentType = "image/jpeg";
+            finalFilename = Path.ChangeExtension(filename, ".jpg");
+        }
+
+        // Generate blob path and upload
+        uploadStream.Position = 0;
+        var blobPath = _blobStorageService.GenerateReceiptPath(userId, finalFilename);
+        var blobUrl = await _blobStorageService.UploadAsync(uploadStream, blobPath, finalContentType);
+
+        // Create receipt entity with file hash
+        var receipt = new Receipt
+        {
+            UserId = userId,
+            BlobUrl = blobUrl,
+            OriginalFilename = filename,
+            ContentType = finalContentType,
+            FileSize = uploadStream.Length,
+            FileHash = fileHash,
+            Status = ReceiptStatus.Uploaded,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _receiptRepository.AddAsync(receipt);
+
+        _logger.LogInformation(
+            "Receipt {ReceiptId} uploaded successfully for user {UserId}. File: {Filename}, Size: {Size} bytes, Hash: {FileHash}",
+            receipt.Id, userId, filename, uploadStream.Length, fileHash);
+
+        // Queue background processing job
+        _backgroundJobClient.Enqueue<IReceiptProcessingJob>(job => job.ProcessAsync(receipt.Id));
+
+        return new ReceiptUploadResult
+        {
+            IsDuplicate = false,
+            DuplicateType = DuplicateType.None,
+            Receipt = receipt
+        };
+    }
+
+    #endregion
+}
+
+/// <summary>
+/// Result of a receipt upload operation with duplicate detection.
+/// </summary>
+public class ReceiptUploadResult
+{
+    /// <summary>Whether a duplicate was detected</summary>
+    public bool IsDuplicate { get; set; }
+
+    /// <summary>Type of duplicate if detected</summary>
+    public DuplicateType DuplicateType { get; set; }
+
+    /// <summary>ID of the existing receipt if duplicate</summary>
+    public Guid? ExistingReceiptId { get; set; }
+
+    /// <summary>The uploaded receipt (null if duplicate and not allowed)</summary>
+    public Receipt? Receipt { get; set; }
+}
+
+/// <summary>
+/// Result of a content duplicate check.
+/// </summary>
+public class DuplicateCheckResult
+{
+    /// <summary>Whether a duplicate was detected</summary>
+    public bool IsDuplicate { get; set; }
+
+    /// <summary>Type of duplicate if detected</summary>
+    public DuplicateType DuplicateType { get; set; }
+
+    /// <summary>ID of the existing receipt if duplicate</summary>
+    public Guid? ExistingReceiptId { get; set; }
+
+    /// <summary>The computed content hash</summary>
+    public string? ContentHash { get; set; }
+}
+
+/// <summary>
+/// Types of duplicate detection.
+/// </summary>
+public enum DuplicateType
+{
+    /// <summary>No duplicate found</summary>
+    None,
+
+    /// <summary>Exact file duplicate (same file hash)</summary>
+    ExactFile,
+
+    /// <summary>Semantic duplicate (same vendor + date + amount)</summary>
+    SameContent
 }

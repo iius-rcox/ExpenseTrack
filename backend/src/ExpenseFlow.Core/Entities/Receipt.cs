@@ -70,6 +70,12 @@ public class Receipt : BaseEntity
     /// <summary>Match status: Unmatched=0, Proposed=1, Matched=2</summary>
     public MatchStatus MatchStatus { get; set; } = MatchStatus.Unmatched;
 
+    /// <summary>SHA-256 hash of the file content for exact duplicate detection</summary>
+    public string? FileHash { get; set; }
+
+    /// <summary>SHA-256 hash of normalized content (vendor|date|amount) for semantic duplicate detection</summary>
+    public string? ContentHash { get; set; }
+
     /// <summary>Concurrency token for optimistic locking (maps to PostgreSQL xmin)</summary>
     public uint RowVersion { get; set; }
 

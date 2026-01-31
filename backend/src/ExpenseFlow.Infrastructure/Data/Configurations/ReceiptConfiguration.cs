@@ -56,6 +56,17 @@ public class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
             .HasDefaultValue(MatchStatus.Unmatched)
             .IsRequired();
 
+        // Duplicate detection fields
+        builder.Property(r => r.FileHash)
+            .HasColumnName("file_hash")
+            .HasMaxLength(64)
+            .IsRequired(false);
+
+        builder.Property(r => r.ContentHash)
+            .HasColumnName("content_hash")
+            .HasMaxLength(64)
+            .IsRequired(false);
+
         // Indexes for efficient querying
         builder.HasIndex(r => r.UserId);
         builder.HasIndex(r => r.Status);
@@ -65,6 +76,13 @@ public class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
         // Sprint 5: Match status index
         builder.HasIndex(r => new { r.UserId, r.MatchStatus })
             .HasDatabaseName("ix_receipts_match_status");
+
+        // Duplicate detection indexes
+        builder.HasIndex(r => new { r.UserId, r.FileHash })
+            .HasDatabaseName("ix_receipts_file_hash");
+
+        builder.HasIndex(r => new { r.UserId, r.ContentHash })
+            .HasDatabaseName("ix_receipts_content_hash");
 
         // Relationship to User with CASCADE delete
         builder.HasOne(r => r.User)

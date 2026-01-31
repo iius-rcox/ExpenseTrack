@@ -230,4 +230,22 @@ public class ReceiptRepository : IReceiptRepository
             .Take(batchSize)
             .ToListAsync();
     }
+
+    public async Task<Receipt?> FindByFileHashAsync(string fileHash, Guid userId)
+    {
+        if (string.IsNullOrEmpty(fileHash))
+            return null;
+
+        return await _context.Receipts
+            .FirstOrDefaultAsync(r => r.UserId == userId && r.FileHash == fileHash);
+    }
+
+    public async Task<Receipt?> FindByContentHashAsync(string contentHash, Guid userId)
+    {
+        if (string.IsNullOrEmpty(contentHash))
+            return null;
+
+        return await _context.Receipts
+            .FirstOrDefaultAsync(r => r.UserId == userId && r.ContentHash == contentHash);
+    }
 }

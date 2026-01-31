@@ -108,4 +108,20 @@ public interface IReceiptRepository
     /// <param name="offset">Number of receipts to skip (for pagination)</param>
     /// <returns>List of receipts for thumbnail regeneration</returns>
     Task<List<Receipt>> GetReceiptsForThumbnailRegenerationAsync(int batchSize, List<string>? contentTypes = null, int offset = 0);
+
+    /// <summary>
+    /// Finds a receipt by file hash for duplicate detection.
+    /// </summary>
+    /// <param name="fileHash">SHA-256 hash of the file content</param>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <returns>Receipt if found with same file hash, null otherwise</returns>
+    Task<Receipt?> FindByFileHashAsync(string fileHash, Guid userId);
+
+    /// <summary>
+    /// Finds a receipt by content hash for semantic duplicate detection.
+    /// </summary>
+    /// <param name="contentHash">SHA-256 hash of normalized content (vendor|date|amount)</param>
+    /// <param name="userId">User ID for row-level security</param>
+    /// <returns>Receipt if found with same content hash, null otherwise</returns>
+    Task<Receipt?> FindByContentHashAsync(string contentHash, Guid userId);
 }
