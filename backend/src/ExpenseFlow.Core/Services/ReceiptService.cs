@@ -575,6 +575,48 @@ public class ReceiptService : IReceiptService
         };
     }
 
+    /// <summary>
+    /// Backfills file hashes for existing receipts that don't have one.
+    /// </summary>
+    /// <param name="batchSize">Maximum number of receipts to process in this batch</param>
+    /// <returns>Number of receipts processed</returns>
+    public async Task<int> BackfillFileHashesAsync(int batchSize = 50)
+    {
+        var receipts = await _receiptRepository.GetReceiptsWithoutFileHashAsync(batchSize);
+        var processed = 0;
+
+        foreach (var receipt in receipts)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(receipt.BlobUrl))
+                    continue;
+
+                // Download the file from blob storage
+                using var stream = await _blobStorageService.DownloadAsync(receipt.BlobUrl);
+
+                // Compute the file hash
+                var fileHash = await ComputeFileHashAsync(stream);
+                receipt.FileHash = fileHash;
+
+                await _receiptRepository.UpdateAsync(receipt);
+                processed++;
+
+                _logger.LogDebug("Backfilled file hash for receipt {ReceiptId}: {FileHash}",
+                    receipt.Id, fileHash);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error backfilling file hash for receipt {ReceiptId}", receipt.Id);
+            }
+        }
+
+        _logger.LogInformation("Backfilled file hashes for {Processed}/{Total} receipts",
+            processed, receipts.Count);
+
+        return processed;
+    }
+
     #endregion
 }
 

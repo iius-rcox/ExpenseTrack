@@ -69,4 +69,11 @@ public interface IReceiptService
     /// Updates receipt data with manual corrections.
     /// </summary>
     Task<Receipt?> UpdateReceiptAsync(Guid id, Guid userId, Shared.DTOs.ReceiptUpdateRequestDto request);
+
+    /// <summary>
+    /// Backfills file hashes for existing receipts that don't have one.
+    /// </summary>
+    /// <param name="batchSize">Maximum number of receipts to process</param>
+    /// <returns>Number of receipts processed</returns>
+    Task<int> BackfillFileHashesAsync(int batchSize = 50);
 }

@@ -248,4 +248,13 @@ public class ReceiptRepository : IReceiptRepository
         return await _context.Receipts
             .FirstOrDefaultAsync(r => r.UserId == userId && r.ContentHash == contentHash);
     }
+
+    public async Task<List<Receipt>> GetReceiptsWithoutFileHashAsync(int batchSize)
+    {
+        return await _context.Receipts
+            .Where(r => r.FileHash == null && r.BlobUrl != null)
+            .OrderBy(r => r.CreatedAt)
+            .Take(batchSize)
+            .ToListAsync();
+    }
 }

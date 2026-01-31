@@ -124,4 +124,11 @@ public interface IReceiptRepository
     /// <param name="userId">User ID for row-level security</param>
     /// <returns>Receipt if found with same content hash, null otherwise</returns>
     Task<Receipt?> FindByContentHashAsync(string contentHash, Guid userId);
+
+    /// <summary>
+    /// Gets receipts that are missing file hash (for backfill operations).
+    /// </summary>
+    /// <param name="batchSize">Maximum number of receipts to return</param>
+    /// <returns>List of receipts without file hash</returns>
+    Task<List<Receipt>> GetReceiptsWithoutFileHashAsync(int batchSize);
 }

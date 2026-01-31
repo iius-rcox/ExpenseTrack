@@ -669,6 +669,32 @@ public class ReceiptsController : ApiControllerBase
     }
 
     /// <summary>
+    /// Backfills file hashes for existing receipts (admin operation).
+    /// </summary>
+    /// <param name="batchSize">Number of receipts to process per batch (default: 50)</param>
+    /// <returns>Number of receipts processed</returns>
+    [HttpPost("backfill-hashes")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<ActionResult> BackfillFileHashes([FromQuery] int batchSize = 50)
+    {
+        _logger.LogInformation("Starting file hash backfill with batch size {BatchSize}", batchSize);
+
+        var totalProcessed = 0;
+        int processed;
+
+        // Process in batches until no more receipts without hashes
+        do
+        {
+            processed = await _receiptService.BackfillFileHashesAsync(batchSize);
+            totalProcessed += processed;
+        } while (processed == batchSize); // Continue if we hit the batch limit
+
+        _logger.LogInformation("File hash backfill complete. Total processed: {TotalProcessed}", totalProcessed);
+
+        return Ok(new { processed = totalProcessed, message = $"Backfilled file hashes for {totalProcessed} receipts" });
+    }
+
+    /// <summary>
     /// Generates SAS URLs for thumbnail images in a list of receipt summary DTOs.
     /// </summary>
     private async Task PopulateThumbnailSasUrlsAsync(IEnumerable<ReceiptSummaryDto> dtos)
