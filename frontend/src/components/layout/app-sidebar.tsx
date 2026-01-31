@@ -62,7 +62,7 @@ const mainNavItems = [
   },
   {
     title: 'Reports',
-    url: '/reports/editor',
+    url: '/reports',
     icon: FileText,
   },
   {
