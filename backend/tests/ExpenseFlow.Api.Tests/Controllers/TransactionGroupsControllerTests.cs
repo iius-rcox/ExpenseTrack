@@ -570,6 +570,10 @@ public class TransactionGroupsControllerTests
                 It.IsAny<List<string>?>(),
                 It.IsAny<List<string>?>(),
                 It.IsAny<string?>(),
+                It.IsAny<decimal?>(),
+                It.IsAny<decimal?>(),
+                It.IsAny<List<string>?>(),
+                It.IsAny<bool?>(),
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()))
@@ -604,6 +608,10 @@ public class TransactionGroupsControllerTests
                 It.IsAny<List<string>?>(),
                 It.IsAny<List<string>?>(),
                 search,
+                It.IsAny<decimal?>(),
+                It.IsAny<decimal?>(),
+                It.IsAny<List<string>?>(),
+                It.IsAny<bool?>(),
                 "date",
                 "desc",
                 It.IsAny<CancellationToken>()))
@@ -629,6 +637,10 @@ public class TransactionGroupsControllerTests
             It.IsAny<List<string>?>(),
             It.IsAny<List<string>?>(),
             search,
+            It.IsAny<decimal?>(),
+            It.IsAny<decimal?>(),
+            It.IsAny<List<string>?>(),
+            It.IsAny<bool?>(),
             "date",
             "desc",
             It.IsAny<CancellationToken>()), Times.Once);
