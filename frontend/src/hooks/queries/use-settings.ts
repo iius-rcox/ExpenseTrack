@@ -92,13 +92,37 @@ interface CategoryApiResponse {
   categories: Array<{ id: string; name: string }>
 }
 
+/**
+ * Safely extract category id - handles both object and string formats
+ * for backwards compatibility with cached data.
+ */
+function safeCategoryId(cat: unknown, index: number): string {
+  if (typeof cat === 'string') return `cat-${index}`
+  if (typeof cat === 'object' && cat !== null && 'id' in cat) {
+    return String((cat as { id: unknown }).id)
+  }
+  return `cat-${index}`
+}
+
+/**
+ * Safely extract category name - handles both object and string formats
+ * for backwards compatibility with cached data.
+ */
+function safeCategoryName(cat: unknown): string {
+  if (typeof cat === 'string') return cat
+  if (typeof cat === 'object' && cat !== null && 'name' in cat) {
+    return String((cat as { name: unknown }).name)
+  }
+  return 'Unknown'
+}
+
 export function useCategories() {
   return useQuery({
     queryKey: settingsKeys.categories(),
     queryFn: () => apiFetch<CategoryApiResponse>('/transactions/categories')
-      .then(res => res.categories.map((cat): Category => ({
-        id: cat.id,
-        name: cat.name,
+      .then(res => res.categories.map((cat, index): Category => ({
+        id: safeCategoryId(cat, index),
+        name: safeCategoryName(cat),
         description: undefined, // Categories from transactions don't have descriptions
         isActive: true
       }))),
