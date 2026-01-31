@@ -593,10 +593,15 @@ public class ReceiptService : IReceiptService
                     continue;
 
                 // Download the file from blob storage
-                using var stream = await _blobStorageService.DownloadAsync(receipt.BlobUrl);
+                using var downloadStream = await _blobStorageService.DownloadAsync(receipt.BlobUrl);
+
+                // Copy to MemoryStream since blob streams are non-seekable
+                using var memoryStream = new MemoryStream();
+                await downloadStream.CopyToAsync(memoryStream);
+                memoryStream.Position = 0;
 
                 // Compute the file hash
-                var fileHash = await ComputeFileHashAsync(stream);
+                var fileHash = await ComputeFileHashAsync(memoryStream);
                 receipt.FileHash = fileHash;
 
                 await _receiptRepository.UpdateAsync(receipt);
