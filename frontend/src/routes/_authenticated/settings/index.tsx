@@ -9,18 +9,13 @@ import {
   useDepartments,
   useProjects,
   useCategories,
-  useCreateCategory,
-  useUpdateCategory,
-  useDeleteCategory,
 } from '@/hooks/queries/use-settings'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Separator } from '@/components/ui/separator'
 import {
   Select,
   SelectContent,
@@ -28,26 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import {
   User,
@@ -56,10 +31,7 @@ import {
   Building2,
   Tag,
   Plus,
-  Pencil,
-  Trash2,
   Loader2,
-  Check,
   Moon,
   Sun,
   Monitor,
@@ -81,16 +53,6 @@ function SettingsPage() {
   const { data: categories, isLoading: loadingCategories } = useCategories()
 
   const { mutate: updatePreferences, isPending: updatingPrefs } = useUpdatePreferences()
-  const { mutate: createCategory, isPending: creatingCategory } = useCreateCategory()
-  const { mutate: updateCategory } = useUpdateCategory()
-  const { mutate: deleteCategory, isPending: deletingCategory } = useDeleteCategory()
-
-  const [newCategoryName, setNewCategoryName] = useState('')
-  const [newCategoryDesc, setNewCategoryDesc] = useState('')
-  const [editingCategory, setEditingCategory] = useState<{ id: string; name: string; description: string } | null>(null)
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null)
 
   // Allowance dialog state
   const [allowanceDialogOpen, setAllowanceDialogOpen] = useState(false)
@@ -149,75 +111,6 @@ function SettingsPage() {
         toast.error('Failed to update project')
       },
     })
-  }
-
-  const handleCreateCategory = () => {
-    if (!newCategoryName.trim()) return
-
-    createCategory(
-      { name: newCategoryName.trim(), description: newCategoryDesc.trim() || undefined },
-      {
-        onSuccess: () => {
-          toast.success('Category created')
-          setNewCategoryName('')
-          setNewCategoryDesc('')
-          setCategoryDialogOpen(false)
-        },
-        onError: () => {
-          toast.error('Failed to create category')
-        },
-      }
-    )
-  }
-
-  const handleUpdateCategory = () => {
-    if (!editingCategory || !editingCategory.name.trim()) return
-
-    updateCategory(
-      {
-        id: editingCategory.id,
-        name: editingCategory.name.trim(),
-        description: editingCategory.description.trim() || undefined,
-      },
-      {
-        onSuccess: () => {
-          toast.success('Category updated')
-          setEditingCategory(null)
-        },
-        onError: () => {
-          toast.error('Failed to update category')
-        },
-      }
-    )
-  }
-
-  const handleDeleteCategory = () => {
-    if (!categoryToDelete) return
-
-    deleteCategory(categoryToDelete, {
-      onSuccess: () => {
-        toast.success('Category deleted')
-        setCategoryToDelete(null)
-        setDeleteDialogOpen(false)
-      },
-      onError: () => {
-        toast.error('Failed to delete category')
-      },
-    })
-  }
-
-  const handleToggleCategoryActive = (id: string, currentActive: boolean) => {
-    updateCategory(
-      { id, isActive: !currentActive },
-      {
-        onSuccess: () => {
-          toast.success(`Category ${currentActive ? 'deactivated' : 'activated'}`)
-        },
-        onError: () => {
-          toast.error('Failed to update category')
-        },
-      }
-    )
   }
 
   const handleReportPrefsChange = (field: 'employeeId' | 'supervisorName' | 'departmentName', value: string) => {
@@ -496,189 +389,33 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Category Management */}
+        {/* Expense Categories (Read-only) */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5" />
               Expense Categories
             </CardTitle>
-            <CardDescription>Manage custom expense categories</CardDescription>
+            <CardDescription>Categories derived from your transaction history</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Category
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create Category</DialogTitle>
-                  <DialogDescription>Add a new expense category</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="category-name">Name</Label>
-                    <Input
-                      id="category-name"
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      placeholder="e.g., Office Supplies"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="category-desc">Description (optional)</Label>
-                    <Input
-                      id="category-desc"
-                      value={newCategoryDesc}
-                      onChange={(e) => setNewCategoryDesc(e.target.value)}
-                      placeholder="Brief description"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    onClick={handleCreateCategory}
-                    disabled={creatingCategory || !newCategoryName.trim()}
-                  >
-                    {creatingCategory && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Create Category
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            <Separator />
-
+          <CardContent>
             {loadingCategories ? (
               <div className="space-y-2">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
+                  <Skeleton key={i} className="h-10 w-full" />
                 ))}
               </div>
             ) : categories && categories.length > 0 ? (
-              <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
                 {categories.map((category) => (
-                  <div
-                    key={category.id}
-                    className="flex items-center justify-between p-3 rounded-lg border"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        checked={category.isActive}
-                        onCheckedChange={() => handleToggleCategoryActive(category.id, category.isActive)}
-                      />
-                      <div>
-                        <p className={`font-medium ${!category.isActive ? 'text-muted-foreground' : ''}`}>
-                          {category.name}
-                        </p>
-                        {category.description && (
-                          <p className="text-xs text-muted-foreground">{category.description}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {!category.isActive && (
-                        <Badge variant="outline" className="mr-2">Inactive</Badge>
-                      )}
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingCategory({
-                              id: category.id,
-                              name: category.name,
-                              description: category.description || '',
-                            })}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Edit Category</DialogTitle>
-                            <DialogDescription>Update category details</DialogDescription>
-                          </DialogHeader>
-                          {editingCategory && (
-                            <div className="space-y-4 py-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-category-name">Name</Label>
-                                <Input
-                                  id="edit-category-name"
-                                  value={editingCategory.name}
-                                  onChange={(e) => setEditingCategory({
-                                    ...editingCategory,
-                                    name: e.target.value,
-                                  })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-category-desc">Description</Label>
-                                <Input
-                                  id="edit-category-desc"
-                                  value={editingCategory.description}
-                                  onChange={(e) => setEditingCategory({
-                                    ...editingCategory,
-                                    description: e.target.value,
-                                  })}
-                                />
-                              </div>
-                            </div>
-                          )}
-                          <DialogFooter>
-                            <Button onClick={handleUpdateCategory}>
-                              <Check className="mr-2 h-4 w-4" />
-                              Save Changes
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-
-                      <AlertDialog open={deleteDialogOpen && categoryToDelete === category.id} onOpenChange={setDeleteDialogOpen}>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setCategoryToDelete(category.id)
-                              setDeleteDialogOpen(true)
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Category?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete the "{category.name}" category.
-                              Existing expenses using this category will not be affected.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel onClick={() => setCategoryToDelete(null)}>
-                              Cancel
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={handleDeleteCategory}
-                              disabled={deletingCategory}
-                            >
-                              {deletingCategory && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
+                  <Badge key={category.id} variant="secondary" className="text-sm py-1.5 px-3">
+                    {category.name}
+                  </Badge>
                 ))}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">
-                No custom categories yet
+                No categories yet. Categories will appear here as you add transactions.
               </p>
             )}
           </CardContent>
