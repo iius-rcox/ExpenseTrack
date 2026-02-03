@@ -62,6 +62,10 @@ public class TransactionPredictionConfiguration : IEntityTypeConfiguration<Trans
             .HasColumnName("is_manual_override")
             .HasDefaultValue(false);
 
+        builder.Property(e => e.IsPersonalPrediction)
+            .HasColumnName("is_personal_prediction")
+            .HasDefaultValue(false);
+
         // Unique: one prediction per transaction
         builder.HasIndex(e => e.TransactionId)
             .IsUnique()

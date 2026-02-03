@@ -80,6 +80,16 @@ const CONFIDENCE_COLORS: Record<
 };
 
 /**
+ * Color configuration for personal expense predictions
+ */
+const PERSONAL_COLORS = {
+  bg: 'bg-rose-500/10 dark:bg-rose-500/20',
+  border: 'border-rose-500/30 dark:border-rose-500/40',
+  text: 'text-rose-700 dark:text-rose-400',
+  icon: 'text-rose-600 dark:text-rose-400',
+};
+
+/**
  * Labels for confidence levels
  */
 const CONFIDENCE_LABELS: Record<Exclude<PredictionConfidence, 'Low'>, string> = {
@@ -149,8 +159,11 @@ export const ExpenseBadge = memo(function ExpenseBadge({
     return null;
   }
 
-  const colors = CONFIDENCE_COLORS[prediction.confidenceLevel];
-  const label = CONFIDENCE_LABELS[prediction.confidenceLevel];
+  // Use personal colors if this is a personal expense prediction
+  const isPersonal = prediction.isPersonalPrediction === true;
+  const colors = isPersonal ? PERSONAL_COLORS : CONFIDENCE_COLORS[prediction.confidenceLevel];
+  const label = isPersonal ? 'Likely Personal expense' : CONFIDENCE_LABELS[prediction.confidenceLevel];
+  const badgeText = isPersonal ? 'Likely Personal' : 'Pending Review';
   const confidenceScore = confidenceToScore(prediction.confidenceLevel);
 
   // Compact mode - interactive badge with dropdown
@@ -171,7 +184,7 @@ export const ExpenseBadge = memo(function ExpenseBadge({
               title={`${label} - Click to change`}
             >
               <Sparkles className={cn('h-3 w-3', colors.icon)} />
-              <span className="text-xs font-medium">Pending Review</span>
+              <span className="text-xs font-medium">{badgeText}</span>
             </Badge>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
@@ -233,7 +246,7 @@ export const ExpenseBadge = memo(function ExpenseBadge({
       <div className="flex items-center gap-1.5">
         <Sparkles className={cn('h-3.5 w-3.5', colors.icon)} />
         <span className={cn('text-xs font-medium', colors.text)}>
-          Pending Review
+          {badgeText}
         </span>
       </div>
 
@@ -366,12 +379,16 @@ export function ExpenseBadgeSkeleton({ compact = false }: { compact?: boolean })
  */
 export function ExpenseBadgeInline({
   confidenceLevel,
+  isPersonalPrediction,
   className,
 }: {
   confidenceLevel: Exclude<PredictionConfidence, 'Low'>;
+  isPersonalPrediction?: boolean;
   className?: string;
 }) {
-  const colors = CONFIDENCE_COLORS[confidenceLevel];
+  const isPersonal = isPersonalPrediction === true;
+  const colors = isPersonal ? PERSONAL_COLORS : CONFIDENCE_COLORS[confidenceLevel];
+  const badgeText = isPersonal ? 'Likely Personal' : 'Pending Review';
 
   return (
     <span
@@ -382,7 +399,7 @@ export function ExpenseBadgeInline({
       )}
     >
       <Sparkles className={cn('h-2.5 w-2.5', colors.icon)} />
-      <span>Pending Review</span>
+      <span>{badgeText}</span>
     </span>
   );
 }

@@ -17,11 +17,12 @@ public interface ITransactionPredictionRepository
     Task<TransactionPrediction?> GetByIdAsync(Guid userId, Guid predictionId);
 
     /// <summary>
-    /// Gets a prediction by transaction ID.
+    /// Gets a prediction by transaction ID for a specific user.
     /// </summary>
+    /// <param name="userId">User ID for authorization.</param>
     /// <param name="transactionId">Transaction ID.</param>
-    /// <returns>Prediction if found, null otherwise.</returns>
-    Task<TransactionPrediction?> GetByTransactionIdAsync(Guid transactionId);
+    /// <returns>Prediction if found and owned by user, null otherwise.</returns>
+    Task<TransactionPrediction?> GetByTransactionIdAsync(Guid userId, Guid transactionId);
 
     /// <summary>
     /// Gets paginated predictions for a user with optional filters.
@@ -55,11 +56,12 @@ public interface ITransactionPredictionRepository
     Task<List<TransactionPrediction>> GetByPatternIdAsync(Guid patternId);
 
     /// <summary>
-    /// Gets predictions for multiple transaction IDs.
+    /// Gets predictions for multiple transaction IDs for a specific user.
     /// </summary>
+    /// <param name="userId">User ID for authorization.</param>
     /// <param name="transactionIds">Transaction IDs.</param>
-    /// <returns>Dictionary mapping transaction ID to prediction.</returns>
-    Task<Dictionary<Guid, TransactionPrediction>> GetByTransactionIdsAsync(IEnumerable<Guid> transactionIds);
+    /// <returns>Dictionary mapping transaction ID to prediction (only those owned by user).</returns>
+    Task<Dictionary<Guid, TransactionPrediction>> GetByTransactionIdsAsync(Guid userId, IEnumerable<Guid> transactionIds);
 
     /// <summary>
     /// Gets count of predictions by status for a user.

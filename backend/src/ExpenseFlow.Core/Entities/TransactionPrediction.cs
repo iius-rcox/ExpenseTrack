@@ -39,6 +39,13 @@ public class TransactionPrediction : BaseEntity
     /// </summary>
     public bool IsManualOverride { get; set; }
 
+    /// <summary>
+    /// True if this prediction was generated from a pattern classified as personal.
+    /// Personal predictions suggest the transaction is likely NOT a business expense.
+    /// This allows the UI to proactively show "likely personal" transactions.
+    /// </summary>
+    public bool IsPersonalPrediction { get; set; }
+
     // Navigation properties
     public ExpensePattern? Pattern { get; set; }
     public Transaction Transaction { get; set; } = null!;

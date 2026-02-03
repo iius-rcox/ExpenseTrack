@@ -668,9 +668,9 @@ public class ExpensePredictionService : IExpensePredictionService
     }
 
     /// <inheritdoc />
-    public async Task<PredictionSummaryDto?> GetPredictionForTransactionAsync(Guid transactionId)
+    public async Task<PredictionSummaryDto?> GetPredictionForTransactionAsync(Guid userId, Guid transactionId)
     {
-        var prediction = await _predictionRepository.GetByTransactionIdAsync(transactionId);
+        var prediction = await _predictionRepository.GetByTransactionIdAsync(userId, transactionId);
 
         if (prediction == null || prediction.ConfidenceLevel < PredictionConfidence.Medium)
             return null;
@@ -679,9 +679,9 @@ public class ExpensePredictionService : IExpensePredictionService
     }
 
     /// <inheritdoc />
-    public async Task<Dictionary<Guid, PredictionSummaryDto>> GetPredictionsForTransactionsAsync(IEnumerable<Guid> transactionIds)
+    public async Task<Dictionary<Guid, PredictionSummaryDto>> GetPredictionsForTransactionsAsync(Guid userId, IEnumerable<Guid> transactionIds)
     {
-        var predictions = await _predictionRepository.GetByTransactionIdsAsync(transactionIds);
+        var predictions = await _predictionRepository.GetByTransactionIdsAsync(userId, transactionIds);
 
         return predictions
             .Where(kvp => kvp.Value.ConfidenceLevel >= PredictionConfidence.Medium)
@@ -1464,11 +1464,11 @@ public class ExpensePredictionService : IExpensePredictionService
     #region Transaction Enrichment
 
     /// <inheritdoc />
-    public async Task<List<PredictionTransactionDto>> EnrichWithPredictionsAsync(IEnumerable<TransactionSummaryDto> transactions)
+    public async Task<List<PredictionTransactionDto>> EnrichWithPredictionsAsync(Guid userId, IEnumerable<TransactionSummaryDto> transactions)
     {
         var transactionList = transactions.ToList();
         var transactionIds = transactionList.Select(t => t.Id).ToList();
-        var predictions = await GetPredictionsForTransactionsAsync(transactionIds);
+        var predictions = await GetPredictionsForTransactionsAsync(userId, transactionIds);
 
         return transactionList.Select(t => new PredictionTransactionDto
         {
@@ -1585,13 +1585,16 @@ public class ExpensePredictionService : IExpensePredictionService
         if (matchingPattern == null || matchingPattern.OccurrenceCount < MinOccurrencesForPrediction)
             return null;
 
-        // Skip patterns classified as personal (ActiveClassification == false)
-        if (matchingPattern.ActiveClassification == false)
+        // Determine if this is a personal pattern prediction
+        // Personal patterns now generate predictions (with IsPersonalPrediction = true)
+        // instead of being skipped - this enables proactive "likely personal" display
+        var isPersonalPrediction = matchingPattern.ActiveClassification == false;
+
+        if (isPersonalPrediction)
         {
             _logger.LogDebug(
-                "Pattern {PatternId} ({VendorName}) is classified as personal - skipping prediction for transaction {TransactionId}",
+                "Pattern {PatternId} ({VendorName}) is classified as personal - creating prediction with IsPersonalPrediction=true for transaction {TransactionId}",
                 matchingPattern.Id, matchingPattern.DisplayName, transaction.Id);
-            return null;
         }
 
         // Check if pattern requires a confirmed receipt match before generating prediction
@@ -1630,6 +1633,7 @@ public class ExpensePredictionService : IExpensePredictionService
             ConfidenceScore = confidenceScore,
             ConfidenceLevel = confidenceLevel,
             Status = PredictionStatus.Pending,
+            IsPersonalPrediction = isPersonalPrediction,
             CreatedAt = DateTime.UtcNow
         };
     }
@@ -1714,7 +1718,13 @@ public class ExpensePredictionService : IExpensePredictionService
             LastSeenAt = pattern.LastSeenAt,
             IsSuppressed = pattern.IsSuppressed,
             RequiresReceiptMatch = pattern.RequiresReceiptMatch,
-            AccuracyRate = accuracyRate
+            AccuracyRate = accuracyRate,
+            ActiveClassification = pattern.ActiveClassification switch
+            {
+                true => "Business",
+                false => "Personal",
+                null => null
+            }
         };
     }
 
@@ -1743,6 +1753,12 @@ public class ExpensePredictionService : IExpensePredictionService
             IsSuppressed = pattern.IsSuppressed,
             RequiresReceiptMatch = pattern.RequiresReceiptMatch,
             AccuracyRate = accuracyRate,
+            ActiveClassification = pattern.ActiveClassification switch
+            {
+                true => "Business",
+                false => "Personal",
+                null => null
+            },
             CreatedAt = pattern.CreatedAt,
             UpdatedAt = pattern.UpdatedAt
         };
@@ -1760,7 +1776,9 @@ public class ExpensePredictionService : IExpensePredictionService
             ConfidenceLevel = prediction.ConfidenceLevel,
             Status = prediction.Status,
             SuggestedCategory = prediction.Pattern?.Category,
-            SuggestedGLCode = prediction.Pattern?.DefaultGLCode
+            SuggestedGLCode = prediction.Pattern?.DefaultGLCode,
+            IsManualOverride = prediction.IsManualOverride,
+            IsPersonalPrediction = prediction.IsPersonalPrediction
         };
     }
 
@@ -1781,7 +1799,9 @@ public class ExpensePredictionService : IExpensePredictionService
             PatternAverageAmount = prediction.Pattern?.AverageAmount ?? 0m,
             PatternOccurrenceCount = prediction.Pattern?.OccurrenceCount ?? 0,
             CreatedAt = prediction.CreatedAt,
-            ResolvedAt = prediction.ResolvedAt
+            ResolvedAt = prediction.ResolvedAt,
+            IsManualOverride = prediction.IsManualOverride,
+            IsPersonalPrediction = prediction.IsPersonalPrediction
         };
     }
 

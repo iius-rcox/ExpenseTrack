@@ -96,7 +96,7 @@ public class TransactionsController : ApiControllerBase
 
         // Batch-fetch predictions for all transactions in one query
         var transactionIds = transactions.Select(t => t.Id).ToList();
-        var predictions = await _predictionService.GetPredictionsForTransactionsAsync(transactionIds);
+        var predictions = await _predictionService.GetPredictionsForTransactionsAsync(user.Id, transactionIds);
 
         var response = new TransactionListResponse
         {

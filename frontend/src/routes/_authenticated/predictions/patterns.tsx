@@ -17,20 +17,6 @@
  */
 
 import { useState } from 'react'
-
-/**
- * DEFENSIVE HELPER: Safely convert any value to a displayable string.
- * Guards against React Error #301 where empty objects {} might be in cached data.
- */
-function safeDisplayString(value: unknown, fallback = ''): string {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
-    const keys = Object.keys(value as object);
-    if (keys.length === 0) return fallback;
-    return fallback;
-  }
-  return String(value);
-}
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { motion } from 'framer-motion'
 import {
@@ -73,7 +59,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { formatCurrency, cn } from '@/lib/utils'
+import { formatCurrency, cn, safeDisplayString } from '@/lib/utils'
 import { staggerContainer, staggerChild } from '@/lib/animations'
 import { toast } from 'sonner'
 import {
@@ -87,6 +73,9 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
+  CircleCheck,
+  CircleX,
+  HelpCircle,
   Store,
   Percent,
 } from 'lucide-react'
@@ -272,6 +261,7 @@ function PatternDashboard() {
                   <TableRow>
                     <TableHead className="w-[200px]">Vendor</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead className="text-center">Classification</TableHead>
                     <TableHead className="text-right">Avg. Amount</TableHead>
                     <TableHead className="text-center">Frequency</TableHead>
                     <TableHead className="text-center">Accuracy</TableHead>
@@ -399,6 +389,78 @@ function StatsCards({
   )
 }
 
+/**
+ * Classification badge for expense patterns.
+ * Shows Business (green), Personal (rose), or Undetermined (muted).
+ */
+function ClassificationBadge({
+  classification,
+}: {
+  classification: 'Business' | 'Personal' | null | undefined
+}) {
+  if (classification === 'Business') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge
+              variant="outline"
+              className="gap-1 bg-green-500/10 border-green-500/30 text-green-700 dark:bg-green-500/20 dark:border-green-500/40 dark:text-green-400"
+            >
+              <CircleCheck className="h-3 w-3" aria-hidden="true" />
+              Business
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            This vendor is typically a business expense
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  if (classification === 'Personal') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge
+              variant="outline"
+              className="gap-1 bg-rose-500/10 border-rose-500/30 text-rose-700 dark:bg-rose-500/20 dark:border-rose-500/40 dark:text-rose-400"
+            >
+              <CircleX className="h-3 w-3" aria-hidden="true" />
+              Personal
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            This vendor is typically a personal expense
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  // Undetermined (null)
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            variant="outline"
+            className="gap-1 bg-muted/50 border-muted-foreground/20 text-muted-foreground"
+          >
+            <HelpCircle className="h-3 w-3" aria-hidden="true" />
+            Undetermined
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          Not enough data to determine if this is typically business or personal
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
 interface PatternRowProps {
   pattern: PatternSummary
   onToggleSuppression: (pattern: PatternSummary) => void
@@ -435,6 +497,9 @@ function PatternRow({
         ) : (
           <span className="text-muted-foreground">-</span>
         )}
+      </TableCell>
+      <TableCell className="text-center">
+        <ClassificationBadge classification={pattern.activeClassification} />
       </TableCell>
       <TableCell className="text-right font-medium">
         {formatCurrency(pattern.averageAmount)}
@@ -537,6 +602,7 @@ function PatternTableSkeleton() {
           <Skeleton className="h-6 w-6" />
           <Skeleton className="h-6 flex-1" />
           <Skeleton className="h-6 w-20" />
+          <Skeleton className="h-6 w-24" /> {/* Classification column */}
           <Skeleton className="h-6 w-16" />
           <Skeleton className="h-6 w-16" />
           <Skeleton className="h-6 w-24" />

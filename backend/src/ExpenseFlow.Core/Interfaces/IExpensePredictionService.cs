@@ -103,16 +103,18 @@ public interface IExpensePredictionService
     /// <summary>
     /// Gets a single prediction for a transaction if one exists and meets confidence threshold.
     /// </summary>
+    /// <param name="userId">User ID for authorization.</param>
     /// <param name="transactionId">Transaction ID.</param>
-    /// <returns>Prediction summary if available, null otherwise.</returns>
-    Task<PredictionSummaryDto?> GetPredictionForTransactionAsync(Guid transactionId);
+    /// <returns>Prediction summary if available and owned by user, null otherwise.</returns>
+    Task<PredictionSummaryDto?> GetPredictionForTransactionAsync(Guid userId, Guid transactionId);
 
     /// <summary>
-    /// Gets predictions for multiple transactions.
+    /// Gets predictions for multiple transactions for a specific user.
     /// </summary>
+    /// <param name="userId">User ID for authorization.</param>
     /// <param name="transactionIds">Transaction IDs.</param>
-    /// <returns>Dictionary mapping transaction ID to prediction summary.</returns>
-    Task<Dictionary<Guid, PredictionSummaryDto>> GetPredictionsForTransactionsAsync(IEnumerable<Guid> transactionIds);
+    /// <returns>Dictionary mapping transaction ID to prediction summary (only those owned by user).</returns>
+    Task<Dictionary<Guid, PredictionSummaryDto>> GetPredictionsForTransactionsAsync(Guid userId, IEnumerable<Guid> transactionIds);
 
     #endregion
 
@@ -298,9 +300,10 @@ public interface IExpensePredictionService
     /// Enriches transactions with prediction data for display.
     /// Used to add prediction badges to transaction lists.
     /// </summary>
+    /// <param name="userId">User ID for authorization.</param>
     /// <param name="transactions">Transaction summaries to enrich.</param>
     /// <returns>Transactions with prediction data attached.</returns>
-    Task<List<PredictionTransactionDto>> EnrichWithPredictionsAsync(IEnumerable<TransactionSummaryDto> transactions);
+    Task<List<PredictionTransactionDto>> EnrichWithPredictionsAsync(Guid userId, IEnumerable<TransactionSummaryDto> transactions);
 
     #endregion
 

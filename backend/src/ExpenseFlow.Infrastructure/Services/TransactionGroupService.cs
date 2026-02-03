@@ -828,7 +828,7 @@ public class TransactionGroupService : ITransactionGroupService
             .Where(x => x.Item is Transaction)
             .Select(x => ((Transaction)x.Item).Id)
             .ToList();
-        var predictions = await _predictionService.GetPredictionsForTransactionsAsync(transactionIds);
+        var predictions = await _predictionService.GetPredictionsForTransactionsAsync(userId, transactionIds);
 
         // Map to DTOs
         var transactionDtos = new List<TransactionSummaryDto>();

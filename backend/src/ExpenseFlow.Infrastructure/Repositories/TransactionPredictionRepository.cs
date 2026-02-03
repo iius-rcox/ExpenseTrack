@@ -27,11 +27,11 @@ public class TransactionPredictionRepository : ITransactionPredictionRepository
             .FirstOrDefaultAsync(p => p.Id == predictionId && p.UserId == userId);
     }
 
-    public async Task<TransactionPrediction?> GetByTransactionIdAsync(Guid transactionId)
+    public async Task<TransactionPrediction?> GetByTransactionIdAsync(Guid userId, Guid transactionId)
     {
         return await _context.TransactionPredictions
             .Include(p => p.Pattern)
-            .FirstOrDefaultAsync(p => p.TransactionId == transactionId);
+            .FirstOrDefaultAsync(p => p.TransactionId == transactionId && p.UserId == userId);
     }
 
     public async Task<(List<TransactionPrediction> Predictions, int TotalCount)> GetPagedAsync(
@@ -91,12 +91,12 @@ public class TransactionPredictionRepository : ITransactionPredictionRepository
             .ToListAsync();
     }
 
-    public async Task<Dictionary<Guid, TransactionPrediction>> GetByTransactionIdsAsync(IEnumerable<Guid> transactionIds)
+    public async Task<Dictionary<Guid, TransactionPrediction>> GetByTransactionIdsAsync(Guid userId, IEnumerable<Guid> transactionIds)
     {
         var ids = transactionIds.ToList();
         var predictions = await _context.TransactionPredictions
             .Include(p => p.Pattern)
-            .Where(p => ids.Contains(p.TransactionId))
+            .Where(p => p.UserId == userId && ids.Contains(p.TransactionId))
             .ToListAsync();
 
         return predictions.ToDictionary(p => p.TransactionId, p => p);

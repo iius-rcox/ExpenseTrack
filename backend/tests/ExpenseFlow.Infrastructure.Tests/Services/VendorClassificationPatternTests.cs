@@ -17,10 +17,13 @@ namespace ExpenseFlow.Infrastructure.Tests.Services;
 /// <summary>
 /// Tests for vendor classification patterns feature.
 ///
-/// Classification Rules:
+/// Classification Rules (UPDATED - lowered personal threshold):
 /// - Business: 50%+ confirm rate AND total count >= 1
-/// - Personal: 75%+ reject rate AND total count >= 4
+/// - Personal: 60%+ reject rate AND total count >= 3 (was 75%/4)
 /// - Otherwise: null (undetermined)
+///
+/// NEW BEHAVIOR: Personal patterns now generate predictions with IsPersonalPrediction = true
+/// (previously they were skipped entirely).
 ///
 /// The ActiveClassification property is calculated from ConfirmCount and RejectCount.
 /// </summary>
@@ -154,29 +157,29 @@ public class VendorClassificationPatternTests : IDisposable
     [Fact]
     public void ActiveClassification_Returns_Null_When_BelowThresholds()
     {
-        // Arrange: Pattern with 2 confirms, 3 rejects (40% confirm rate, 60% reject rate, count = 5)
-        // Not 50%+ confirm, not 75%+ reject
-        var pattern = CreatePattern(confirmCount: 2, rejectCount: 3);
+        // Arrange: Pattern with 9 confirms, 11 rejects (45% confirm rate, 55% reject rate, count = 20)
+        // Not 50%+ confirm, not 60%+ reject
+        var pattern = CreatePattern(confirmCount: 9, rejectCount: 11);
 
         // Act
         var classification = pattern.ActiveClassification;
 
         // Assert: Should be undetermined (null)
-        classification.Should().BeNull("pattern doesn't meet either threshold (40% confirm, 60% reject)");
+        classification.Should().BeNull("pattern doesn't meet either threshold (45% confirm, 55% reject)");
     }
 
     [Fact]
     public void ActiveClassification_Returns_Null_When_InsufficientData_ForPersonal()
     {
-        // Arrange: Pattern with 0 confirms, 3 rejects (100% reject but only 3 count)
-        // Needs 4+ for personal classification
-        var pattern = CreatePattern(confirmCount: 0, rejectCount: 3);
+        // Arrange: Pattern with 0 confirms, 2 rejects (100% reject but only 2 count)
+        // Needs 3+ for personal classification (with new threshold)
+        var pattern = CreatePattern(confirmCount: 0, rejectCount: 2);
 
         // Act
         var classification = pattern.ActiveClassification;
 
-        // Assert: Should be undetermined because count < 4 for personal
-        classification.Should().BeNull("pattern needs 4+ total count for personal classification");
+        // Assert: Should be undetermined because count < 3 for personal
+        classification.Should().BeNull("pattern needs 3+ total count for personal classification");
     }
 
     [Fact]
@@ -259,7 +262,8 @@ public class VendorClassificationPatternTests : IDisposable
 
         var updatedPattern = await _dbContext.ExpensePatterns.FindAsync(pattern.Id);
         updatedPattern!.ConfirmCount.Should().Be(2);
-        updatedPattern.ActiveClassification.Should().BeNull("33% confirm, 67% reject - neither threshold met");
+        // With new thresholds: 33% confirm < 50%, 67% reject >= 60% = still personal
+        updatedPattern.ActiveClassification.Should().BeFalse("33% confirm, 67% reject - personal threshold still met");
     }
 
     #endregion
@@ -269,9 +273,10 @@ public class VendorClassificationPatternTests : IDisposable
     [Fact]
     public async Task RejectPredictionAsync_UpdatesPatternClassification_ToPersonalWhenThresholdMet()
     {
-        // Arrange: Create a pattern with 1 confirm, 2 rejects (need 1 more reject to reach 75% with count 4)
-        var pattern = await CreatePatternInDbAsync(confirmCount: 1, rejectCount: 2);
-        pattern.ActiveClassification.Should().BeNull("starting as undetermined");
+        // Arrange: Create a pattern with 4 confirms, 5 rejects (44% confirm, 56% reject, count = 9)
+        // After reject: 4 confirms, 6 rejects = 40% confirm, 60% reject, count = 10
+        var pattern = await CreatePatternInDbAsync(confirmCount: 4, rejectCount: 5);
+        pattern.ActiveClassification.Should().BeNull("starting as undetermined (44% confirm, 56% reject)");
 
         var prediction = await CreatePredictionInDbAsync(pattern.Id);
 
@@ -279,7 +284,7 @@ public class VendorClassificationPatternTests : IDisposable
             .Setup(x => x.GetByIdAsync(_testUserId, prediction.Id))
             .ReturnsAsync(prediction);
 
-        // Act: Reject the prediction (now 1 confirm, 3 rejects = 75% reject with count 4)
+        // Act: Reject the prediction (now 4 confirms, 6 rejects = 40% confirm, 60% reject)
         var result = await _service.RejectPredictionAsync(_testUserId, new RejectPredictionRequestDto
         {
             PredictionId = prediction.Id
@@ -289,8 +294,8 @@ public class VendorClassificationPatternTests : IDisposable
         result.Success.Should().BeTrue();
 
         var updatedPattern = await _dbContext.ExpensePatterns.FindAsync(pattern.Id);
-        updatedPattern!.RejectCount.Should().Be(3);
-        updatedPattern.ActiveClassification.Should().BeFalse("75% reject rate with 4 total count = personal");
+        updatedPattern!.RejectCount.Should().Be(6);
+        updatedPattern.ActiveClassification.Should().BeFalse("60% reject rate with 10 total count = personal");
     }
 
     [Fact]
@@ -322,7 +327,7 @@ public class VendorClassificationPatternTests : IDisposable
     }
 
     [Fact]
-    public async Task RejectPredictionAsync_UpdatesPatternClassification_BusinessToUndetermined_EdgeCase()
+    public async Task RejectPredictionAsync_UpdatesPatternClassification_BusinessToPersonal_EdgeCase()
     {
         // Arrange: Create a pattern currently classified as business (1 confirm, 1 reject = 50% confirm)
         var pattern = await CreatePatternInDbAsync(confirmCount: 1, rejectCount: 1);
@@ -334,7 +339,7 @@ public class VendorClassificationPatternTests : IDisposable
             .Setup(x => x.GetByIdAsync(_testUserId, prediction.Id))
             .ReturnsAsync(prediction);
 
-        // Act: Reject the prediction (now 1 confirm, 2 rejects = 33% confirm)
+        // Act: Reject the prediction (now 1 confirm, 2 rejects = 33% confirm, 67% reject)
         var result = await _service.RejectPredictionAsync(_testUserId, new RejectPredictionRequestDto
         {
             PredictionId = prediction.Id
@@ -345,16 +350,16 @@ public class VendorClassificationPatternTests : IDisposable
 
         var updatedPattern = await _dbContext.ExpensePatterns.FindAsync(pattern.Id);
         updatedPattern!.RejectCount.Should().Be(2);
-        // 33% confirm, 67% reject - neither threshold met
-        updatedPattern.ActiveClassification.Should().BeNull("33% confirm, 67% reject - undetermined");
+        // 33% confirm, 67% reject with count=3 meets personal threshold (60%/3)
+        updatedPattern.ActiveClassification.Should().BeFalse("33% confirm, 67% reject with count 3 = personal");
     }
 
     #endregion
 
-    #region Prediction Matching Skips Personal Patterns Tests
+    #region Prediction Generation Tests (Personal patterns now generate predictions)
 
     [Fact]
-    public async Task GeneratePredictionsAsync_SkipsPersonalPatterns()
+    public async Task GeneratePredictionsAsync_GeneratesForPersonalPatterns()
     {
         // Arrange: Create a pattern classified as personal
         var personalPattern = await CreatePatternInDbAsync(
@@ -374,8 +379,8 @@ public class VendorClassificationPatternTests : IDisposable
         // Act: Generate predictions
         var predictionsGenerated = await _service.GeneratePredictionsAsync(_testUserId, new[] { transaction.Id });
 
-        // Assert: No prediction should be generated because pattern is personal
-        predictionsGenerated.Should().Be(0, "personal patterns should be skipped");
+        // Assert: Prediction should be generated (with IsPersonalPrediction = true)
+        predictionsGenerated.Should().Be(1, "personal patterns should now generate predictions");
     }
 
     [Fact]
@@ -407,12 +412,13 @@ public class VendorClassificationPatternTests : IDisposable
     public async Task GeneratePredictionsAsync_IncludesUndeterminedPatterns()
     {
         // Arrange: Create a pattern with undetermined classification
+        // 45% confirm, 55% reject = undetermined (not meeting either threshold)
         var undeterminedPattern = await CreatePatternInDbAsync(
-            confirmCount: 2,
-            rejectCount: 3,
+            confirmCount: 9,
+            rejectCount: 11,
             vendorName: "UNDETERMINED_VENDOR",
-            occurrenceCount: 5);
-        undeterminedPattern.ActiveClassification.Should().BeNull("should be undetermined");
+            occurrenceCount: 20);
+        undeterminedPattern.ActiveClassification.Should().BeNull("should be undetermined (45% confirm, 55% reject)");
 
         // Create a transaction matching this vendor
         var transaction = await CreateTransactionInDbAsync("UNDETERMINED_VENDOR");
@@ -429,7 +435,7 @@ public class VendorClassificationPatternTests : IDisposable
     }
 
     [Fact]
-    public async Task GeneratePredictionsAsync_MixedPatterns_OnlyGeneratesForNonPersonal()
+    public async Task GeneratePredictionsAsync_MixedPatterns_GeneratesForAll()
     {
         // Arrange: Create multiple patterns with different classifications
         var businessPattern = await CreatePatternInDbAsync(
@@ -453,8 +459,8 @@ public class VendorClassificationPatternTests : IDisposable
             _testUserId,
             new[] { tx1.Id, tx2.Id, tx3.Id });
 
-        // Assert: Should skip personal pattern
-        predictionsGenerated.Should().Be(2, "should skip personal pattern, include business and undetermined");
+        // Assert: Should generate for ALL patterns (business, personal, and undetermined)
+        predictionsGenerated.Should().Be(3, "should generate predictions for all patterns including personal");
     }
 
     #endregion

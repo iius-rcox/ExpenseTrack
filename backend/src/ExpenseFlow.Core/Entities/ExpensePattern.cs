@@ -57,10 +57,16 @@ public class ExpensePattern : BaseEntity
     /// <summary>Last update timestamp</summary>
     public DateTime UpdatedAt { get; set; }
 
+    // Classification threshold constants (lowered personal threshold for better detection)
+    private const decimal BusinessConfirmThreshold = 0.50m;  // 50%+ confirm rate
+    private const int BusinessMinCount = 1;                   // Minimum 1 sample
+    private const decimal PersonalRejectThreshold = 0.60m;   // 60%+ reject rate (was 75%)
+    private const int PersonalMinCount = 3;                   // Minimum 3 samples (was 4)
+
     /// <summary>
     /// Active classification calculated from feedback.
     /// true = business expense (50%+ confirm rate, count >= 1)
-    /// false = personal expense (75%+ reject rate, count >= 4)
+    /// false = personal expense (60%+ reject rate, count >= 3)
     /// null = undetermined (doesn't meet either threshold)
     /// </summary>
     public bool? ActiveClassification
@@ -77,11 +83,12 @@ public class ExpensePattern : BaseEntity
             var rejectRate = (decimal)RejectCount / totalCount;
 
             // Business: 50%+ confirm rate AND total count >= 1
-            if (confirmRate >= 0.50m && totalCount >= 1)
+            // Business classification takes precedence (check first)
+            if (confirmRate >= BusinessConfirmThreshold && totalCount >= BusinessMinCount)
                 return true;
 
-            // Personal: 75%+ reject rate AND total count >= 4
-            if (rejectRate >= 0.75m && totalCount >= 4)
+            // Personal: 60%+ reject rate AND total count >= 3
+            if (rejectRate >= PersonalRejectThreshold && totalCount >= PersonalMinCount)
                 return false;
 
             // Undetermined

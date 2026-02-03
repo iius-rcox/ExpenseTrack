@@ -56,6 +56,8 @@ export interface PatternSummary {
   requiresReceiptMatch: boolean;
   /** Calculated accuracy from confirm/reject ratio */
   accuracyRate: number;
+  /** Active classification for this pattern: Business, Personal, or null (undetermined) */
+  activeClassification: 'Business' | 'Personal' | null;
 }
 
 /**
@@ -110,6 +112,8 @@ export interface PredictionSummary {
   suggestedGLCode: string | null;
   /** True if this was manually set by user (not auto-predicted) */
   isManualOverride: boolean;
+  /** True if the pattern predicts this is a personal (non-reimbursable) expense */
+  isPersonalPrediction: boolean;
 }
 
 /**

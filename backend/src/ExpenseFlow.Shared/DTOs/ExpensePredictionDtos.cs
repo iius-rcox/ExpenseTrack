@@ -33,6 +33,12 @@ public class PatternSummaryDto
 
     /// <summary>Calculated accuracy from confirm/reject ratio.</summary>
     public decimal AccuracyRate { get; set; }
+
+    /// <summary>
+    /// Active classification: "Business", "Personal", or null (undetermined).
+    /// Based on confirm/reject feedback thresholds.
+    /// </summary>
+    public string? ActiveClassification { get; set; }
 }
 
 /// <summary>
@@ -88,6 +94,12 @@ public class PatternDetailDto
     /// <summary>Accuracy rate (ConfirmCount / (ConfirmCount + RejectCount)).</summary>
     public decimal AccuracyRate { get; set; }
 
+    /// <summary>
+    /// Active classification: "Business", "Personal", or null (undetermined).
+    /// Based on confirm/reject feedback thresholds.
+    /// </summary>
+    public string? ActiveClassification { get; set; }
+
     /// <summary>Pattern creation date.</summary>
     public DateTime CreatedAt { get; set; }
 
@@ -129,6 +141,12 @@ public class PredictionSummaryDto
 
     /// <summary>True if this was manually set by user (not auto-predicted).</summary>
     public bool IsManualOverride { get; set; }
+
+    /// <summary>
+    /// True if this prediction is from a personal pattern (transaction is likely NOT a business expense).
+    /// Allows the UI to proactively show "likely personal" transactions.
+    /// </summary>
+    public bool IsPersonalPrediction { get; set; }
 }
 
 /// <summary>
@@ -180,6 +198,12 @@ public class PredictionDetailDto
 
     /// <summary>True if this was manually set by user (not auto-predicted).</summary>
     public bool IsManualOverride { get; set; }
+
+    /// <summary>
+    /// True if this prediction is from a personal pattern (transaction is likely NOT a business expense).
+    /// Allows the UI to proactively show "likely personal" transactions.
+    /// </summary>
+    public bool IsPersonalPrediction { get; set; }
 }
 
 /// <summary>

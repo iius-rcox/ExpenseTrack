@@ -134,7 +134,8 @@ public class PredictionsController : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<ActionResult<PredictionSummaryDto>> GetPredictionForTransaction(Guid transactionId)
     {
-        var prediction = await _predictionService.GetPredictionForTransactionAsync(transactionId);
+        var user = await _userService.GetOrCreateUserAsync(User);
+        var prediction = await _predictionService.GetPredictionForTransactionAsync(user.Id, transactionId);
         if (prediction == null)
         {
             return NoContent();

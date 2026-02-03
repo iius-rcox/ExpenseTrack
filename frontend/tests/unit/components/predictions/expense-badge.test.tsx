@@ -32,6 +32,7 @@ describe('ExpenseBadge', () => {
     suggestedCategory: 'Food & Beverage',
     suggestedGLCode: '6100',
     isManualOverride: false,
+    isPersonalPrediction: false,
     ...overrides,
   });
 
